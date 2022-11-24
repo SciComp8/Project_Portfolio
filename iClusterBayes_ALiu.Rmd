@@ -1,0 +1,1749 @@
+---
+title: "Clustering Analysis of Lipidomics and Transcriptomics Profiles in Breast Tissues"
+author: "Anni Liu"
+date: "May 30, 2022"
+output: 
+  rmdformats::readthedown:
+    fig_height: 4.5
+    fig_width: 4.5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  options(scipen = 999, digits = 2),
+  cache = TRUE,
+  error = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  tidy.opts = list(width.cutoff = 60),
+  tidy = TRUE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Overall summary
+
+* We first perform the principal component analyses on 171 lipid species including macro lipid groups, 4032 most variable genes, and combined data on these lipid species and genes in 75 patients, respectively, to explore clustering patterns. In two-dimensional scatter plots of principal components, lipid species show the evident 2 clusters. However, the clustering pattern is not very apparent in genes or combined data on lipid species and genes.
+* We next apply a novel Bayesian latent variable model for integrative clustering analysis on 171 lipid species and 4032 most variable genes in 75 patients. To find the appropriate number of clusters co-driven by lipid species and genes, we define the driver feature with the posterior probability greater than 0.5; choose a grid of `prior.gamma` values (0.5, 0.6, 0.7, or 0.8) and `thin` values (1, 2, or 3); and plot the line graphs between number of cluster - 1 and BIC, and between number of cluster - 1 and deviance ratio. `prior.gamma` is a parameter of the prior probability for the indicator variable $\gamma$ of the lipid species expression data set and gene expression data set. This indicator variable refers to the probability of an omics feature being selected as a driving factor for clustering. It follows Bernoulli distribution with probability q ($\gamma$ ~ $Bernoulli(q)$). It has been shown that there is very little effect on the results by choosing the prior (`prior.gamma`) in the range of 0.05 - 0.5. `thin` is a parameter to thin the Markov chain Monte Carlo (MCMC) chain in order to reduce autocorrelation, in other words, when thin = t, we discard t − 1 out of every t observations. When thin = 1, all sampling values are kept. The number of cluster is chosen as 2 as the line graphs show the lowest BIC while the highest deviance ratio. We plot heatmaps to illustrate the expression levels of driver lipid species and genes between clusters. We select the model with `prior.gamma` = 0.5, and `thin` = 1, compared to other models with different configurations on these two parameters, since the corresponding heatmap shows the apparent different patterns in lipid and gene expression between two clusters and this configuration is a default one. The heatmap corresponding to this model shows 9 lipid species including 3 macro lipid groups, and 1765 genes co-drive the formation of two clusters.
+* We use boxplots and Wilcoxon rank sum test to further examine the expression distribution of each driver lipid and gene between clusters. We observe that nearly all driver lipids and genes have statistically significant distinctive expression distributions between two clusters (undajusted p < 0.05).   
+* We extract the cluster labels and assign each of them to each of 75 patients. We describe and compare the distributions of clinical characteristics such as age, race, body mass index (BMI), crown-like structure (CLS) status, tumor phenotype, invasive status, and BRCA mutation between clusters, using the median (interquartile range) and Wilcoxon rank sum (exact) test for continuous variables or using n (proportion) and Fisher's exact test or Person's Chi-squared test for categorical variables. We observe that 9 lipids including 3 macro lipid groups and 1765 genes, which co-drive the formation of two clusters, are significantly associated with the breast cancer phenotype (p = 0.027), invasive status (p = 0.009), and BRCA mutation status (p = 0.035). However, these driver lipid species and genes are not significantly associated with age, race, menopausal status, BMI, total fat, trunk fat, dyslipidemia, adipocyte diameter, CLS, aromatase, hypertension, diabetes mellitus, leptin, or IL-6.
+
+
+# Principal component analysis
+## Lipidomics 
+```{r fig.width=10}
+# Load data
+lipid_data <- readRDS(file = "lipid_data_clean_3.RDS") 
+
+# Plot correlation matrix between lipid species
+corrplot::corrplot(cor(lipid_data, method = "spearman"), 
+                   method = "color", # Set visualization method of the correlation matrix
+                   mar = c(0, 0, 3, 0), # Set margin
+                   tl.cex = 0.1, # Set size of text label
+                   tl.col = "black", # Set color of text label
+                   order = "hclust") # Set ordering method of the correlation matrix
+mtext("Correlation matrix of the data", at = 55, line = 1, cex = 1.2) # Add title
+mtext("Correlation\ncoefficient", at = 180, line = 0.5, cex = 0.7) # Add legend title
+```
+
+```{r}
+# Perform PCA
+pca_data <- prcomp(x = lipid_data, center = TRUE, scale. = TRUE) # Scale data
+pca_result <- summary(pca_data) # Summarize PCA results
+pca_result # Output PCA result
+```
+
+```{r}
+# Create a dataframe on cumulative proportion of variation explained by each PC
+library(tidyverse)
+var_explained_df <- data.frame(pc = paste0("PC", 1:75), # Add PC column
+                               var_explained = pca_result$importance[3, ]) # Add variation column
+
+# Make a plot of the cumulative variance explained by the PCs
+var_explained_df %>%
+  ggplot(aes(x = factor(pc, levels = pc), # Initialize ggplot object; order PC
+             y = var_explained, 
+             group = 1)) + # Remove the default grouping
+    geom_point() + # Make points
+    geom_line() + # Make lines
+    labs(
+      title = "Scree plot: PCA", # Add title
+      x = "PC", # Relabel x-axis
+      y = "Cumulative variation explained") + # Relabel y-axis
+    theme_classic() + # Stylize plot
+    theme(axis.text.x = element_text(size = 5, # Adjust label size
+                                     angle = 90, # Rotate x-axis label
+                                     vjust = 0.5, # Adjust x-axis label location
+                                     hjust = 0.5)) # Adjust x-axis label location
+```
+
+```{r}
+library(factoextra)
+fviz_eig(pca_data, addlabels = TRUE, ylim = c(0, 50), ncp = 20)
+```
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point"
+             )
+```
+
+\
+
+## Transcriptomics
+```{r}
+# Load data
+rna_data <- readRDS(file = "top_var_gene_0.5.RDS") 
+```
+
+```{r eval=FALSE}
+# Plot correlation matrix between lipid species
+corrplot::corrplot(cor(rna_data, method = "spearman"), 
+                   method = "color", # Set visualization method of the correlation matrix
+                   mar = c(0, 0, 3, 0), # Set margin
+                   tl.cex = 0.1, # Set size of text label
+                   tl.col = "black", # Set color of text label
+                   order = "hclust") # Set ordering method of the correlation matrix
+# mtext("Correlation matrix of the data", at = 55, line = 1, cex = 1.2) # Add title
+# mtext("Correlation\ncoefficient", at = 300, line = 0.5, cex = 0.7) # Add legend title
+```
+
+```{r echo=FALSE, fig.align="center", out.width="90%"}
+knitr::include_graphics("rna_corr.png")
+```
+
+```{r}
+# Perform PCA
+pca_data <- prcomp(x = rna_data, center = TRUE, scale. = TRUE) # Scale data
+pca_result <- summary(pca_data) # Summarize PCA results
+```
+
+```{r}
+# Create a dataframe on cumulative proportion of variation explained by each PC
+var_explained_df <- data.frame(pc = paste0("PC", 1:75), # Add PC column
+                               var_explained = pca_result$importance[3, ]) # Add variation column
+
+# Make a plot of the cumulative variance explained by the PCs
+var_explained_df %>%
+  ggplot(aes(x = factor(pc, levels = pc), # Initialize ggplot object; order PC
+             y = var_explained, 
+             group = 1)) + # Remove the default grouping
+    geom_point() + # Make points
+    geom_line() + # Make lines
+    labs(
+      title = "Scree plot: PCA", # Add title
+      x = "PC", # Relabel x-axis
+      y = "Cumulative variation explained") + # Relabel y-axis
+    theme_classic() + # Stylize plot
+    theme(axis.text.x = element_text(size = 5, # Adjust label size
+                                     angle = 90, # Rotate x-axis label
+                                     vjust = 0.5, # Adjust x-axis label location
+                                     hjust = 0.5)) # Adjust x-axis label location
+```
+
+```{r}
+fviz_eig(pca_data, addlabels = TRUE, ylim = c(0, 50), ncp = 20)
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point"
+             )
+```
+
+
+## Combine lipidomics and transcriptomics
+```{r eval=FALSE}
+lipid_rna_data <- cbind(lipid_data, rna_data)
+lipid_rna_data <- saveRDS(lipid_rna_data, file = "lipid_rna_data.RDS")
+```
+
+```{r}
+# Load new data
+lipid_rna_data <- readRDS(file = "lipid_rna_data.RDS") 
+```
+
+```{r eval=FALSE}
+# Plot correlation matrix between lipid species
+corrplot::corrplot(cor(lipid_rna_data, method = "spearman"), 
+                   method = "color", # Set visualization method of the correlation matrix
+                   mar = c(0, 0, 3, 0), # Set margin
+                   tl.cex = 0.1, # Set size of text label
+                   tl.col = "black", # Set color of text label
+                   order = "hclust") # Set ordering method of the correlation matrix
+# mtext("Correlation matrix of the data", at = 55, line = 1, cex = 1.2) # Add title
+# mtext("Correlation\ncoefficient", at = 180, line = 0.5, cex = 0.7) # Add legend title
+```
+
+```{r echo=FALSE, fig.align="center", out.width="90%"}
+knitr::include_graphics("lipid_rna_corr.png")
+```
+
+```{r}
+# Perform PCA
+pca_data <- prcomp(x = lipid_rna_data, center = TRUE, scale. = TRUE) # Scale data
+pca_result <- summary(pca_data) # Summarize PCA results
+```
+
+```{r}
+# Create a dataframe on cumulative proportion of variation explained by each PC
+var_explained_df <- data.frame(pc = paste0("PC", 1:75), # Add PC column
+                               var_explained = pca_result$importance[3, ]) # Add variation column
+
+# Make a plot of the cumulative variance explained by the PCs
+var_explained_df %>%
+  ggplot(aes(x = factor(pc, levels = pc), # Initialize ggplot object; order PC
+             y = var_explained, 
+             group = 1)) + # Remove the default grouping
+    geom_point() + # Make points
+    geom_line() + # Make lines
+    labs(
+      title = "Scree plot: PCA", # Add title
+      x = "PC", # Relabel x-axis
+      y = "Cumulative variation explained") + # Relabel y-axis
+    theme_classic() + # Stylize plot
+    theme(axis.text.x = element_text(size = 5, # Adjust label size
+                                     angle = 90, # Rotate x-axis label
+                                     vjust = 0.5, # Adjust x-axis label location
+                                     hjust = 0.5)) # Adjust x-axis label location
+```
+
+```{r}
+fviz_eig(pca_data, addlabels = TRUE, ylim = c(0, 50), ncp = 20)
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point"
+             )
+```
+
+
+```{r eval=FALSE}
+clinical_data <- readRDS(file = "clinical_data_clean.RDS")
+```
+
+# iClusterBayes
+
+Guide: [Bioconductor of iClusterBayes](https://www.bioconductor.org/packages/release/bioc/html/iClusterPlus.html)
+
+```{r eval=FALSE}
+# Install packages
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("iClusterPlus")
+BiocManager::install("GenomicRanges")
+```
+
+```{r}
+# Load packages
+my_packages <- c("iClusterPlus", "GenomicRanges", "gplots", "lattice")
+easypackages::libraries(my_packages)
+```
+
+## Build the Bayesian clustering model {.tabset}
+
+```{r}
+# Load lipid and rna data, separately
+lipid_data <- readRDS(file = "lipid_data_clean_3.RDS") 
+rna_data <- readRDS(file = "top_var_gene_0.5.RDS") 
+```
+
+Tune `prior.gamma` and `thin` parameters.
+
+* `prior.gamma` refers to the prior probability for the indicator variable $\gamma$ of each data set. This indicator variable follows Bernoulli distribution with probability q ($\gamma$ ~ $Bernoulli(q)$) of an omics feature being selected as a driving factor for clustering. There was very little effect on the results by choosing the prior (`prior.gamma`) in the range of 0.05 – 0.5. 
+* `thin` is a parameter to thin the Markov chain Monte Carlo (MCMC) chain in order to reduce autocorrelation. **Discard t − 1 out of every t observations**. When thin = 1, all sampling values are kept.
+
+Other concepts:
+
+* **Burn-in** is the practice of throwing away some iterations at the beginning of an MCMC run. The burn-in notion says we start somewhere, say at x, then we run the Markov chain for n steps, from which we throw away all the data (no output). This is the burn-in period. After the burn-in we run normally, using each iterate in our MCMC calculations.
+
+### `prior.gamma` = 0.5, `thin` = 1  
+
+Among all heatmaps of gene expression and lipid expression which drive the clustering, we find when `prior.gamma` = 0.5 and `thin` = 1, the driver genes and lipids are differentially expressed between two clusters.
+
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.5, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 1) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r eval=FALSE}
+save.image(file = "Bayfit_0.5_1.RData")
+```
+
+```{r}
+load("Bayfit_0.5_1.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(5.5,5.5,0.5,0.5),
+    mfrow = c(2,1))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19)),
+     cex.main = 1.5, 
+     cex.lab = 1.5, 
+     cex.axis = 1.5) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19)),
+     cex.main = 1.5, 
+     cex.lab = 1.5, 
+     cex.axis = 1.5) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+# Truncate the values for a better image plot
+# cn.image <- gbm.cn
+# cn.image[cn.image > 1.5] <- 1.5
+# cn.image[cn.image < -1.5] <- -1.5
+# exp.image <- gbm.exp
+# exp.image[exp.image>2.5] <- 2.5
+# exp.image[exp.image< -2.5] <- -2.5
+###
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+###
+# chr=unlist(strsplit(colnames(gbm.cn),"\\."))
+# chr=chr[seq(1,length(chr),by=2)]
+# chr=gsub("chr","",chr)
+# chr=as.numeric(chr)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+### `prior.gamma` = 0.6, `thin` = 1  
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.6, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 1) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r eval=FALSE}
+save.image(file = "Bayfit_0.6_1.RData")
+```
+
+```{r}
+load("Bayfit_0.6_1.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+### `prior.gamma` = 0.7, `thin` = 1 
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.7, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 1) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r eval=FALSE}
+save.image(file = "Bayfit_0.7_1.RData")
+```
+
+```{r}
+load("Bayfit_0.7_1.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+### `prior.gamma` = 0.8, `thin` = 1 
+```{r}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.8, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 1) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r eval=FALSE}
+save.image(file = "Bayfit_0.8_1.RData")
+```
+
+```{r}
+load("Bayfit_0.8_1.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+
+### `prior.gamma` = 0.5, `thin` = 2
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.5, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 2) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r eval=FALSE}
+save.image(file = "Bayfit_0.5_2.RData")
+```
+
+```{r}
+load("Bayfit_0.5_2.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+
+### `prior.gamma` = 0.6, `thin` = 2
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.6, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 2) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r eval=FALSE}
+save.image(file = "Bayfit_0.6_2.RData")
+```
+
+```{r}
+load("Bayfit_0.6_2.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+### `prior.gamma` = 0.7, `thin` = 2
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.7, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 2) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r eval=FALSE}
+save.image(file = "Bayfit_0.7_2.RData")
+```
+
+```{r}
+load("Bayfit_0.7_2.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+### `prior.gamma` = 0.8, `thin` = 2
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.8, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 2) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r eval=FALSE}
+save.image(file = "Bayfit_0.8_2.RData")
+```
+
+```{r}
+load("Bayfit_0.8_2.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+### `prior.gamma` = 0.5, `thin` = 3
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.5, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 3) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r}
+save.image(file = "Bayfit_0.5_3.RData")
+```
+
+```{r}
+load("Bayfit_0.5_3.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+### `prior.gamma` = 0.6, `thin` = 3
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.6, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 3) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r}
+save.image(file = "Bayfit_0.6_3.RData")
+```
+
+```{r}
+load("Bayfit_0.6_3.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+### `prior.gamma` = 0.7, `thin` = 3
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.7, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 3) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r}
+save.image(file = "Bayfit_0.7_3.RData")
+```
+
+```{r}
+load("Bayfit_0.7_3.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+### `prior.gamma` = 0.8, `thin` = 3
+```{r eval=FALSE}
+set.seed(999)
+date() # Start time
+bayfit <- tune.iClusterBayes(cpus = 1, # Number of CPU used for parallel computation
+                             dt1 = as.matrix(rna_data), # Matrix object
+                             dt2 = as.matrix(lipid_data),
+	                           type = c("gaussian", "gaussian"),
+                           	 K = 1:6, # Each element is the number of eigen features; Given k, the number of cluster is k+1
+                             n.burnin = 1000, # Number of MCMC burnin
+                             n.draw = 1200, # Number of MCMC draw
+                             prior.gamma = rep(0.8, 2),
+	                           sdev = 0.5, # Standard deviation of random walk proposal for the latent variable
+                             thin = 3) # A parameter to thin the MCMC chain in order to reduce autocorrelation
+date() # End time 
+```
+
+**Save and load images**
+```{r}
+save.image(file = "Bayfit_0.8_3.RData")
+```
+
+```{r}
+load("Bayfit_0.8_3.RData")
+```
+
+**Select an optimal value for k**
+```{r}
+allBIC <- NULL
+devratio <- NULL
+nK <- length(bayfit$fit)
+for(i in 1:nK){
+  allBIC <- c(allBIC, bayfit$fit[[i]]$BIC)
+  devratio <- c(devratio, bayfit$fit[[i]]$dev.ratio)}
+
+# BIC and percent of explained variation vs. K.
+par(mar = c(4.0,4.0,0.5,0.5),
+   mfrow = c(1,2))
+plot(1:nK, allBIC,
+     type = "b", 
+     xlab = "k",
+     ylab = "BIC",
+     pch = c(19,rep(1,19))) # From the BIC plot, we see that k = 1 is an optimal solution
+plot(1:nK, devratio,
+     type = "b",
+     xlab = "k",
+     ylab = "Deviance ratio",
+     pch = c(19,rep(1,19))) # From the deviance ratio plot, we see that k = 1 is an optimal solution
+```
+
+**Posterior probabilities of genomic and lipidomic features**
+```{r}
+par(mfrow = c(2, 1))
+k = 1
+plot(bayfit$fit[[k]]$beta.pp[[1]], xlab = "Genes", ylab = "Posterior probability", main = "Expression")
+plot(bayfit$fit[[k]]$beta.pp[[2]], xlab = "Lipids", ylab = "Posterior probability", main = "Expression")
+```
+
+**Generate the heatmap**
+```{r}
+col.scheme = alist()
+col.scheme[[1]] = bluered(256)
+col.scheme[[2]] = bluered(256)
+k = 1
+rna_data_rank <- apply(rna_data, 2, rank)
+lipid_data_rank <- apply(lipid_data, 2, rank)
+plotHMBayes(fit = bayfit$fit[[k]], # A iClusterBayes object
+            datasets = list(rna_data_rank, lipid_data_rank), 
+            type = c("gaussian", "gaussian"), 
+            col.scheme = col.scheme, 
+            threshold = c(0.5, 0.5), # When sparse is TRUE, a vector of threshold values to include the genomic features on the heatmap. For each data set, a feature with posterior probability greater than the threshold will be included. Default value is 0.5 for each data set.
+            row.order = c(T, T), # A vector of logical values each specify whether the genomic features in the corresponding data matrix should be reordered by similarity. Default is TRUE
+            chr = NULL, # A vector of chromosome number
+            plot.chr = c(F, F), # A vector of logical values each specify whether to annotate chromosome number on the left of the panel. Typically used for copy number data type. Default is FALSE.
+            sparse = c(T, T), # A vector of logical values each specify whether to plot the top cluster-discriminant features. Default is FALSE.
+            cap = c(F, F)) # Image color option
+```
+
+## {-}
+
+## Visualize the driver genes between two clusters under qt = 0.05, thin = 1
+
+### Extract the genes driving the clustering
+
+```{r}
+# Load images
+load("Bayfit_0.5_1.RData")
+
+# Extract the clustering labels
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+
+# Extract the indices of genes driving the clustering
+k <- 1
+rna_driver_index <- which(bayfit$fit[[k]]$beta.pp[[1]] > 0.5)
+```
+
+```{r fig.width=9, fig.height=12}
+# Plot the first 9 driver genes using the boxplot
+library(gridExtra)
+library(tidyverse)
+library(ggpubr)
+driver_rna_label <- cbind(rna_data[rna_driver_index], cluster_label)
+predictor <- colnames(rna_data[rna_driver_index])[1:9]
+boxplot <- function(var){
+  ggplot(data = driver_rna_label,
+         aes(y = get(var), x = cluster_label)) + 
+    geom_boxplot(aes(group = cluster_label, color = cluster_label),
+                 lwd = 1.5) + 
+    geom_jitter(aes(color = cluster_label)) + 
+    theme_classic() + 
+    guides(color = "none") + # Remove legends
+    labs(
+      y = paste0(var, " expression"),
+      x = "Cluster") + 
+    stat_compare_means(method = "wilcox.test") + 
+    scale_color_manual(values = c("#0073C2FF", "#EFC000FF"))
+}
+plot <- lapply(predictor, boxplot)
+grid.arrange(do.call("arrangeGrob", c(plot, ncol = 3)))
+```
+
+```{r fig.width=9, fig.height=12}
+# Batch plot 1764 driver genes using the boxplot
+for (i in seq(1, 1764, 9)) {
+  name_range <- seq(i, i + 8, 1)
+  predictor <- colnames(rna_data[rna_driver_index])[name_range]
+  # print(predictor)
+  plot <- lapply(predictor, boxplot)
+  grid.arrange(do.call("arrangeGrob", c(plot, ncol = 3)))
+}
+```
+
+```{r fig.width=3, fig.height=3}
+# Plot the 1765th driver gene using the boxplot
+predictor <- colnames(rna_data[rna_driver_index])[1765]
+boxplot <- function(var){
+  ggplot(data = driver_rna_label,
+         aes(y = get(var), x = cluster_label)) + 
+    geom_jitter() + 
+    geom_boxplot(aes(group = cluster_label, fill = cluster_label)) + 
+    theme_bw() + 
+    scale_fill_manual(values = c("grey70", "#526593")) + 
+    guides(fill = FALSE) + # Remove legends
+    labs(
+      y = var,
+      x = "Cluster") + 
+    stat_compare_means(method = "wilcox.test")
+}
+plot <- lapply(predictor, boxplot)
+grid.arrange(do.call("arrangeGrob", c(plot, ncol = 1)))
+```
+
+## Visualize the driver lipids between two clusters under qt = 0.05, thin = 1
+
+### Extract the lipids driving the clustering
+```{r}
+# Load images
+load("Bayfit_0.5_1.RData")
+
+# Extract the clustering labels
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+
+# Extract the indices of lipids driving the clustering
+k <- 1
+lipid_driver_index <- which(bayfit$fit[[k]]$beta.pp[[2]] > 0.5)
+```
+
+
+```{r fig.width=9, fig.height=12}
+# Batch plot driver lipids using the boxplot
+library(gridExtra)
+library(tidyverse)
+library(ggpubr)
+predictor <- colnames(lipid_data[lipid_driver_index])
+driver_lipid_label <- cbind(lipid_data[lipid_driver_index], cluster_label)
+boxplot <- function(var){
+  ggplot(data = driver_lipid_label,
+         aes(y = get(var), x = cluster_label)) + 
+    geom_boxplot(aes(group = cluster_label, color = cluster_label),
+                 lwd = 1.5) + 
+    geom_jitter(shape = 4) + # Use different shapes
+    theme_classic() + 
+    scale_color_manual(values = c("#0073C2FF", "#EFC000FF")) + 
+    guides(color = "none") + # Remove legends
+    labs(
+      y = paste0(var, " expression"),
+      x = "Cluster") + 
+    stat_compare_means(method = "wilcox.test")
+}
+plot <- lapply(predictor, boxplot)
+grid.arrange(do.call("arrangeGrob", c(plot, ncol = 3)))
+```
+
+## Examine clinical characterisitcs between two clusters
+```{r}
+library(gtsummary)
+library(tidyverse)
+load("Bayfit_0.5_1.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+
+# clinical_data_cluster %>%
+#   dplyr::select(everything()) %>%
+#   tbl_summary(by = cluster_label,
+#               percent = "column")
+```
+
+**Interpretation**:
+
+* 1765 genes and 9 lipids including 3 macro lipid groups, which co-drive the formation of two clusters, are significantly associated with the breast cancer phenotype (p = 0.027), invasive status (p = 0.009), and BRCA mutation status (p = 0.035).
+* However, these driver lipid species and genes are not significantly associated with age, race, menopausal status, BMI, total fat, trunk fat, dyslipidemia, adipocyte diameter, CLS, aromatase, hypertension, diabetes mellitus, leptin, or IL-6.
+
+
+```{r}
+
+library(tidyverse)
+lipid_rna_data <- readRDS(file = "lipid_rna_data.RDS") 
+load("Bayfit_0.5_1.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+
+# Perform PCA
+pca_data <- prcomp(x = lipid_rna_data, center = TRUE, scale. = TRUE) # Scale data
+pca_result <- summary(pca_data) # Summarize PCA results
+
+library(factoextra)
+# fviz_pca_ind(pca_data,
+#              geom.ind = "point",
+#              col.ind = clinical_data_cluster$cluster_label, # color by groups
+#              palette = c("#FFC72C", "#B31B1B"),
+#              pointsize = 2.5, 
+#              ellipse.level = 0.95,
+#              addEllipses = FALSE, # Concentration ellipses
+#              legend.title = "Groups") +
+#   theme_classic() + 
+#   theme(axis.text = element_text(size = 12),
+#         legend.title = element_text(size = 11),
+#         legend.text = element_text(size = 11)) 
+
+legend_title <- expression(paste(q[t], " = 0.5, thin = 1"))
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#0073C2FF", "#EFC000FF"), # Use this color set with great contrasts
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = legend_title) + 
+  theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11))
+```
+
+
+```{r}
+load("Bayfit_0.5_2.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+
+###### 画PCA时不需要运行下面代码  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+
+# clinical_data_cluster %>%
+#   dplyr::select(everything()) %>%
+#   tbl_summary(by = cluster_label,
+#               percent = "column")
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.5, thin = 2") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.5_3.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.5, thin = 3") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.6_1.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.6, thin = 1") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.6_2.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.6, thin = 2") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.6_3.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.6, thin = 3") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.7_1.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.7, thin = 1") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.7_2.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.7, thin = 2") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.7_3.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.7, thin = 3") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.8_1.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.8, thin = 1") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.8_2.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.8, thin = 2") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+```{r}
+load("Bayfit_0.8_3.RData")
+cluster_label <- as.factor(bayfit$fit[[1]]$clusters)
+clinical_data_clean <- readRDS(file = "clinical_data_clean.RDS")
+clinical_data_cluster <- cbind(clinical_data_clean, cluster_label)
+
+clinical_data_cluster <- clinical_data_cluster %>%
+  mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
+         cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
+  
+clinical_data_cluster %>%
+  dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
+  tbl_summary(by = cluster_label,
+              percent = "column") %>%
+  add_p()
+```
+
+```{r}
+fviz_pca_ind(pca_data,
+             geom.ind = "point",
+             col.ind = clinical_data_cluster$cluster_label, # color by groups
+             palette = c("#A73030FF", "#003C67FF"),
+             addEllipses = FALSE, # Concentration ellipses
+             legend.title = "qt = 0.8, thin = 3") + 
+ theme_classic() + 
+  theme(axis.text = element_text(size = 12),
+        legend.title = element_text(size = 11),
+        legend.text = element_text(size = 11)) 
+```
+
+# R session info
+```{r}
+sessionInfo()
+```
+
