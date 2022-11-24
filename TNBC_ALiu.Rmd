@@ -21,7 +21,6 @@ editor_options:
 #################################################################
 ##                    Previous analysis plan                   ##
 #################################################################
-##----------XKZ Comments start--------------------------------------------
 ## Variables to add:
 ## T2LR: time from Date.of.Diagnosis to date of local recurrence
 ## T2DR: time from Date.of.Diagnosis to date of distant recurrence
@@ -42,7 +41,6 @@ editor_options:
 ##       change to NA if no recurrence and time to last follow up since diagnosis less than 5 years  
 ## DR5y (5-year distant recurrence): defined in similar fashion as above
 ## NP5y (5-year new primary): defined in similar fashion as above
-##----------------------xkz comments end----------------------------------------------------------
 ```
 
 
