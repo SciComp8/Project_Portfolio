@@ -1,3 +1,3 @@
 # omics
 
-This repository contains codes affiliated with the omics projects. 
+This repository contains codes affiliated with omics projects. 
