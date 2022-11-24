@@ -1,0 +1,3585 @@
+---
+title: "Lipidomic Project - Section: Lipidomic Profiling in Women at High Risk or Diagnosed with Breast Cancer Highlights Obesity-Related Changes in Lipid Composition"
+author: "Anni Liu, B.M., D.M.Sc., M.Sc."
+date: "October 5, 2022"
+output:
+  word_document:
+    fig_height: 4.5
+    fig_width: 4.5
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  options(scipen = 999, digits = 4),
+  cache = TRUE,
+  error = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  tidy.opts = list(width.cutoff = 60),
+  tidy = TRUE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Load images and libraries
+```{r start, eval=FALSE}
+# Load image
+load(file = "2022Oct9.RData")
+
+# Save image
+save.image(file = "2022Oct9.RData")
+
+# Load libraries
+easypackages::libraries("tidyverse", "ggpubr", "gridExtra", "broom", "circlize", "ComplexHeatmap", "Hmisc")
+```
+
+```{r}
+lipid_structure <- readRDS("lipid_structure.RDS")
+```
+
+# Data preprocess for lipidomics
+
+## Import data
+
+```{r eval=FALSE}
+# Load and wrangle lipidomics data. These lipid data include the individual lipid species and the macro lipid groups containing individual lipid species.
+## PosConcSamples Data
+lipid_data_1 <- readxl::read_xlsx("MSK-WCMC Data w CVs_18FEB21.xlsx", sheet = "PosConcSamples Data", range = c("A3:CX267"), col_names = TRUE) %>% rename("Sample ID" = "Match", "Replicate" = "Sample_Replicate", "Sample Name PosConc" = "Row Labels")
+
+## NegConcSamples Data
+lipid_data_2 <- readxl::read_xlsx("MSK-WCMC Data w CVs_18FEB21.xlsx", sheet = "NegConcSamples Data", range = "A3:EC267", col_names = TRUE) %>% rename("Sample ID" = "...1", "Replicate" = "...2", "Sample Name NegConc" = "Row Labels")
+
+## PosSphingosineConc Data
+lipid_data_3 <- readxl::read_xlsx("MSK-WCMC Data w CVs_18FEB21.xlsx", sheet = "PosSphingosineConc Data", range = "A2:G266", col_names = TRUE) %>% rename("Sample Name PosSphingosineConc" = "Sample")
+
+## Merge all lipid datasets
+lipid_data_full <- full_join(lipid_data_1, lipid_data_2, by = c("Sample ID" = "Sample ID", "Replicate" = "Replicate")) %>% full_join(lipid_data_3, by = c("Sample ID" = "Sample ID", "Replicate" = "Replicate"))
+
+## Remove unnecessary columns
+lipid_data_full <- lipid_data_full %>% select(-c("Replicate", "Sample Name PosConc", "Sample Name NegConc", "Sample Name PosSphingosineConc", "SampleList.File Text.x", "SampleList.File Text.y", "SampleList.File Text")) 
+
+# Number of patients
+length(unique(lipid_data_full$`Sample ID`)) # There are 88 patients
+# Number of lipid species
+ncol(lipid_data_full) - 1 # There are 230 types of lipid species, including 13 macro lipid groups
+a <- colnames(lipid_data_full)[-1]
+# Print out lipid names
+data.frame(Macro = a[grep("macro", a)])
+data.frame(Individual = a[grep("macro", a, invert = TRUE)])
+
+# Save cleaned data to disk
+saveRDS(object = lipid_data_full, file = "lipid_data_full.RDS")
+
+# Load cleaned lipid data
+lipid_data_full <- readRDS(file = "lipid_data_full.RDS")
+```
+
+## Filter lipids - 50% rule
+
+We use the following criteria 1 and 2 to select eligible lipids having reliable measurements.
+
+
+* Criterion 1: Identify a specific type of lipid which has less than or equal to 50% (44 in count) patients who miss all 3 replicates of the lipid; we will keep this lipid in the dataset.
+
+* Criterion 2: Identify a specific type of lipid whose inter-assay coefficient of variation (cv) are less than 0.2; we will keep this lipid in the dataset. 
+
+```{r eval=FALSE}
+# Create a user-written function to select eligible lipids, using the frequency of patients who miss all 3 replicates of a lipid 
+select_lipid_OOR <- function(threshold_total_OOR) {
+  step = number_OOR = total_OOR = 0; type_OOR <- vector(length = 0)
+  for (type in c(2:length(lipid_data_full))) { # Loop over each lipid type
+    total_OOR = 0 # Clear total_OOR for next total_OOR
+    for (i in seq(from = 1, to = dim(lipid_data_full)[1], by = 3)) { # Loop over each group of triple replicates for a patient
+      while (step <= 2) {
+        if (lipid_data_full[i + step, type] == "OOR") {number_OOR = number_OOR + 1}
+        step = step + 1}
+      if (number_OOR == 3) {total_OOR <- total_OOR + 1}
+      step = number_OOR = 0 } # Clear step and number_OOR for next patient, under the same lipid column
+      if (total_OOR <= threshold_total_OOR) {type_OOR <- append(type_OOR, type)}}; return(type_OOR)} # Store eligible lipids in type_OOR
+
+# Test the accuracy of the user-written function select_lipid()
+# step = number_OOR = total_OOR = 0; type_OOR <- vector(length = 0)
+# for (type in c(2:2)) { # Loop over the lipid 15:0:18:1 (d7) PC macro
+#   total_OOR = 0 # Clear total_OOR for next loop
+#   for (i in seq(from = 1, to = dim(lipid_data_full)[1], by = 3)) { # Loop over each group of triple replicates for a patient
+#     while (step <= 2) {
+#       if (lipid_data_full[i + step, type] == "OOR") {number_OOR = number_OOR + 1}
+#       step = step + 1}
+#     print(number_OOR)
+#     if (number_OOR == 3) {total_OOR <- total_OOR + 1}
+#     step = number_OOR = 0 } # Clear step and number_OOR for next patient, under the same lipid column
+#     print(total_OOR)
+#     if (total_OOR <= 80) {type_OOR <- append(type_OOR, type)}}
+
+# Store the eligible lipid indices using the particular criterion
+## Criterion 1: Identify a specific type of lipid which has less than or equal to 50% (44 in count) patients who miss all 3 replicates of the lipid; we will keep this lipid in the dataset.
+lipid_50 <- select_lipid_OOR(threshold_total_OOR = 44)
+## Create a lipid dataset containing sample id and eligible lipids
+lipid_eligible <- lipid_data_full[, c(1, lipid_50)]
+
+# Save eligible lipid data to disk
+saveRDS(object = lipid_eligible, file = "lipid_eligible_50rule.RDS")
+```
+
+**Interpretation**:
+
+* After filtering lipids using the criteria 1 and 2, 143 eligible lipids remain in our dataset.
+* We exclude 87 metabolites that show missing values for 50% of participants [Cite PNAS]. 
+
+```{r eval=FALSE}
+# Transform OOR into NA
+# Transform all character columns to numerical columns, except the column of sample id
+library("naniar")
+oor_fun <- function(dataset) {
+  newdata <- get(dataset) %>% 
+    replace_with_na_all(condition = ~.x == "OOR") %>% 
+    mutate(across(-c("Sample ID"), function(x) as.numeric(x))) %>% 
+    mutate(across(-c("Sample ID"), function(x) x + 0.5))}
+lipid_eligible <- oor_fun(dataset = "lipid_eligible")
+
+# Save cleaned eligible lipid data to disk
+saveRDS(object = lipid_eligible, file = "lipid_eligible.RDS")
+```
+
+## Imputation
+```{r}
+# Impute the missing portion of each lipid using the minimum value
+lipid_eligible_MM <- lipid_eligible %>% 
+  mutate(across(-c("Sample ID"), function(x) ifelse(is.na(x), min(x, na.rm = T), x)))
+
+# Log transform for normalization
+lipid_eligible_MM[, -1] <- log(lipid_eligible_MM[, -1])
+```
+
+## Relabel lipid species names
+
+```{r}
+label(lipid_eligible_MM$`Sample ID`) <- "Sample ID"
+
+# SIL standards
+label(lipid_eligible_MM$`15:0:18:1 (d7) PC macro`) <- "15:0/18:1(d7) PC (pos mode)"
+label(lipid_eligible_MM$`17:0:14:1 PC macro`) <- "17:0/14:1 PC (pos mode)"
+label(lipid_eligible_MM$`18:1 (d7) LPC macro.x`) <- "18:1(d7) LPC (pos mode)"
+label(lipid_eligible_MM$`18:1 (d7) LPE macro.x`) <- "18:1(d7) LPE (pos mode)"
+label(lipid_eligible_MM$`18:1 (d9) SM macro`) <- "18:1(d9) SM (pos mode)"
+label(lipid_eligible_MM$`15:0-18:1_(d7)_PA macro`) <- "15:0/18:1(d7) PA (neg mode)"
+label(lipid_eligible_MM$`15:0-18:1_(d7)_PE macro`) <- "15:0/18:1(d7) PE (neg mode)"
+label(lipid_eligible_MM$`15:0-18:1_(d7)_PG macro`) <- "15:0/18:1(d7) PG (neg mode)"
+label(lipid_eligible_MM$`15:0-18:1_(d7)_PI macro`) <- "15:0/18:1(d7) PI (neg mode)"
+label(lipid_eligible_MM$`15:0-18:1_(d7)_PS macro`) <- "15:0/18:1(d7) PS (neg mode)"
+label(lipid_eligible_MM$`18:1 (d7) LPC macro.y`) <- "18:1(d7) LPC (neg mode)"
+label(lipid_eligible_MM$`18:1 (d7) LPE macro.y`) <- "18:1(d7) LPE (neg mode)"
+
+# LPA
+label(lipid_eligible_MM$`LPA(18:2)`) <- "LPA 18:2 (neg mode)"
+
+# LPC
+label(lipid_eligible_MM$`LPC(16:1)`) <- "LPC 16:1 (pos mode)"
+label(lipid_eligible_MM$`LPC(18:0)`) <- "LPC 18:0 (pos mode)"
+label(lipid_eligible_MM$`LPC(18:1)`) <- "LPC 18:1 (pos mode)"
+label(lipid_eligible_MM$`LPC(18:2)`) <- "LPC 18:2 (pos mode)"
+label(lipid_eligible_MM$`LPC(20:3)`) <- "LPC 20:3 (pos mode)"
+label(lipid_eligible_MM$`LPC(20:4)`) <- "LPC 20:4 (pos mode)"
+label(lipid_eligible_MM$`LPC(22:6)`) <- "LPC 22:6 (pos mode)"
+label(lipid_eligible_MM$`LPC(O-16:0)`) <- "LPC O-16:0 (pos mode)"
+label(lipid_eligible_MM$`LPC(O-18:0)`) <- "LPC O-18:0 (pos mode)"
+label(lipid_eligible_MM$`LPC (16:0) ES-`) <- "LPC 16:0 (neg mode)"
+label(lipid_eligible_MM$`LPC(18:0) ES-`) <- "LPC 18:0 (neg mode)"
+label(lipid_eligible_MM$`LPC(18:2) ES-`) <- "LPC 18:2 (neg mode)"
+label(lipid_eligible_MM$`LPC(20:4) ES-`) <- "LPC 20:4 (neg mode)"
+
+
+# LPE
+label(lipid_eligible_MM$`LPE(16:0)`) <- "LPE 16:0 (pos mode)"
+label(lipid_eligible_MM$`LPE(16:1)`) <- "LPE 16:1 (pos mode)"
+label(lipid_eligible_MM$`LPE(18:3)`) <- "LPE 18:3 (pos mode)"
+label(lipid_eligible_MM$`LPE(20:1)`) <- "LPE 20:1 (pos mode)"
+label(lipid_eligible_MM$`LPE(20:3)`) <- "LPE 20:3 (pos mode)"
+label(lipid_eligible_MM$`LPE(20:4)`) <- "LPE 20:4 (pos mode)"
+label(lipid_eligible_MM$`LPE(20:5)`) <- "LPE 20:5 (pos mode)"
+label(lipid_eligible_MM$`LPE(22:4)`) <- "LPE 22:4 (pos mode)"
+label(lipid_eligible_MM$`LPE(22:5)`) <- "LPE 22:5 (pos mode)"
+label(lipid_eligible_MM$`LPE(22:6)`) <- "LPE 22:6 (pos mode)"
+label(lipid_eligible_MM$`LPE(16:0) ES-`) <- "LPE 16:0 (neg mode)"
+label(lipid_eligible_MM$`LPE(16:1) ES-`) <- "LPE 16:1 (neg mode)"
+label(lipid_eligible_MM$`LPE(17:1) ES-`) <- "LPE 17:1 (neg mode)"
+label(lipid_eligible_MM$`LPE(20:3) ES-`) <- "LPE 20:3 (neg mode)"
+label(lipid_eligible_MM$`LPE(20:4) ES-`) <- "LPE 20:4 (neg mode)"
+label(lipid_eligible_MM$`LPE(P-16:0) ES-`) <- "LPE P-16:0 (neg mode)"
+label(lipid_eligible_MM$`LPE(P-18:0) ES-`) <- "LPE P-18:0 (neg mode)"
+label(lipid_eligible_MM$`LPE(P-20:0) ES-`) <- "LPE P-20:0 (neg mode)"
+label(lipid_eligible_MM$`LPE(P-18:1) ES-`) <- "LPE P-18:1 (neg mode)"
+
+# LPI
+label(lipid_eligible_MM$`LPI(18:0)`) <- "LPI 18:0 (neg mode)"
+label(lipid_eligible_MM$`LPI(18:1)`) <- "LPI 18:1 (neg mode)"
+label(lipid_eligible_MM$`LPI(18:2)`) <- "LPI 18:2 (neg mode)"
+label(lipid_eligible_MM$`LPI(20:3)`) <- "LPI 20:3 (neg mode)"
+label(lipid_eligible_MM$`LPI(20:4)`) <- "LPI 20:4 (neg mode)"
+
+# PA
+label(lipid_eligible_MM$`PA(16:0/16:0)`) <- "PA 16:0/16:0 (neg mode)"
+label(lipid_eligible_MM$`PA(16:0/16:1)`) <- "PA 16:0/16:1 (neg mode)"
+label(lipid_eligible_MM$`PA(16:0/18:0)`) <- "PA 16:0/18:0 (neg mode)"
+label(lipid_eligible_MM$`PA(16:0/18:1)`) <- "PA 16:0/18:1 (neg mode)"
+label(lipid_eligible_MM$`PA(17:0/14:1)`) <- "PA 17:0/14:1 (neg mode)"
+
+# PC
+label(lipid_eligible_MM$`PC (O-16:0/18:0)`) <- "PC O-16:0/18:0 (pos mode)"
+label(lipid_eligible_MM$`PC (O-16:0/18:3)`) <- "PC O-16:0/18:3 (pos mode)"
+label(lipid_eligible_MM$`PC (O-16:0/20:1)`) <- "PC O-16:0/20:1 (pos mode)"
+label(lipid_eligible_MM$`PC (O-16:0/20:4)`) <- "PC O-16:0/20:4 (pos mode)"
+label(lipid_eligible_MM$`PC (O-18:0/16:0)`) <- "PC O-18:0/16:0 (pos mode)"
+label(lipid_eligible_MM$`PC (O-18:0/18:0)`) <- "PC O-18:0/18:0 (pos mode)"
+label(lipid_eligible_MM$`PC (O-18:0/18:1)`) <- "PC O-18:0/18:1 (pos mode)"
+label(lipid_eligible_MM$`PC (P-16:0/18:2)`) <- "PC P-16:0/18:2 (pos mode)"
+label(lipid_eligible_MM$`PC (P-16:0/20:0)`) <- "PC P-16:0/20:0 (pos mode)"
+label(lipid_eligible_MM$`PC(16:0/18:0).x`) <- "PC 16:0/18:0 (pos mode)"
+label(lipid_eligible_MM$`PC(16:1/18:2).x`) <- "PC 16:1/18:2 (pos mode)"
+label(lipid_eligible_MM$`PC(18:0/18:0).x`) <- "PC 18:0/18:0 (pos mode)"
+label(lipid_eligible_MM$`PC(O-18:1/18:0)`) <- "PC O-18:1/18:0 (pos mode)"
+label(lipid_eligible_MM$`PC(O-18:2/16:1)`) <- "PC O-18:2/16:1 (pos mode)"
+label(lipid_eligible_MM$`PC(P-18:0/18:0)`) <- "PC P-18:0/18:0 (pos mode)"
+label(lipid_eligible_MM$`PC(P-18:0/18:3)`) <- "PC P-18:0/18:3 (pos mode)"
+label(lipid_eligible_MM$`PC(P-18:2/18:1)`) <- "PC P-18:2/18:1 (pos mode)"
+label(lipid_eligible_MM$`PC(P-18:2/18:2)`) <- "PC P-18:2/18:2 (pos mode)"
+label(lipid_eligible_MM$`PC(14:0/16:0)`) <- "PC 14:0/16:0 (neg mode)"
+label(lipid_eligible_MM$`PC(14:1/16:0)`) <- "PC 14:1/16:0 (neg mode)"
+label(lipid_eligible_MM$`PC(16:0/16:0).y`) <- "PC 16:0/16:0 (neg mode)"
+label(lipid_eligible_MM$`PC(16:0/16:1).y`) <- "PC 16:0/16:1 (neg mode)"
+label(lipid_eligible_MM$`PC(16:0/18:0).y`) <- "PC 16:0/18:0 (neg mode)"
+label(lipid_eligible_MM$`PC(16:0/18:3)`) <- "PC 16:0/18:3 (neg mode)"
+label(lipid_eligible_MM$`PC(16:0/20:2).y`) <- "PC 16:0/20:2 (neg mode)"
+label(lipid_eligible_MM$`PC(16:0/20:3).y`) <- "PC 16:0/20:3 (neg mode)"
+label(lipid_eligible_MM$`PC(16:0/20:4)`) <- "PC 16:0/20:4 (neg mode)"
+label(lipid_eligible_MM$`PC(16:0/20:5)`) <- "PC 16:0/20:5 (neg mode)"
+label(lipid_eligible_MM$`PC(16:1/18:0).y`) <- "PC 16:1/18:0 (neg mode)"
+label(lipid_eligible_MM$`PC(16:1/18:1).y`) <- "PC 16:1/18:1 (neg mode)"
+label(lipid_eligible_MM$`PC(16:1/18:2).y`) <- "PC 16:1/18:2 (neg mode)"
+label(lipid_eligible_MM$`PC(18:0/18:2).y`) <- "PC 18:0/18:2 (neg mode)"
+label(lipid_eligible_MM$`PC(18:0/20:3)`) <- "PC 18:0/20:3 (neg mode)"
+label(lipid_eligible_MM$`PC(18:0/20:5)`) <- "PC 18:0/20:5 (neg mode)"
+label(lipid_eligible_MM$`PC(18:0-22:5)`) <- "PC 18:0/22:5 (neg mode)"
+label(lipid_eligible_MM$`PC(18:1/18:1)`) <- "PC 18:1/18:1 (neg mode)"
+label(lipid_eligible_MM$`PC(18:1/18:2).y`) <- "PC 18:1/18:2 (neg mode)"
+label(lipid_eligible_MM$`PC(18:1/20:3)`) <- "PC 18:1/20:3 (neg mode)"
+label(lipid_eligible_MM$`PC(18:2/18:2)`) <- "PC 18:2/18:2 (neg mode)"
+label(lipid_eligible_MM$`PC(18:0/18:1).y`) <- "PC 18:0/18:1 (neg mode)"
+
+# PE
+label(lipid_eligible_MM$`PE(16:0/18:0)`) <- "PE 16:0/18:0 (neg mode)"
+label(lipid_eligible_MM$`PE(16:0/18:1)`) <- "PE 16:0/18:1 (neg mode)"
+label(lipid_eligible_MM$`PE(16:0/18:2)`) <- "PE 16:0/18:2 (neg mode)"
+label(lipid_eligible_MM$`PE(16:0/20:3)`) <- "PE 16:0/20:3 (neg mode)"
+label(lipid_eligible_MM$`PE(16:0/20:4)`) <- "PE 16:0/20:4 (neg mode)" 
+label(lipid_eligible_MM$`PE(16:1/18:1)`) <- "PE 16:1/18:1 (neg mode)"
+label(lipid_eligible_MM$`PE(16:1/18:2)`) <- "PE 16:1/18:2 (neg mode)"
+label(lipid_eligible_MM$`PE(18:0/18:0)`) <- "PE 18:0/18:0 (neg mode)"
+label(lipid_eligible_MM$`PE(18:0/18:1)`) <- "PE 18:0/18:1 (neg mode)"
+label(lipid_eligible_MM$`PE(18:0/18:2)`) <- "PE 18:0/18:2 (neg mode)"
+label(lipid_eligible_MM$`PE(18:0/18:3)`) <- "PE 18:0/18:3 (neg mode)"
+label(lipid_eligible_MM$`PE(18:0/20:3)`) <- "PE 18:0/20:3 (neg mode)"
+label(lipid_eligible_MM$`PE(18:0/20:4)`) <- "PE 18:0/20:4 (neg mode)"
+label(lipid_eligible_MM$`PE(18:1/18:1)`) <- "PE 18:1/18:1 (neg mode)"
+label(lipid_eligible_MM$`PE(18:1/18:2)`) <- "PE 18:1/18:2 (neg mode)"
+label(lipid_eligible_MM$`PE(18:1/20:3)`) <- "PE 18:1/20:3 (neg mode)"
+label(lipid_eligible_MM$`PE(18:1/20:4)`) <- "PE 18:1/20:4 (neg mode)"
+
+# PG
+label(lipid_eligible_MM$`PG(16:0/18:1)`) <- "PG 16:0/18:1 (neg mode)"
+
+# PI
+label(lipid_eligible_MM$`PI(16:0/16:1)`) <- "PI 16:0/16:1 (neg mode)"
+label(lipid_eligible_MM$`PI(16:0/18:1)`) <- "PI 16:0/18:1 (neg mode)"
+label(lipid_eligible_MM$`PI(16:0/18:2)`) <- "PI 16:0/18:2 (neg mode)"
+label(lipid_eligible_MM$`PI(16:1/18:0)`) <- "PI 16:1/18:0 (neg mode)"
+label(lipid_eligible_MM$`PI(18:0/18:1)`) <- "PI 18:0/18:1 (neg mode)"
+label(lipid_eligible_MM$`PI(18:0/18:2)`) <- "PI 18:0/18:2 (neg mode)"
+label(lipid_eligible_MM$`PI(18:0/20:2)`) <- "PI 18:0/20:2 (neg mode)"
+label(lipid_eligible_MM$`PI(18:0/20:3)`) <- "PI 18:0/20:3 (neg mode)"
+label(lipid_eligible_MM$`PI(18:1/18:1)`) <- "PI 18:1/18:1 (neg mode)"
+label(lipid_eligible_MM$`PI(18:1/18:2)`) <- "PI 18:1/18:2 (neg mode)"
+
+# PS
+label(lipid_eligible_MM$`PS(18:0/18:2)`) <- "PS 18:0/18:2 (neg mode)"
+label(lipid_eligible_MM$`PS(18:1/18:1)`) <- "PS 18:1/18:1 (neg mode)"
+label(lipid_eligible_MM$`PS(18:0/18:1)`) <- "PS 18:0/18:1 (neg mode)"
+label(lipid_eligible_MM$`PS(16:1/18:0)`) <- "PS 16:1/18:0 (neg mode)"
+
+# SM
+label(lipid_eligible_MM$`SM(d18:1/14:0)`) <- "SM d18:1/14:0 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/14:1)`) <- "SM d18:1/14:1 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/16:1)`) <- "SM d18:1/16:1 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/17:0)`) <- "SM d18:1/17:0 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/18:0)`) <- "SM d18:1/18:0 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/18:1)`) <- "SM d18:1/18:1 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/18:2)`) <- "SM d18:1/18:2 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/20:0)`) <- "SM d18:1/20:0 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/20:1)`) <- "SM d18:1/20:1 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/22:0)`) <- "SM d18:1/22:0 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/22:1)`) <- "SM d18:1/22:1 (pos mode)"
+label(lipid_eligible_MM$`SM(d18:1/22:2)`) <- "SM d18:1/22:2 (pos mode)"
+
+# SPH
+label(lipid_eligible_MM$`Sphinganine (18:0)`) <- "Sphinganine 18:0 (pos mode)"
+label(lipid_eligible_MM$`Sphingosine d18:1`) <- "Sphingosine d18:1 (pos mode)"
+
+# S1P
+label(lipid_eligible_MM$`Sphingosine-1:-Phosphate`) <- "Sphingosine-1-Phosphate (pos mode)"
+
+# Check labels
+# label(lipid_eligible_MM)
+```
+
+## Coefficient of variation
+```{r}
+# Calculate the coefficient of variation (CV, sample standard deviation / sample mean)
+lipid_data_cv <- as.data.frame(matrix(data = NA, 
+                                      nrow = 88, 
+                                      ncol = length(names(lipid_eligible_MM))))
+colnames(lipid_data_cv) <- label(lipid_eligible_MM)
+
+patient_index = 0
+for (type in c(2:length(lipid_eligible_MM))) { # Loop over each lipid type
+  patient_index = 0 # Clear patient index for next lipid
+  for (i in seq(from = 1, to = dim(lipid_eligible_MM)[1], by = 3)) { # Loop over each patient
+    patient_index <- patient_index + 1
+    lipid_data_cv[patient_index, type] = sd(c(pull(lipid_eligible_MM[i, type])[1],
+                                              pull(lipid_eligible_MM[i + 1, type])[1],
+                                              pull(lipid_eligible_MM[i + 2, type])[1]))/
+                                         mean(c(pull(lipid_eligible_MM[i, type])[1], 
+                                                pull(lipid_eligible_MM[i + 1, type])[1], 
+                                                pull(lipid_eligible_MM[i + 2, type]))[1])
+    }
+}
+lipid_data_cv <- lipid_data_cv %>% mutate(`Sample ID` = unique(lipid_eligible_MM$`Sample ID`))
+
+# Show the CV for each lipid species across a total of 88 patients
+lipid_mean_cv <- lipid_data_cv %>% 
+  mutate(across(-c("Sample ID"), abs)) %>% 
+  summarise(across(-c("Sample ID"), list(mean_cv = mean))) %>% 
+  pivot_longer(cols = everything(), names_to = "Lipid Species", values_to = "Mean CV")
+
+
+# Make a line plot (JCI supplementary figure 3)
+# 稍后改
+lipid_mean_cv$group <- c(rep("SIL standard", 5), 
+                         rep("LPC", 8), 
+                         rep("LPE", 7),
+                         rep("PC", 12),
+                         rep("SM", 10),
+                         rep("SIL standard", 7),
+                         "LPA",
+                         rep("LPC", 3),
+                         rep("LPE", 7),
+                         rep("LPI", 5),
+                         rep("PA", 5),
+                         rep("PC", 20),
+                         rep("PE", 14),
+                         rep("PI", 10),
+                         rep("PS", 2),
+                         rep("SPH", 2),
+                         rep("S1P", 1))
+lipid_mean_cv$`Lipid Species` <- colnames(lipid_data_cv)[-1] # Reassign the lipid species names
+
+# Set the pallete
+library(RColorBrewer)
+getPalette <- colorRampPalette(brewer.pal(12, "Paired"))
+mean_cv_plot <- ggplot(lipid_mean_cv, aes(x = `Lipid Species`, y = `Mean CV`, group = group)) +
+  geom_line(aes(color = group)) +
+  geom_point(aes(color = group)) + 
+  geom_hline(yintercept = 0.2, linetype = "dashed", color = "red3") + 
+  scale_y_continuous(breaks = c(0, 0.2, 0.5, 1.0), labels = c("0.0","0.2","0.5","1.0")) + 
+  scale_color_manual(values = getPalette(length(unique(lipid_mean_cv$group)))) +
+  theme_bw() + 
+  theme(legend.position = "bottom",
+        panel.grid.major = element_blank(), 
+        panel.background = element_blank(), 
+        axis.ticks = element_blank(),  
+        axis.text.x = element_text(size = 4, angle = 90, hjust = 1, color = "black"),
+        axis.text.y = element_text(color = c("black", "red3", "black", "black"))) + 
+  labs(color = "Lipid Class")
+mean_cv_plot
+
+ggsave("mean_cv_plot_MM.jpeg", width = 25, height = 12, units = "cm")
+
+(197-14 + 1)/197
+(197 - 3)/197
+```
+
+
+**Interpretation**: Except 15:0/18:1(d7) PS (neg mode), Sphingosine-1-Phosphate (pos mode), 17:0/14:1 PC (pos mode), all the remaining lipids have the mean CVs < 20% across a total of 88 patients 
+
+## Filter lipids - CV < 0.2
+
+```{r eval=FALSE}
+# Exclude 15:0-18:1_(d7)_PS macro
+drop_lipid <- names(lipid_eligible_MM) %in% c("15:0-18:1_(d7)_PS macro", "Sphingosine-1:-Phosphate", "17:0:14:1 PC macro")
+lipid_ffa_MM_final <- lipid_eligible_MM[!drop_lipid]
+
+# Extract lipid species labels
+lipid_label <- label(lipid_ffa_MM_final)
+
+# Take the average of 3 replicates for each type of lipids per patient
+lipid_ffa_MM_final <- lipid_ffa_MM_final %>% group_by(`Sample ID`) %>% summarise_all(mean)
+
+# Label the variables at once
+names(lipid_label) <- NULL
+label(lipid_ffa_MM_final) <- as.list(lipid_label)
+```
+
+**Summary**:
+
+* Using the criteria 1 and 2, we identify 139 types of lipid species which have 1) $\leq$ 50% patients who miss all 3 replicates and 2) mean CV < 20%. 
+
+## Integrate the final lipid dataset with the clinical dataset
+
+```{r eval=FALSE, warning=FALSE}
+# Extract unique sample id
+lipid_sample_id <- unique(lipid_ffa_MM_final$`Sample ID`)
+
+# Load and filter the clinical dataset using sample id affiliated to the lipid dataset
+clinical_data <- read_csv("dat_DEXA_qPCR_Blood_20190711.csv") %>% 
+  rename(`Sample ID` = StudyID) %>% 
+  filter(`Sample ID` %in% lipid_sample_id)
+
+# Merge the clinical dataset with the final lipid dataset 
+data_full <- merge(x = clinical_data, 
+                             y = lipid_ffa_MM_final, 
+                             by.x = "Sample ID", 
+                             by.y = "Sample ID")
+```
+
+## Standardize lipid species names [outdated]
+```{r}
+# Relabel lipid species names in accordance to standardized shorthand notation for lipid structures from the Journal of Lipid Research
+
+# SIL standards
+label(lipid_ffa_MM_final$`15:0:18:1 (d7) PC macro`) <- "15:0/18:1(d7) PC (pos mode)"
+label(lipid_ffa_MM_final$`18:1 (d7) LPC macro.x`) <- "18:1(d7) LPC (pos mode)"
+label(lipid_ffa_MM_final$`18:1 (d7) LPE macro.x`) <- "18:1(d7) LPE (pos mode)"
+label(lipid_ffa_MM_final$`18:1 (d9) SM macro`) <- "18:1(d9) SM (pos mode)"
+label(lipid_ffa_MM_final$`15:0-18:1_(d7)_PA macro`) <- "15:0/18:1(d7) PA (neg mode)"
+label(lipid_ffa_MM_final$`15:0-18:1_(d7)_PE macro`) <- "15:0/18:1(d7) PE (neg mode)"
+label(lipid_ffa_MM_final$`15:0-18:1_(d7)_PG macro`) <- "15:0/18:1(d7) PG (neg mode)"
+label(lipid_ffa_MM_final$`15:0-18:1_(d7)_PI macro`) <- "15:0/18:1(d7) PI (neg mode)"
+label(lipid_ffa_MM_final$`18:1 (d7) LPC macro.y`) <- "18:1(d7) LPC (neg mode)"
+label(lipid_ffa_MM_final$`18:1 (d7) LPE macro.y`) <- "18:1(d7) LPE (neg mode)"
+
+# LPA
+label(lipid_ffa_MM_final$`LPA(18:2)`) <- "LPA 18:2 (neg mode)"
+
+# LPC
+label(lipid_ffa_MM_final$`LPC(16:1)`) <- "LPC 16:1 (pos mode)"
+label(lipid_ffa_MM_final$`LPC(18:0)`) <- "LPC 18:0 (pos mode)"
+label(lipid_ffa_MM_final$`LPC(18:1)`) <- "LPC 18:1 (pos mode)"
+label(lipid_ffa_MM_final$`LPC(18:2)`) <- "LPC 18:2 (pos mode)"
+label(lipid_ffa_MM_final$`LPC(20:3)`) <- "LPC 20:3 (pos mode)"
+label(lipid_ffa_MM_final$`LPC(20:4)`) <- "LPC 20:4 (pos mode)"
+label(lipid_ffa_MM_final$`LPC(22:6)`) <- "LPC 22:6 (pos mode)"
+label(lipid_ffa_MM_final$`LPC(O-18:0)`) <- "LPC O-18:0 (pos mode)"
+label(lipid_ffa_MM_final$`LPC (16:0) ES-`) <- "LPC 16:0 (neg mode)"
+label(lipid_ffa_MM_final$`LPC(18:0) ES-`) <- "LPC 18:0 (neg mode)"
+label(lipid_ffa_MM_final$`LPC(18:2) ES-`) <- "LPC 18:2 (neg mode)"
+
+# LPE
+label(lipid_ffa_MM_final$`LPE(16:1)`) <- "LPE 16:1 (pos mode)"
+label(lipid_ffa_MM_final$`LPE(18:3)`) <- "LPE 18:3 (pos mode)"
+label(lipid_ffa_MM_final$`LPE(20:3)`) <- "LPE 20:3 (pos mode)"
+label(lipid_ffa_MM_final$`LPE(20:4)`) <- "LPE 20:4 (pos mode)"
+label(lipid_ffa_MM_final$`LPE(20:5)`) <- "LPE 20:5 (pos mode)"
+label(lipid_ffa_MM_final$`LPE(22:5)`) <- "LPE 22:5 (pos mode)"
+label(lipid_ffa_MM_final$`LPE(22:6)`) <- "LPE 22:6 (pos mode)"
+label(lipid_ffa_MM_final$`LPE(17:1) ES-`) <- "LPE 17:1 (neg mode)"
+label(lipid_ffa_MM_final$`LPE(20:3) ES-`) <- "LPE 20:3 (neg mode)"
+label(lipid_ffa_MM_final$`LPE(20:4) ES-`) <- "LPE 20:4 (neg mode)"
+label(lipid_ffa_MM_final$`LPE(P-16:0) ES-`) <- "LPE P-16:0 (neg mode)"
+label(lipid_ffa_MM_final$`LPE(P-18:0) ES-`) <- "LPE P-18:0 (neg mode)"
+label(lipid_ffa_MM_final$`LPE(P-20:0) ES-`) <- "LPE P-20:0 (neg mode)"
+
+# LPI
+label(lipid_ffa_MM_final$`LPI(18:0)`) <- "LPI 18:0 (neg mode)"
+label(lipid_ffa_MM_final$`LPI(18:1)`) <- "LPI 18:1 (neg mode)"
+label(lipid_ffa_MM_final$`LPI(18:2)`) <- "LPI 18:2 (neg mode)"
+label(lipid_ffa_MM_final$`LPI(20:3)`) <- "LPI 20:3 (neg mode)"
+label(lipid_ffa_MM_final$`LPI(20:4)`) <- "LPI 20:4 (neg mode)"
+
+# PA
+label(lipid_ffa_MM_final$`PA(16:0/16:0)`) <- "PA 16:0/16:0 (neg mode)"
+label(lipid_ffa_MM_final$`PA(16:0/16:1)`) <- "PA 16:0/16:1 (neg mode)"
+label(lipid_ffa_MM_final$`PA(16:0/18:0)`) <- "PA 16:0/18:0 (neg mode)"
+label(lipid_ffa_MM_final$`PA(16:0/18:1)`) <- "PA 16:0/18:1 (neg mode)"
+label(lipid_ffa_MM_final$`PA(17:0/14:1)`) <- "PA 17:0/14:1 (neg mode)"
+
+# PC
+label(lipid_ffa_MM_final$`PC (O-16:0/18:0)`) <- "PC O-16:0/18:0 (pos mode)"
+label(lipid_ffa_MM_final$`PC (O-16:0/20:1)`) <- "PC O-16:0/20:1 (pos mode)"
+label(lipid_ffa_MM_final$`PC (O-16:0/20:4)`) <- "PC O-16:0/20:4 (pos mode)"
+label(lipid_ffa_MM_final$`PC (O-18:0/16:0)`) <- "PC O-18:0/16:0 (pos mode)"
+label(lipid_ffa_MM_final$`PC (O-18:0/18:1)`) <- "PC O-18:0/18:1 (pos mode)"
+label(lipid_ffa_MM_final$`PC (P-16:0/20:0)`) <- "PC P-16:0/20:0 (pos mode)"
+label(lipid_ffa_MM_final$`PC(16:1/18:2).x`) <- "PC 16:1/18:2 (pos mode)"
+label(lipid_ffa_MM_final$`PC(18:0/18:0).x`) <- "PC 18:0/18:0 (pos mode)"
+label(lipid_ffa_MM_final$`PC(O-18:1/18:0)`) <- "PC O-18:1/18:0 (pos mode)"
+label(lipid_ffa_MM_final$`PC(P-18:0/18:0)`) <- "PC P-18:0/18:0 (pos mode)"
+label(lipid_ffa_MM_final$`PC(P-18:0/18:3)`) <- "PC P-18:0/18:3 (pos mode)"
+label(lipid_ffa_MM_final$`PC(P-18:2/18:1)`) <- "PC P-18:2/18:1 (pos mode)"
+label(lipid_ffa_MM_final$`PC(14:0/16:0)`) <- "PC 14:0/16:0 (neg mode)"
+label(lipid_ffa_MM_final$`PC(14:1/16:0)`) <- "PC 14:1/16:0 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:0/16:0).y`) <- "PC 16:0/16:0 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:0/16:1).y`) <- "PC 16:0/16:1 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:0/18:0).y`) <- "PC 16:0/18:0 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:0/18:3)`) <- "PC 16:0/18:3 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:0/20:2).y`) <- "PC 16:0/20:2 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:0/20:3).y`) <- "PC 16:0/20:3 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:0/20:4)`) <- "PC 16:0/20:4 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:0/20:5)`) <- "PC 16:0/20:5 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:1/18:1).y`) <- "PC 16:1/18:1 (neg mode)"
+label(lipid_ffa_MM_final$`PC(16:1/18:2).y`) <- "PC 16:1/18:2 (neg mode)"
+label(lipid_ffa_MM_final$`PC(18:0/20:3)`) <- "PC 18:0/20:3 (neg mode)"
+label(lipid_ffa_MM_final$`PC(18:0/20:5)`) <- "PC 18:0/20:5 (neg mode)"
+label(lipid_ffa_MM_final$`PC(18:0-22:5)`) <- "PC 18:0/22:5 (neg mode)"
+label(lipid_ffa_MM_final$`PC(18:1/18:1)`) <- "PC 18:1/18:1 (neg mode)"
+label(lipid_ffa_MM_final$`PC(18:1/18:2).y`) <- "PC 18:1/18:2 (neg mode)"
+label(lipid_ffa_MM_final$`PC(18:1/20:3)`) <- "PC 18:1/20:3 (neg mode)"
+label(lipid_ffa_MM_final$`PC(18:2/18:2)`) <- "PC 18:2/18:2 (neg mode)"
+
+# PE
+label(lipid_ffa_MM_final$`PE(16:0/18:0)`) <- "PE 16:0/18:0 (neg mode)"
+label(lipid_ffa_MM_final$`PE(16:0/18:1)`) <- "PE 16:0/18:1 (neg mode)"
+label(lipid_ffa_MM_final$`PE(16:0/18:2)`) <- "PE 16:0/18:2 (neg mode)"
+label(lipid_ffa_MM_final$`PE(16:0/20:3)`) <- "PE 16:0/20:3 (neg mode)"
+label(lipid_ffa_MM_final$`PE(16:0/20:4)`) <- "PE 16:0/20:4 (neg mode)"
+label(lipid_ffa_MM_final$`PE(18:0/18:0)`) <- "PE 18:0/18:0 (neg mode)"
+label(lipid_ffa_MM_final$`PE(18:0/18:1)`) <- "PE 18:0/18:1 (neg mode)"
+label(lipid_ffa_MM_final$`PE(18:0/18:2)`) <- "PE 18:0/18:2 (neg mode)"
+label(lipid_ffa_MM_final$`PE(18:0/20:3)`) <- "PE 18:0/20:3 (neg mode)"
+label(lipid_ffa_MM_final$`PE(18:0/20:4)`) <- "PE 18:0/20:4 (neg mode)"
+label(lipid_ffa_MM_final$`PE(18:1/18:1)`) <- "PE 18:1/18:1 (neg mode)"
+label(lipid_ffa_MM_final$`PE(18:1/18:2)`) <- "PE 18:1/18:2 (neg mode)"
+label(lipid_ffa_MM_final$`PE(18:1/20:3)`) <- "PE 18:1/20:3 (neg mode)"
+label(lipid_ffa_MM_final$`PE(18:1/20:4)`) <- "PE 18:1/20:4 (neg mode)"
+
+# PI
+label(lipid_ffa_MM_final$`PI(16:0/16:1)`) <- "PI 16:0/16:1 (neg mode)"
+label(lipid_ffa_MM_final$`PI(16:0/18:1)`) <- "PI 16:0/18:1 (neg mode)"
+label(lipid_ffa_MM_final$`PI(16:0/18:2)`) <- "PI 16:0/18:2 (neg mode)"
+label(lipid_ffa_MM_final$`PI(16:1/18:0)`) <- "PI 16:1/18:0 (neg mode)"
+label(lipid_ffa_MM_final$`PI(18:0/18:1)`) <- "PI 18:0/18:1 (neg mode)"
+label(lipid_ffa_MM_final$`PI(18:0/18:2)`) <- "PI 18:0/18:2 (neg mode)"
+label(lipid_ffa_MM_final$`PI(18:0/20:2)`) <- "PI 18:0/20:2 (neg mode)"
+label(lipid_ffa_MM_final$`PI(18:0/20:3)`) <- "PI 18:0/20:3 (neg mode)"
+label(lipid_ffa_MM_final$`PI(18:1/18:1)`) <- "PI 18:1/18:1 (neg mode)"
+label(lipid_ffa_MM_final$`PI(18:1/18:2)`) <- "PI 18:1/18:2 (neg mode)"
+
+# SM
+label(lipid_ffa_MM_final$`SM(d18:1/14:0)`) <- "SM d18:1/14:0 (pos mode)"
+label(lipid_ffa_MM_final$`SM(d18:1/16:1)`) <- "SM d18:1/16:1 (pos mode)"
+label(lipid_ffa_MM_final$`SM(d18:1/17:0)`) <- "SM d18:1/17:0 (pos mode)"
+label(lipid_ffa_MM_final$`SM(d18:1/18:0)`) <- "SM d18:1/18:0 (pos mode)"
+label(lipid_ffa_MM_final$`SM(d18:1/18:1)`) <- "SM d18:1/18:1 (pos mode)"
+label(lipid_ffa_MM_final$`SM(d18:1/20:0)`) <- "SM d18:1/20:0 (pos mode)"
+label(lipid_ffa_MM_final$`SM(d18:1/20:1)`) <- "SM d18:1/20:1 (pos mode)"
+label(lipid_ffa_MM_final$`SM(d18:1/22:0)`) <- "SM d18:1/22:0 (pos mode)"
+label(lipid_ffa_MM_final$`SM(d18:1/22:1)`) <- "SM d18:1/22:1 (pos mode)"
+label(lipid_ffa_MM_final$`SM(d18:1/22:2)`) <- "SM d18:1/22:2 (pos mode)"
+
+# SPH
+label(lipid_ffa_MM_final$`Sphinganine (18:0)`) <- "Sphinganine 18:0 (pos mode)"
+label(lipid_ffa_MM_final$`Sphingosine d18:1`) <- "Sphingosine d18:1 (pos mode)"
+```
+
+
+# Data preprocess for free fatty acids and bile acids
+
+## Import data
+```{r}
+ffa_data <- readxl::read_xlsx("MSK-WCMC Data FFA_Response_3MAR21.xlsx", 
+                              sheet = "FFA_Area_Response_Raw", 
+                              range = c("A2:BG266"), 
+                              col_names = TRUE) %>% 
+  rename("Sample ID" = "...1") %>%
+  select(-c("...2", "Row Labels", "SampleList.File Text"))
+```
+
+## Relabel analytes
+```{r}
+label(ffa_data$`Sample ID`) <- "Sample ID"
+
+## Bile acids
+label(ffa_data$`Chenodeoxycholic Acid`) <- "Chenodeoxycholic acid"
+label(ffa_data$`Cholic Acid`) <- "Cholic acid"
+label(ffa_data$`Deoxycholic Acid`) <- "Deoxycholic acid"
+label(ffa_data$`Glycochenodeoxycholic acid`) <- "Glycochenodeoxycholic acid"
+label(ffa_data$`Glycocholic Acid`) <- "Glycocholic acid"
+label(ffa_data$`Glycodeoxycholic acid`) <- "Glycodeoxycholic acid"
+label(ffa_data$`Glycolithocholic Acid`) <- "Glycolithocholic acid"
+label(ffa_data$`Glycoursodeoxycholic acid`) <- "Glycoursodeoxycholic acid"
+label(ffa_data$`Lithocholic Acid`) <- "Lithocholic acid"
+label(ffa_data$`Taurochenodeoxycholic acid`) <- "Taurochenodeoxycholic acid"
+label(ffa_data$`Taurocholic Acid`) <- "Taurocholic acid"
+label(ffa_data$`Taurocholic Acid (isobaric peak 1)`) <- "Taurocholic acid (isobaric peak 1)"
+label(ffa_data$`Taurocholic Acid (isobaric peak 2)`) <- "Taurocholic acid (isobaric peak 2)"
+label(ffa_data$`Taurocholic Acid (isobaric peak 3)`) <- "Taurocholic acid (isobaric peak 3)"
+label(ffa_data$`Taurodeoxycholic acid`) <- "Taurodeoxycholic acid"
+label(ffa_data$`Taurodeoxycholic acid (isobaric peak 1)`) <- "Taurodeoxycholic acid (isobaric peak 1)"
+label(ffa_data$`Taurolithocholic acid`) <- "Taurolithocholic acid"
+label(ffa_data$`Tauroursodeoxycholic acid`) <- "Tauroursodeoxycholic acid"
+label(ffa_data$`Ursodeoxycholic Acid`) <- "Ursodeoxycholic acid"
+
+## Free fatty acid
+label(ffa_data$`FFA 24_0`) <- "FA 24:0"
+label(ffa_data$`FFA 24_1`) <- "FA 24:1"
+label(ffa_data$`FFA 24_2`) <- "FA 24:2"
+label(ffa_data$`FFA 24_3`) <- "FA 24:3"
+label(ffa_data$`FFA 24_4`) <- "FA 24:4"
+label(ffa_data$`FFA 24_5`) <- "FA 24:5"
+label(ffa_data$`FFA_10_0`) <- "FA 10:0"
+label(ffa_data$`FFA_10_1`) <- "FA 10:1"
+label(ffa_data$`FFA_10_2`) <- "FA 10:2"
+label(ffa_data$`FFA_12_0`) <- "FA 12:0"
+label(ffa_data$`FFA_12_1`) <- "FA 12:1"
+label(ffa_data$`FFA_14_0`) <- "FA 14:0"
+label(ffa_data$`FFA_14_1`) <- "FA 14:1"
+label(ffa_data$`FFA_16_0`) <- "FA 16:0"
+label(ffa_data$`FFA_16_1`) <- "FA 16:1"
+label(ffa_data$`FFA_16_2`) <- "FA 16:2"
+label(ffa_data$`FFA_17_0`) <- "FA 17:0"
+label(ffa_data$`FFA_17_1`) <- "FA 17:1"
+label(ffa_data$`FFA_18_0`) <- "FA 18:0"
+label(ffa_data$`FFA_18_1`) <- "FA 18:1"
+label(ffa_data$`FFA_18_2`) <- "FA 18:2"
+label(ffa_data$`FFA_18_3`) <- "FA 18:3"
+label(ffa_data$`FFA_18_4`) <- "FA 18:4"
+label(ffa_data$`FFA_20_0`) <- "FA 20:0"
+label(ffa_data$`FFA_20_1`) <- "FA 20:1"
+label(ffa_data$`FFA_20_2`) <- "FA 20:2"
+label(ffa_data$`FFA_20_3`) <- "FA 20:3"
+label(ffa_data$`FFA_20_4`) <- "FA 20:4"
+label(ffa_data$`FFA_20_5`) <- "FA 20:5"
+label(ffa_data$`FFA_22_0`) <- "FA 22:0"
+label(ffa_data$`FFA_22_1`) <- "FA 22:1"
+label(ffa_data$`FFA_22_2`) <- "FA 22:2"
+label(ffa_data$`FFA_22_3`) <- "FA 22:3"
+label(ffa_data$`FFA_22_4`) <- "FA 22:4"
+label(ffa_data$`FFA_22_5`) <- "FA 22:5"
+label(ffa_data$`FFA_22_6`) <- "FA 22:6"
+```
+
+## Filter analytes - 50% rule
+
+We use the following criteria 1 and 2 to select eligible analytes having reliable measurements.
+
+* Criterion 1: Identify a specific type of analyte which has less than or equal to 50% (44 in count) patients who miss all 3 replicates of the analyte; we will keep this analyte in the dataset.
+
+* Criterion 2: Identify a specific type of analyte which has less than or equal to 50% of patients whose inter-assay coefficient of variation (cv) are less than 0.2; we will keep this analyte in the dataset. 
+
+```{r eval=FALSE}
+# Create a user-written function to select eligible lipids, using the frequency of patients who miss all 3 replicates of a lipid 
+select_ffa_OOR <- function(threshold_total_OOR) {
+  step = number_OOR = total_OOR = 0; type_OOR <- vector(length = 0)
+  for (type in c(2:length(ffa_data))) { # Loop over each ffa type
+    total_OOR = 0 # Clear total_OOR for next total_OOR
+    for (i in seq(from = 1, to = dim(ffa_data)[1], by = 3)) { # Loop over each group of triple replicates for a patient
+      while (step <= 2) {
+        if (ffa_data[i + step, type] == "OOR_L") {number_OOR = number_OOR + 1}
+        step = step + 1}
+      if (number_OOR == 3) {total_OOR <- total_OOR + 1}
+      step = number_OOR = 0 } # Clear step and number_OOR for next patient, under the same ffa column
+      if (total_OOR <= threshold_total_OOR) {type_OOR <- append(type_OOR, type)}}; return(type_OOR)} # Store eligible ffa in type_OOR
+
+# Test the accuracy of the user-written function select_lipid()
+# step = number_OOR = total_OOR = 0; type_OOR <- vector(length = 0)
+# for (type in c(10:10)) { # Loop over the lipid 15:0:18:1 (d7) PC macro
+#   total_OOR = 0 # Clear total_OOR for next loop
+#   for (i in seq(from = 1, to = dim(ffa_data)[1], by = 3)) { # Loop over each group of triple replicates for a patient
+#     while (step <= 2) {
+#       if (ffa_data[i + step, type] == "OOR_L") {number_OOR = number_OOR + 1}
+#       step = step + 1}
+#     print(number_OOR)
+#     if (number_OOR == 3) {total_OOR <- total_OOR + 1}
+#     step = number_OOR = 0 } # Clear step and number_OOR for next patient, under the same lipid column
+#     print(total_OOR)
+#     if (total_OOR <= 44) {type_OOR <- append(type_OOR, type)}}
+
+# Store the eligible lipid indices using the particular criterion
+## Criterion 1: Identify a specific type of lipid which has less than or equal to 50% (44 in count) patients who miss all 3 replicates of the lipid; we will keep this lipid in the dataset.
+ffa_50 <- select_ffa_OOR(threshold_total_OOR = 44)
+## Create a analyte dataset containing sample id and eligible analytes
+ffa_eligible <- ffa_data[, c(1, ffa_50)]
+
+# Save eligible lipid data to disk
+saveRDS(object = ffa_eligible, file = "ffa_eligible_50rule.RDS")
+```
+
+**Interpretation**:
+
+* After filtering analytes using the criteria 1, 55 eligible analytes remain in our dataset.
+
+```{r eval=FALSE}
+# Transform OOR_L into NA
+# Transform all character columns to numerical columns, except the column of sample id
+library("naniar")
+oor_fun <- function(dataset) {
+  newdata <- get(dataset) %>% 
+    replace_with_na_all(condition = ~.x == "OOR_L") %>% 
+    mutate(across(-c("Sample ID"), function(x) as.numeric(x))) %>% 
+    mutate(across(-c("Sample ID"), function(x) x + 0.5))}
+ffa_eligible <- oor_fun(dataset = "ffa_eligible")
+
+# Save cleaned eligible lipid data to disk
+saveRDS(object = ffa_eligible, file = "ffa_eligible.RDS")
+```
+
+## Imputation
+```{r}
+# Impute the missing portion of each lipid using the minimum value
+ffa_eligible_MM <- ffa_eligible %>% 
+  mutate(across(-c("Sample ID"), function(x) ifelse(is.na(x), min(x, na.rm = T), x)))
+
+# Perform the log transform for normalization
+ffa_eligible_MM[, -1] <- log(ffa_eligible_MM[, -1])
+```
+
+## Coefficient of variation
+```{r}
+# Calculate the coefficient of variation (CV, sample standard deviation / sample mean)
+ffa_data_cv <- as.data.frame(matrix(data = NA, 
+                                    nrow = 88, 
+                                    ncol = ncol(ffa_eligible_MM)))
+colnames(ffa_data_cv) <- label(ffa_data)
+
+patient_index = 0
+for (type in c(2:length(ffa_eligible_MM))) { # Loop over each ffa type
+  patient_index = 0 # Clear patient index for next ffa
+  for (i in seq(from = 1, to = dim(ffa_eligible_MM)[1], by = 3)) { # Loop over each patient
+    patient_index <- patient_index + 1
+    ffa_data_cv[patient_index, type] = sd(c(pull(ffa_eligible_MM[i, type])[1],
+                                              pull(ffa_eligible_MM[i + 1, type])[1],
+                                              pull(ffa_eligible_MM[i + 2, type])[1]))/
+                                         mean(c(pull(ffa_eligible_MM[i, type])[1], 
+                                                pull(ffa_eligible_MM[i + 1, type])[1], 
+                                                pull(ffa_eligible_MM[i + 2, type]))[1])
+    }
+}
+ffa_data_cv <- ffa_data_cv %>% 
+  mutate(`Sample ID` = unique(ffa_eligible_MM$`Sample ID`))
+
+# Show the CV for each ffa species across a total of 88 patients
+ffa_mean_cv <- ffa_data_cv %>% 
+  mutate(across(-c("Sample ID"), abs)) %>% 
+  summarise(across(-c("Sample ID"), list(mean_cv = mean))) %>% 
+  pivot_longer(cols = everything(), names_to = "Free Fatty Acids and Bile Acids", values_to = "Mean CV")
+```
+
+### CV for all lipid analytes
+```{r}
+# Make a line plot (JCI supplementary figure 3)
+## Merge lipid_mean_cv with ffa_mean_cv
+colnames(ffa_mean_cv)[1] <- "Lipid Species"
+mean_cv_all <- rbind(lipid_mean_cv, ffa_mean_cv)
+
+# Count the frequency of each lipid class
+# str_starts(mean_cv_all$`Lipid Species`, "LPC", negate = FALSE)
+
+mean_cv_all$Group <- c(rep("SIL standard", 5), 
+                       rep("LPC", 9), 
+                       rep("LPE", 10),
+                       rep("PC", 18),
+                       rep("SM", 12),
+                       rep("SIL standard", 7),
+                       "LPA",
+                       rep("LPC", 4),
+                       rep("LPE", 9),
+                       rep("LPI", 5),
+                       rep("PA", 5),
+                       rep("PC", 22),
+                       rep("PE", 17),
+                       "PG",
+                       rep("PI", 10),
+                       rep("PS", 4),
+                       rep("SPH", 2),
+                       rep("S1P", 1),
+                       rep("BA", 3),
+                       rep("FA", 36),
+                       rep("BA", 16))
+mean_cv_all$`Lipid Species` <- c(colnames(lipid_data_cv)[-1], colnames(ffa_data_cv)[-1]) # Reassign the species names
+
+# Set the pallete
+library(RColorBrewer)
+getPalette <- colorRampPalette(brewer.pal(16, "Paired"))
+
+mean_cv_all_sort <- mean_cv_all %>%
+  group_by(Group) %>%
+  arrange("Lipid Sepcies", Group)
+
+mean_cv_plot <- mean_cv_all_sort %>%
+  ggplot(aes(x = factor(`Lipid Species`, levels = `Lipid Species`), y = `Mean CV`, group = Group)) + # Data Science I Lab 6
+  geom_line(aes(color = Group)) +
+  geom_point(aes(color = Group)) + 
+  geom_hline(yintercept = 0.2, linetype = "dashed", color = "red3") + 
+  scale_y_continuous(breaks = c(0, 0.2, 0.5, 1.0), labels = c("0.0","0.2","0.5","1.0")) + 
+  scale_color_manual(values = getPalette(length(unique(mean_cv_all$Group)))) +
+  theme_bw() + 
+  theme(legend.position = "bottom",
+        panel.grid.major = element_blank(), 
+        panel.background = element_blank(), 
+        axis.ticks = element_blank(),  
+        axis.text.x = element_text(size = 5, angle = 90, hjust = 1, color = "black"),
+        axis.text.y = element_text(color = c("black", "red3", "black", "black"))) + 
+  labs(color = "Lipid Class",
+       x = "Lipid Analyte",
+       y = "Mean Coefficient of Variation")
+mean_cv_plot
+
+ggsave("mean_cv_plot_MM_Oct1.jpeg", width = 32, height = 15, units = "cm")
+
+(197-14 + 1)/197 
+(197 - 3)/197
+```
+
+**Interpretation**: 
+
+* 93% of the lipid analyte had mean CVs of less than 10%.
+* 98% of the lipid analyte had CVs of less than 20%. 
+
+## Further steps
+```{r eval=FALSE}
+# Extract lipid species labels
+ffa_label <- label(ffa_data)
+
+# Take the average of 3 replicates for each type of lipids per patient
+ffa_eligible_MM_final <- ffa_eligible_MM %>% 
+  group_by(`Sample ID`) %>% 
+  summarise_all(mean)
+
+# Label the variables at once
+names(ffa_label) <- NULL
+label(ffa_eligible_MM_final) <- as.list(ffa_label)
+
+# Merge the final ffa data with the final lipid data
+lipid_ffa_MM_final <- merge(x = lipid_ffa_MM_final, 
+                            y = ffa_eligible_MM_final, 
+                            by.x = "Sample ID", 
+                            by.y = "Sample ID")
+
+# Merge the final ffa data with the final lipid and clinical data
+data_full <- merge(x = data_full, 
+                   y = ffa_eligible_MM_final, 
+                   by.x = "Sample ID", 
+                   by.y = "Sample ID")
+
+# Save cleaned data to disk
+saveRDS(object = lipid_ffa_MM_final, file = "lipid_ffa.RDS")
+saveRDS(object = data_full, file = "lipid_clinical_ffa.RDS")
+```
+
+**Summary**: Using the criteria 1 and 2, we identify 55 types of free fatty acids and bile acies which have 1) $\leq$ 50% patients who miss all 3 replicates and 2) mean CV < 20%. 
+
+# Data preprocess for transcriptomics
+## Import FPKM data
+```{r}
+# Load and wrangle FPKM dataset
+FPKM_origin <- read_csv("RNASeqReport_Dec28_2018_FPKM.csv")
+
+# Check the original number of patients in the FPKM dataset
+ncol(FPKM_origin) - 3 # There are 93 patients
+
+# Check the original number of genes in the FPKM dataset
+nrow(FPKM_origin) # There are 20422 genes
+
+# Clean FPKM dataset
+FPKM_data <- FPKM_origin %>%
+  select(-c(`...1`, Entrez.ID)) %>%
+  t() %>% # Gene name as column names, and sample id as row names
+  janitor::row_to_names(., row_number = 1) %>% # Transform first-row values as column names 
+  data.frame(check.names = FALSE) %>%
+  mutate(across(everything(), function(x) as.numeric(x)))
+
+# Extract the FPKM sample id and check the updated number of patients
+FPKM_sample_id <- rownames(FPKM_data)
+# length(FPKM_sample_id) # There are 93 patients
+
+# Find the common sample id between the FPKM dataset and lipidomics dataset
+sample_id_intersect <- intersect(FPKM_sample_id, lipid_sample_id)
+
+# Use the common sample id to subset the transcriptomics dataset
+FPKM_data_2 <- FPKM_data[sample_id_intersect, ]
+
+# Check the updated number of patients
+nrow(FPKM_data_2) # There are 81 patients
+
+# Save cleaned data to disk
+saveRDS(object = FPKM_data_2, file = "FPKM_data_2.RDS")
+```
+
+* Now we have a total of 81 patients who have both eligible transcriptomics and lipid analytes information.
+
+## Check the distribution of gene expression in FPKM
+### First 9 genes
+```{r}
+# Create a batch histogram plotting function
+histogram <- function(gene_name, dataset){
+  ggplot(data = get(dataset), 
+         mapping = aes(x = get(gene_name))) + 
+    geom_histogram(bins = 30, fill = "#B31B1B") + 
+    theme_bw() +
+    labs(
+      y = "Count",
+      x = paste0(gene_name, " FPKM")) + 
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+# Plot the distribution of gene expression levels of first 9 genes
+gene_name <- colnames(FPKM_data_2) # Extract gene names
+library(gridExtra)
+plot_array <- lapply(gene_name[1:9], histogram, "FPKM_data_2")
+grid.arrange(do.call("arrangeGrob", c(plot_array, ncol = 3)))
+```
+
+**Interpretation:** Since some gene expression levels in FPKM are skewed, we use $log_2(FPKM + 0.5)$ to normalize the gene expression levels.
+
+```{r eval=FALSE}
+# Log2 transform FPKM for each gene
+FPKM_data_log <- log2(FPKM_data_2 + 0.5)
+saveRDS(object = FPKM_data_log, file = "FPKM_data_log.RDS")
+```
+
+## Check the distribution of gene expression in log2(FPKM + 0.5)
+### First 9 genes
+```{r}
+# Create a batch histogram plotting function
+histogram <- function(gene_name, dataset){
+  ggplot(data = get(dataset), 
+         mapping = aes(x = get(gene_name))) + 
+    geom_histogram(bins = 30, fill = "#B31B1B") + 
+    theme_bw() +
+    labs(
+      y = "Count",
+      x = paste0(gene_name, " FPKM-T")) + 
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+# Plot the distribution of gene expression levels of first 9 genes
+gene_name <- colnames(FPKM_data_log
+                      ) # Extract gene names
+library(gridExtra)
+plot_array <- lapply(gene_name[1:9], histogram, "FPKM_data_log")
+grid.arrange(do.call("arrangeGrob", c(plot_array, ncol = 3)))
+```
+
+
+## Import count data [Use this]
+```{r}
+# Load and wrangle count dataset
+Count_origin <- read_csv("RNASeqReport_Dec28_2018_Counts.csv") %>%
+  rename("gene" = "...1")
+
+# Check the original number of patients in the Count dataset
+ncol(Count_origin) - 1 # There are 93 patients
+
+# Check the original number of genes in the Count dataset
+nrow(Count_origin) # There are 25369 genes
+
+# Clean Count dataset
+Count_data <- Count_origin %>%
+  t() %>% # Gene name as column names, and sample id as row names
+  janitor::row_to_names(., row_number = 1) %>% # Transform first-row values as column names 
+  data.frame(check.names = FALSE) %>%
+  mutate(across(everything(), function(x) as.numeric(x)))
+
+# Extract the Count sample id and check the updated number of patients
+Count_sample_id <- rownames(Count_data)
+# length(Count_sample_id) # There are 93 patients
+
+# Find the common sample id between the Count dataset and lipidomics dataset
+sample_id_intersect_count <- intersect(Count_sample_id, lipid_sample_id)
+
+# Use the common sample id to subset the transcriptomics dataset
+Count_data_2 <- Count_data[sample_id_intersect_count, ]
+
+# Check the updated number of patients
+nrow(Count_data_2) # There are 81 patients
+
+# Save cleaned data to disk
+saveRDS(object = Count_data_2, file = "Count_data_2.RDS")
+```
+
+* Now we have a total of 81 patients who have both eligible transcriptomics and lipid analytes information.
+
+## Check the distribution of gene expression in count
+### First 9 genes
+```{r}
+# Create a batch histogram plotting function
+histogram <- function(gene_name, dataset){
+  ggplot(data = get(dataset), 
+         mapping = aes(x = get(gene_name))) + 
+    geom_histogram(bins = 30, fill = "#B31B1B") + 
+    theme_bw() +
+    labs(
+      y = "Count",
+      x = paste0(gene_name, " count")) + 
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+# Plot the distribution of gene expression levels of first 9 genes
+gene_name <- colnames(Count_data_2) # Extract gene names
+library(gridExtra)
+plot_array <- lapply(gene_name[1:9], histogram, "Count_data_2")
+grid.arrange(do.call("arrangeGrob", c(plot_array, ncol = 3)))
+```
+
+**Interpretation:** Since some gene expression levels in count are skewed where low and/or high count outliers are observed, we use variance stabilizing transformation (VST) to normalize the gene expression levels.
+
+```{r eval=FALSE}
+# VST for each gene
+## http://master.bioconductor.org/packages/release/workflows/vignettes/rnaseqGene/inst/doc/rnaseqGene.html
+library(DESeq2)
+Count_data_vst <- varianceStabilizingTransformation(as.matrix(Count_data_2 + 1)) # Expression must be a positive integer
+Count_data_vst <- data.frame(Count_data_vst)
+saveRDS(object = Count_data_vst, file = "Count_data_vst.RDS")
+```
+
+## Check the distribution of gene expression in vst
+### First 9 genes
+```{r}
+# Create a batch histogram plotting function
+histogram <- function(gene_name, dataset){
+  ggplot(data = get(dataset), 
+         mapping = aes(x = get(gene_name))) + 
+    geom_histogram(bins = 30, fill = "#B31B1B") + 
+    theme_bw() +
+    labs(
+      y = "Count",
+      x = paste0(gene_name, " vst")) + 
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+# Plot the distribution of gene expression levels of first 9 genes
+gene_name <- colnames(Count_data_vst) # Extract gene names
+library(gridExtra)
+plot_array <- lapply(gene_name[1:9], histogram, "Count_data_vst")
+grid.arrange(do.call("arrangeGrob", c(plot_array, ncol = 3)))
+```
+**Interpretation:**
+The above histograms show that after vst, some gene expression levels still have skewed distributions. Vst is not sufficient to normalize all gene expression levels. This motivates us to use the robust measure `median absolute deviation (MAD)`, rather than standard deviation which is more affected by extremely high or extremely low values and non-normality, in order to select the most variable genes defined by MAD higher than 0.5. \
+[Reference](https://www.cell.com/cancer-cell/fulltext/S1535-6108(09)00432-2)
+
+## Select most variable genes (vst) 
+
+In order to avoid screening out genes valuable for downstream analyses, we set a series of cut-off values of MAD: 0.5.
+```{r eval=FALSE}
+top_var_gene <- Count_data_vst %>%
+  select_if(function(x) mad(x) > 0.5)
+ncol(top_var_gene) # A total of 19427 genes of 25369 genes are selected as most variable genes
+saveRDS(object = top_var_gene, file = "top_var_gene_0.5.RDS")
+```
+
+* A total of 19427 genes of 25369 genes are selected as most variable genes.
+
+## Obtain a list of genes related to lipid synthesis and catabolism
+
+```{r}
+library(qusage)
+# Lipid metabolism-related genes
+## https://www.gsea-msigdb.org/gsea/msigdb/human/geneset/GOBP_LIPID_METABOLIC_PROCESS.html
+lipid_met <- read.gmt("GOBP_LIPID_METABOLIC_PROCESS.v2022.1.Hs.gmt")
+lipid_met_gene_list <- intersect(lipid_met[["GOBP_LIPID_METABOLIC_PROCESS"]], colnames(top_var_gene))
+top_var_lipid_gene <- top_var_gene[lipid_met_gene_list]
+```
+
+## Integrate the final gene dataset with the clinical dataset
+
+```{r eval=FALSE, warning=FALSE}
+# Load and filter the clinical dataset using sample id affiliated to the gene dataset
+clinical_data_2 <- clinical_data %>% 
+  filter(`Sample ID` %in% sample_id_intersect_count)
+
+# Merge the clinical dataset with the final gene dataset 
+top_var_lipid_gene$`Sample ID` <- sample_id_intersect_count
+# top_var_lipid_gene$`Sample ID` == rownames(top_var_lipid_gene)
+data_full_2 <- merge(x = clinical_data_2, 
+                     y = top_var_lipid_gene, 
+                     by.x = "Sample ID", 
+                     by.y = "Sample ID")
+```
+
+
+
+# Obesity-related conditions
+
+* elevated BMI
+* OwOb
+* elevated fat:lean ratio
+* elevated total body fat
+* elevated total fat mass
+* elevated trunk fat
+* elevated trunk fat mass
+* elevated CLSB cm2
+* CLSB yes
+
+# Relationships between continuous total body fat (%) and lipids/genes related to lipid metabolism
+
+## QQ plot of total body fat (%)
+
+```{r eval=FALSE}
+qqplot_shapiro <- function(variable, dataset) {
+  dataset %>% 
+    ggplot(aes(sample = get(variable))) + 
+    stat_qq() + 
+    stat_qq_line() + 
+    labs(title = variable, y = "Sample Quantile", x = "Theoretical Quantile") + theme_minimal(base_size = 12) + 
+    theme(plot.title = element_text(face = "bold", size = 12))}
+
+qq_plot_totalfatpercent <- c("TotalFat.percent") %>% map(.f = qqplot_shapiro, dataset = data_full)
+
+grid.arrange(do.call("arrangeGrob", c(qq_plot_totalfatpercent[1], ncol = 2)))
+```
+
+## Spearman correlation - lipid
+
+Since the distributions of total body fat (%) and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with total body fat (%).
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous total body fat (%) and each lipid
+# Create a user-written function to output organized correlation results
+cor_fun <- function(lipid_name, dataset, outcome) {
+  cor.test(getElement(dataset, outcome), getElement(dataset, lipid_name), 
+           method = "spearman")} %>% 
+  tidy()
+
+# Use eligible dataset to output the correlation results
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "TotalFat.percent") %>%
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store significant results
+cor_sig_totalfatpercent <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_totalfatpercent_2 <- cor_sig_totalfatpercent %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+## Spearman correlation - gene
+
+```{r warning=FALSE, eval=FALSE}
+# Use eligible dataset to output the correlation results
+cor_result <- names(top_var_lipid_gene)[-1214] %>% 
+  map_dfr(cor_fun, dataset = data_full_2, outcome = "TotalFat.percent") %>%
+  janitor::clean_names()
+cor_result$gene <- names(top_var_lipid_gene)[-1214] # Revise
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store significant results
+cor_sig_totalfatpercent <- cor_result %>% 
+  select(gene, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_totalfatpercent_2 <- cor_sig_totalfatpercent %>% 
+  select(gene, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+
+## Correlation heatmap [outdated]
+
+```{r eval=FALSE}
+# Visualize the significant correlation using the heatmap
+# Create a user-written heatmap function
+cor_heatmap_fun <- function(dataset, outcome) {
+  ggplot() +
+    geom_bar(data = dataset, aes(x = lipid_name, y = get(outcome), fill = estimate), colour = "white", stat = "identity", position = position_dodge(0.7), width = 1) +  
+    labs(y = "", x = "Lipid Species", fill = "Spearman Correlation") + 
+    theme_minimal() + 
+    theme(panel.grid.major = element_blank(), panel.border = element_blank(), panel.background = element_blank(), axis.ticks = element_blank(),  axis.text.x = element_text(size = 8, angle = 90, hjust = 1, color = "black"), plot.caption = element_text(hjust = 0, size = 12)) + 
+    scale_fill_gradient2(low = "darkgreen", mid = "white", high = "firebrick4")}
+
+cor_sig_totalfatpercent_2$TotalFat.percent <- rep("Total body fat (%)", times = 8) 
+cor_heatmap_totalfatpercent <- cor_heatmap_fun(dataset = cor_sig_totalfatpercent_2, outcome = "TotalFat.percent")
+grid.arrange(cor_heatmap_totalfatpercent, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+
+# Relationships between continuous total fat mass (kg) and lipids
+
+## QQ plot of total fat mass (kg)
+
+```{r eval=FALSE}
+qq_plot_totalfatmass <- c("TotalFatMass.kg") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_totalfatmass[1], ncol = 2)))
+```
+
+
+## Spearman correlation
+
+Since the distributions of total fat mass (kg) and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with total fat mass (kg).
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous total fat mass (kg) and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "TotalFatMass.kg") %>%
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_totalfatmass <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_totalfatmass_2 <- cor_sig_totalfatmass %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+
+# Relationships between continuous total lean mass (kg) and lipids
+
+## QQ plot of total lean mass (kg)
+
+```{r eval=FALSE}
+qq_plot_totalleanmass <- c("TotalLeanMass.kg") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_totalleanmass[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of total lean mass (kg) and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with total lean mass (kg).
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous total lean mass (kg) and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "TotalLeanMass.kg") %>%
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_totalleanmass <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_totalleanmass_2 <- cor_sig_totalleanmass %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) # No significant lipids after Benjamini & Hochberg adjustments
+```
+
+
+# Relationships between continuous fat:lean ratio and lipids
+
+## QQ plot of fat:lean ratio
+
+```{r eval=FALSE}
+qq_plot_fatleanratio <- c("FatLeanRatio") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_fatleanratio[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of fat:lean ratio and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with fat:lean ratio.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous fat:lean ratio and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "FatLeanRatio") %>%
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_fatleanratio <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_fatleanratio_2 <- cor_sig_fatleanratio %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_fatleanratio_2$FatLeanRatio <- rep("Fat:lean ratio", times = 8) 
+cor_heatmap_fatleanratio <- cor_heatmap_fun(dataset = cor_sig_fatleanratio_2, outcome = "FatLeanRatio")
+grid.arrange(cor_heatmap_fatleanratio, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between continuous trunk fat (%) and lipids
+
+## QQ plot of trunk fat (%)
+
+```{r eval=FALSE}
+qq_plot_trunkfatpercent <- c("TrunkFat.percent") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_trunkfatpercent[1], ncol = 2)))
+```
+
+## Spearman correlation - lipid
+
+Since the distributions of trunk fat (%) and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with trunk fat (%).
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous trunk fat (%) and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "TrunkFat.percent") %>%
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_trunkfatpercent <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_trunkfatpercent_2 <- cor_sig_trunkfatpercent %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, names(cor_sig_trunkfatpercent$lipid_name)])
+lipid_trunk_test_sig <- lipid_ffa_MM_final[, names(cor_sig_trunkfatpercent$lipid_name)] %>% apply(2, rank) %>% t()
+rownames(lipid_trunk_test_sig) <- lipid_label
+names(rownames(lipid_trunk_test_sig)) <- NULL
+
+# Store significant lipid names
+names(cor_sig_trunkfatpercent$lipid_name) <- NULL
+lipid_sig_continuous_trunkfatpercent <- c(cor_sig_trunkfatpercent$lipid_name) 
+
+# Sort the column names of lipid_trunk_test_sig based on the increasing order of trunk fat percent
+lipid_trunk_test_sig <- lipid_trunk_test_sig[, order(clinical_data$TrunkFat.percent)]
+```
+
+## Spearman correlation - gene
+
+```{r warning=FALSE, eval=FALSE}
+# Use eligible dataset to output the correlation results
+cor_result <- names(top_var_lipid_gene)[-1214] %>% # -1214: Sample ID
+  map_dfr(cor_fun, dataset = data_full_2, outcome = "TrunkFat.percent") %>%
+  janitor::clean_names()
+cor_result$gene_name <- names(top_var_lipid_gene)[-1214] # Revise
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store significant results
+cor_sig_trunkfatpercent <- cor_result %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_trunkfatpercent_2 <- cor_sig_trunkfatpercent %>% 
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) # 325 genes have the BH adjusted P-values < 0.05
+
+# Store significant gene names
+gene_sig_continuous_trunkfatpercent <- c(cor_sig_trunkfatpercent$gene_name) 
+```
+
+#### Significant lipid ~ significant gene ~ 81 patients
+```{r warning=FALSE}
+# data_full_3: lipid_eligible_MM_final + top_var_lipid_gene
+# Use eligible dataset to output the correlation results
+
+number_lipid_gene_sig_pos <- vector(length = length(lipid_sig_continuous_trunkfatpercent))
+number_lipid_gene_sig_pos_BH <- vector(length = length(lipid_sig_continuous_trunkfatpercent))
+number_lipid_gene_sig_neg <- vector(length = length(lipid_sig_continuous_trunkfatpercent))
+number_lipid_gene_sig_neg_BH <- vector(length = length(lipid_sig_continuous_trunkfatpercent))
+
+cor_result <- vector(mode = "list", length = length(lipid_sig_continuous_trunkfatpercent))
+cor_lipid_gene_sig_trunkfatpercent_pos <- vector(mode = "list", length = length(lipid_sig_continuous_trunkfatpercent))
+cor_lipid_gene_sig_trunkfatpercent_pos_BH <- vector(mode = "list", length = length(lipid_sig_continuous_trunkfatpercent))
+cor_lipid_gene_sig_trunkfatpercent_neg <- vector(mode = "list", length = length(lipid_sig_continuous_trunkfatpercent))
+cor_lipid_gene_sig_trunkfatpercent_neg_BH <- vector(mode = "list", length = length(lipid_sig_continuous_trunkfatpercent))
+  
+for (lipid_sig_id in 1:length(lipid_sig_continuous_trunkfatpercent)) {
+  cor_result[[lipid_sig_id]] <- gene_sig_continuous_trunkfatpercent %>% 
+    map_dfr(cor_fun, dataset = data_full_3, outcome = lipid_sig_continuous_trunkfatpercent[lipid_sig_id]) %>%
+    janitor::clean_names()
+  cor_result[[lipid_sig_id]]$gene_name <- gene_sig_continuous_trunkfatpercent # Revise
+  cor_result[[lipid_sig_id]]$adjusted_p_value <- p.adjust(cor_result[[lipid_sig_id]]$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store positive significant results
+cor_lipid_gene_sig_trunkfatpercent_pos[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05 & estimate > 0)
+cor_lipid_gene_sig_trunkfatpercent_pos_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_trunkfatpercent_pos[[lipid_sig_id]] %>%
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Store negative significant results
+cor_lipid_gene_sig_trunkfatpercent_neg[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05 & estimate < 0)
+cor_lipid_gene_sig_trunkfatpercent_neg_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_trunkfatpercent_neg[[lipid_sig_id]] %>%
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Record the number of genes positively significantly associated with lipids
+number_lipid_gene_sig_pos[lipid_sig_id] <- nrow(cor_lipid_gene_sig_trunkfatpercent_pos[[lipid_sig_id]])
+number_lipid_gene_sig_pos_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_trunkfatpercent_pos_BH[[lipid_sig_id]])
+
+# Record the number of genes negatively significantly associated with lipids
+number_lipid_gene_sig_neg[lipid_sig_id] <- nrow(cor_lipid_gene_sig_trunkfatpercent_neg[[lipid_sig_id]])
+number_lipid_gene_sig_neg_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_trunkfatpercent_neg_BH[[lipid_sig_id]])
+}
+```
+
+#### Create a heatmap
+```{r}
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+# 88 patients
+jpeg("heatmap_continuous_trunk_Oct8.jpeg", width = 52, height = 20, units = "cm", res = 300)
+heatmap_con_trunk <- Heatmap(lipid_trunk_test_sig, 
+                             name = "Ranked \nExpression", 
+                             cluster_rows = FALSE, 
+                             cluster_columns = FALSE, 
+                             column_title = "Trunk Fat (%)",
+                             column_title_gp = gpar(fontsize = 20, fontface = "bold"),
+                             col = col_fun, 
+                             column_gap = unit(3, "mm"),
+                             border = TRUE,
+                             width = unit(30, "cm"), 
+                             height = unit(16, "cm"),
+                             right_annotation = rowAnnotation("Number of significant lipid-metabolism genes \npositively associated with deregulation of lipid expression \nin two trunk fat states" = anno_barplot(number_lipid_gene_sig_pos)),
+                             left_annotation = rowAnnotation(
+                               "Number of significant lipid-metabolism genes \nnegatively associated with deregulation of lipid expression \nin two trunk fat states" = anno_barplot(number_lipid_gene_sig_neg,                                                                                                     axis_param = list(direction = "reverse"))))
+
+draw(heatmap_con_trunk)
+dev.off()
+```
+
+# Relationships between binary trunk fat (%) and lipids
+
+## QQ normal plot and shapiro test
+```{r}
+## Use map to repeatedly plot qqplots of trunk fat (%) 
+data_full <- data_full
+qqplot_shapiro <- function(variable, dataset) {
+  dataset %>% 
+    ggplot(aes(sample = get(variable))) + 
+    stat_qq() + 
+    stat_qq_line() + 
+    labs(title = variable, y = "Sample Quantile", x = "Theoretical Quantile") +
+    theme_minimal(base_size = 12) + 
+    theme(plot.title = element_text(face = "bold", size = 12)) + 
+    annotate("text", x = -0.5, y = 50, 
+             label = paste0("Shapiro Wilk Test \nP-value: ", shapiro.test(getElement(dataset, variable))$p.value %>% round(4)), 
+             col = "red")
+    }
+
+c("TrunkFat.percent") %>% map(.f = qqplot_shapiro, dataset = data_full)
+```
+
+
+## Create a heatmap
+
+### Binary trunk fat percent
+#### Lipid ~ trunk fat percent ~ 88 patients
+```{r}
+library(broom)
+# Use map_dfr to repeatedly derive the relationship between binary trunk fat (%) and each lipid
+# Create a user-written function to output organized Welch t test results (CLT)
+test_fun <- function(lipid_name, dataset, outcome) {
+  t.test(getElement(dataset, lipid_name) ~ getElement(dataset, outcome), 
+         data = dataset, 
+         var.equal = FALSE)} %>% 
+  tidy()
+
+# Dichotomy
+data_full$trunkfatpercent_cat <- ifelse(data_full$TrunkFat.percent > median(data_full$TrunkFat.percent), "Trunk fat (%) > 39.6", "Trunk fat (%) ≤ 39.6")
+# Factorize and order the variable
+trunkfatpercent_cat <- with(data_full, 
+                            factor(trunkfatpercent_cat, levels = c("Trunk fat (%) ≤ 39.6", "Trunk fat (%) > 39.6"), order = TRUE))
+
+# Generate the Welch t test results
+test_res <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(test_fun, dataset = data_full, outcome = "trunkfatpercent_cat") %>%
+  janitor::clean_names()
+
+test_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+test_sig <- test_res %>% select(lipid_name, everything()) %>% filter(p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, test_sig$lipid_name])
+lipid_trunk_test_sig <- lipid_ffa_MM_final[, test_sig$lipid_name] %>% apply(2, rank) %>% t()
+rownames(lipid_trunk_test_sig) <- lipid_label
+names(rownames(lipid_trunk_test_sig)) <- NULL
+lipid_sig_binary_trunkfatpercent <- rownames(lipid_trunk_test_sig) 
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+jpeg("heatmap_binary_trunk_Welch_Sep30.jpeg", width = 40, height = 16, units = "cm", res = 300)
+heatmap_cat_trunk <- Heatmap(lipid_trunk_test_sig, 
+                             name = "Ranked \nExpression", 
+                             cluster_rows = FALSE, 
+                             cluster_columns = FALSE, 
+                             column_split = trunkfatpercent_cat, 
+                             column_title_gp = gpar(fontsize = 20),
+                             col = col_fun, 
+                             column_gap = unit(3, "mm"),
+                             # rect_gp = gpar(col = "white", lwd = 1),
+                             border = TRUE,
+                             width = unit(30, "cm"), 
+                             height = unit(14, "cm"))
+
+draw(heatmap_cat_trunk)
+dev.off()
+```
+
+#### Gene ~ trunk fat percent ~ 81 patients
+```{r}
+# data_full_2: top_var_lipid_gene + clinical_data
+# Dichotomy
+data_full_2$trunkfatpercent_cat <- ifelse(data_full_2$TrunkFat.percent > median(data_full_2$TrunkFat.percent), "Trunk fat (%) > 39.6", "Trunk fat (%) ≤ 39.6") 
+# Factorize and order the variable
+trunkfatpercent_cat <- with(data_full_2, 
+                            factor(trunkfatpercent_cat, levels = c("Trunk fat (%) ≤ 39.6", "Trunk fat (%) > 39.6"), order = TRUE))
+
+# Generate the Welch t test results
+test_res <- names(top_var_lipid_gene)[-1214] %>% 
+  map_dfr(test_fun, dataset = data_full_2, outcome = "trunkfatpercent_cat") %>%
+  janitor::clean_names()
+
+# Create a column that records the gene name
+test_res$gene_name <- names(top_var_lipid_gene)[-1214]
+
+# Store significant results
+test_sig <- test_res %>% select(gene_name, everything()) %>% filter(p_value < 0.05)
+
+# Store significant gene names
+gene_sig_binary_trunkfatpercent <- c(test_sig$gene_name)
+```
+
+#### Significant lipid ~ significant gene ~ 81 patients
+```{r warning=FALSE}
+# data_full_3: lipid_eligible_MM_final + top_var_lipid_gene
+# Use eligible dataset to output the correlation results
+
+number_lipid_gene_sig_pos <- vector(length = length(lipid_sig_binary_trunkfatpercent))
+number_lipid_gene_sig_pos_BH <- vector(length = length(lipid_sig_binary_trunkfatpercent))
+number_lipid_gene_sig_neg <- vector(length = length(lipid_sig_binary_trunkfatpercent))
+number_lipid_gene_sig_neg_BH <- vector(length = length(lipid_sig_binary_trunkfatpercent))
+
+cor_result <- vector(mode = "list", length = length(lipid_sig_binary_trunkfatpercent))
+cor_lipid_gene_sig_trunkfatpercent_pos <- vector(mode = "list", length = length(lipid_sig_binary_trunkfatpercent))
+cor_lipid_gene_sig_trunkfatpercent_pos_BH <- vector(mode = "list", length = length(lipid_sig_binary_trunkfatpercent))
+cor_lipid_gene_sig_trunkfatpercent_neg <- vector(mode = "list", length = length(lipid_sig_binary_trunkfatpercent))
+cor_lipid_gene_sig_trunkfatpercent_neg_BH <- vector(mode = "list", length = length(lipid_sig_binary_trunkfatpercent))
+  
+for (lipid_sig_id in 1:length(lipid_sig_binary_trunkfatpercent)) {
+  cor_result[[lipid_sig_id]] <- gene_sig_binary_trunkfatpercent %>% 
+    map_dfr(cor_fun, dataset = data_full_3, outcome = lipid_sig_binary_trunkfatpercent[lipid_sig_id]) %>%
+    janitor::clean_names()
+  cor_result[[lipid_sig_id]]$gene_name <- gene_sig_binary_trunkfatpercent # Revise
+  cor_result[[lipid_sig_id]]$adjusted_p_value <- p.adjust(cor_result[[lipid_sig_id]]$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store positive significant results
+cor_lipid_gene_sig_trunkfatpercent_pos[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05 & estimate > 0)
+cor_lipid_gene_sig_trunkfatpercent_pos_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_trunkfatpercent_pos[[lipid_sig_id]] %>%
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Store negative significant results
+cor_lipid_gene_sig_trunkfatpercent_neg[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05 & estimate < 0)
+cor_lipid_gene_sig_trunkfatpercent_neg_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_trunkfatpercent_neg[[lipid_sig_id]] %>%
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Record the number of genes positively significantly associated with lipids
+number_lipid_gene_sig_pos[lipid_sig_id] <- nrow(cor_lipid_gene_sig_trunkfatpercent_pos[[lipid_sig_id]])
+number_lipid_gene_sig_pos_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_trunkfatpercent_pos_BH[[lipid_sig_id]])
+
+# Record the number of genes negatively significantly associated with lipids
+number_lipid_gene_sig_neg[lipid_sig_id] <- nrow(cor_lipid_gene_sig_trunkfatpercent_neg[[lipid_sig_id]])
+number_lipid_gene_sig_neg_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_trunkfatpercent_neg_BH[[lipid_sig_id]])
+
+}
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+# 88 patients
+trunkfatpercent_cat <- with(data_full, 
+                            factor(trunkfatpercent_cat, levels = c("Trunk fat (%) ≤ 39.6", "Trunk fat (%) > 39.6"), order = TRUE))
+
+
+jpeg("heatmap_binary_trunk_Welch_Oct5.jpeg", width = 52, height = 18, units = "cm", res = 300)
+heatmap_cat_trunk <- Heatmap(lipid_trunk_test_sig, 
+                             name = "Ranked \nExpression", 
+                             cluster_rows = FALSE, 
+                             cluster_columns = FALSE, 
+                             column_split = trunkfatpercent_cat, 
+                             column_title_gp = gpar(fontsize = 20),
+                             col = col_fun, 
+                             column_gap = unit(3, "mm"),
+                             # rect_gp = gpar(col = "white", lwd = 1),
+                             border = TRUE,
+                             width = unit(30, "cm"), 
+                             height = unit(14, "cm"),
+                             right_annotation = rowAnnotation("Number of significant lipid-metabolism genes \npositively associated with deregulation of lipid expression \nin two trunk fat states" = anno_barplot(number_lipid_gene_sig_pos)),
+                             left_annotation = rowAnnotation(
+                               "Number of significant lipid-metabolism genes \nnegatively associated with deregulation of lipid expression \nin two trunk fat states" = anno_barplot(number_lipid_gene_sig_neg,                                                                                                     axis_param = list(direction = "reverse"))))
+
+draw(heatmap_cat_trunk)
+dev.off()
+```
+
+### > 2 categories
+```{r}
+test_fun_2 <- function(lipid_name, dataset, outcome) {
+  kruskal.test (getElement(dataset, lipid_name) ~ getElement(dataset, outcome), 
+                data = dataset)} %>% 
+  tidy()
+
+# Tertile
+data_full <- data_full %>%
+  mutate(tertiles = ntile(TrunkFat.percent, 3)) %>%
+  mutate(trunkfatpercent_cat = if_else(tertiles == 1, "18.2 ≤ Trunk fat (%) ≤ 35.2", 
+                                       if_else(tertiles == 2, "35.2 < Trunk fat (%) ≤ 45.4", "45.4 < Trunk fat (%) ≤ 60.8")))
+# Factorize and order the variable
+trunkfatpercent_cat <- with(data_full, 
+                            factor(trunkfatpercent_cat, levels = c("18.2 ≤ Trunk fat (%) ≤ 35.2", "35.2 < Trunk fat (%) ≤ 45.4", "45.4 < Trunk fat (%) ≤ 60.8"), order = TRUE))
+## Show the break points
+quantile(data_full$TrunkFat.percent, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+
+# Quartile
+data_full <- data_full %>%
+  mutate(quartile = ntile(TrunkFat.percent, 4)) %>%
+  mutate(trunkfatpercent_cat = case_when(quartile == 1 ~ "18.2 ≤ Trunk fat (%) ≤ 31.4", 
+                                         quartile == 2 ~ "31.4 < Trunk fat (%) ≤ 39.6", 
+                                         quartile == 3 ~ "39.6 < Trunk fat (%) ≤ 47.4",
+                                         quartile == 4 ~ "47.4 < Trunk fat (%) ≤ 60.8"))
+# Factorize and order the variable
+trunkfatpercent_cat <- with(data_full, 
+                            factor(trunkfatpercent_cat, levels = c("18.2 ≤ Trunk fat (%) ≤ 31.4", "31.4 < Trunk fat (%) ≤ 39.6", "39.6 < Trunk fat (%) ≤ 47.4", "47.4 < Trunk fat (%) ≤ 60.8"), order = TRUE))
+## Show the break points
+quantile(data_full$TrunkFat.percent, probs = c(0, 1/4, 1/2, 3/4, 1), na.rm = TRUE)
+
+# Quintile
+data_full <- data_full %>%
+  mutate(quintile = ntile(TrunkFat.percent, 5)) %>%
+  mutate(trunkfatpercent_cat = case_when(quintile == 1 ~ "18.2 ≤ Trunk fat (%) ≤ 29.4", 
+                                         quintile == 2 ~ "29.4 < Trunk fat (%) ≤ 36.5", 
+                                         quintile == 3 ~ "36.5 < Trunk fat (%) ≤ 42.9",
+                                         quintile == 4 ~ "42.9 < Trunk fat (%) ≤ 49.6",
+                                         quintile == 5 ~ "49.6 < Trunk fat (%) ≤ 60.8"))
+# Factorize and order the variable
+trunkfatpercent_cat <- with(data_full, 
+                            factor(trunkfatpercent_cat, levels = c("18.2 ≤ Trunk fat (%) ≤ 29.4", "29.4 < Trunk fat (%) ≤ 36.5", "36.5 < Trunk fat (%) ≤ 42.9", "42.9 < Trunk fat (%) ≤ 49.6", "49.6 < Trunk fat (%) ≤ 60.8"), order = TRUE))
+## Show the break points
+quantile(data_full$TrunkFat.percent, probs = c(0, 1/5, 2/5, 3/5, 4/5, 1), na.rm = TRUE)
+
+#####
+# For > 2 categories
+test_res <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(test_fun_2, dataset = data_full, outcome = "trunkfatpercent_cat") %>%
+  janitor::clean_names()
+
+test_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+test_sig <- test_res %>% select(lipid_name, everything()) %>% filter(p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, test_sig$lipid_name])
+lipid_trunk_test_sig <- lipid_ffa_MM_final[, test_sig$lipid_name] %>% apply(2, rank) %>% t()
+rownames(lipid_trunk_test_sig) <- lipid_label
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+trunkfatpercent_cat <- data.frame(trunkfatpercent_cat = data_full$trunkfatpercent_cat)
+
+jpeg("heatmap_cat_trunk_kruskal_Sep30.jpeg", width = 40, height = 16, units = "cm", res = 300)
+heatmap_cat_trunk <- Heatmap(lipid_trunk_test_sig, name = "Ranked \nExpression", cluster_rows = FALSE, cluster_columns = FALSE, column_split = trunkfatpercent_cat, col = col_fun, width = unit(30, "cm"), height = unit(14, "cm"))
+draw(heatmap_cat_trunk)
+dev.off()
+```
+
+
+# Relationships between continuous trunk fat mass (kg) and lipids
+
+## QQ plot of trunk fat mass (kg)
+
+```{r eval=FALSE}
+qq_plot_trunkfatmass <- c("TrunkFatMass.kg") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_trunkfatmass[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of trunk fat mass (kg) and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with trunk fat mass (kg).
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous trunk fat mass (kg) and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "TrunkFatMass.kg") %>%
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_trunkfatmass <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_trunkfatmass_2 <- cor_sig_trunkfatmass %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_trunkfatmass_2$TrunkFatMass.kg <- rep("Trunk fat mass (kg)", times = 7) 
+cor_heatmap_trunkfatmass <- cor_heatmap_fun(dataset = cor_sig_trunkfatmass_2, outcome = "TrunkFatMass.kg")
+grid.arrange(cor_heatmap_trunkfatmass, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between continuous waist:hip ratio and lipids
+
+## QQ plot of waist:hip ratio
+
+```{r eval=FALSE}
+qq_plot_waisthipratio <- c("WaistHip.Ratio") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_waisthipratio[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of waist:hip ratio and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with waist:hip ratio.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous waist:hip ratio and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "WaistHip.Ratio") %>%
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_waisthipratio <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_waisthipratio_2 <- cor_sig_waisthipratio %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) # No significant lipids after Benjamini & Hochberg adjustments
+```
+
+
+# Relationships between continuous body mass index (kg/m2) and lipids
+
+## QQ plot of body mass index (kg/m2)
+
+```{r eval=FALSE}
+qq_plot_bmi <- c("BMI") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_bmi[1], ncol = 2)))
+```
+
+## Spearman correlation - lipid
+
+```{r warning=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous body mass index and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full[c(-61), ], outcome = "BMI") %>% # Remove ID = 1836 who misses BMI
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_bmi <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_bmi_2 <- cor_sig_bmi %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, names(cor_sig_bmi$lipid_name)])
+lipid_bmi_test_sig <- lipid_ffa_MM_final[c(-61), names(cor_sig_bmi$lipid_name)] %>% 
+  apply(2, rank) %>% 
+  t() 
+rownames(lipid_bmi_test_sig) <- lipid_label
+names(rownames(lipid_bmi_test_sig)) <- NULL
+
+# Store significant lipid names
+names(cor_sig_bmi$lipid_name) <- NULL
+lipid_sig_continuous_bmi <- c(cor_sig_bmi$lipid_name) 
+
+# Sort the column names of lipid_bmi_test_sig based on the increasing order of BMI
+lipid_bmi_test_sig <- lipid_bmi_test_sig[, as.character(order(clinical_data$BMI))[-88]] # Remove the last one - BMI as NA
+```
+
+## Spearman correlation - gene
+
+```{r warning=FALSE, eval=FALSE}
+# Use eligible dataset to output the correlation results
+cor_result <- names(top_var_lipid_gene)[-1214] %>% 
+  map_dfr(cor_fun, dataset = data_full_2[-c(58), ], outcome = "BMI") %>% # Remove ID = 1836 who misses BMI
+  janitor::clean_names()
+cor_result$gene_name <- names(top_var_lipid_gene)[-1214] # Revise
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store significant results
+cor_sig_bmi <- cor_result %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_bmi_2 <- cor_sig_bmi %>% 
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) # 262 genes have the BH adjusted P-values < 0.05
+
+# Store significant gene names
+gene_sig_continuous_bmi <- c(cor_sig_bmi$gene_name) 
+```
+
+
+## Significant lipid ~ significant gene ~ 80 patients - remove ID 1836
+
+```{r warning=FALSE}
+# data_full_3: lipid_eligible_MM_final + top_var_lipid_gene
+# Use eligible dataset to output the correlation results
+
+number_lipid_gene_sig_pos <- vector(length = length(lipid_sig_continuous_bmi))
+number_lipid_gene_sig_pos_BH <- vector(length = length(lipid_sig_continuous_bmi))
+number_lipid_gene_sig_neg <- vector(length = length(lipid_sig_continuous_bmi))
+number_lipid_gene_sig_neg_BH <- vector(length = length(lipid_sig_continuous_bmi))
+
+cor_result <- vector(mode = "list", length = length(lipid_sig_continuous_bmi))
+cor_lipid_gene_sig_bmi_pos <- vector(mode = "list", length = length(lipid_sig_continuous_bmi))
+cor_lipid_gene_sig_bmi_pos_BH <- vector(mode = "list", length = length(lipid_sig_continuous_bmi))
+cor_lipid_gene_sig_bmi_neg <- vector(mode = "list", length = length(lipid_sig_continuous_bmi))
+cor_lipid_gene_sig_bmi_neg_BH <- vector(mode = "list", length = length(lipid_sig_continuous_bmi))
+  
+for (lipid_sig_id in 1:length(lipid_sig_continuous_bmi)) {
+  cor_result[[lipid_sig_id]] <- gene_sig_continuous_bmi %>% 
+    map_dfr(cor_fun, dataset = data_full_3[c(-58), ], outcome = lipid_sig_continuous_bmi[lipid_sig_id]) %>% # Remove ID 1836
+    janitor::clean_names()
+  cor_result[[lipid_sig_id]]$gene_name <- gene_sig_continuous_bmi # Revise
+  cor_result[[lipid_sig_id]]$adjusted_p_value <- p.adjust(cor_result[[lipid_sig_id]]$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store positive significant results
+cor_lipid_gene_sig_bmi_pos[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05 & estimate > 0)
+cor_lipid_gene_sig_bmi_pos_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_bmi_pos[[lipid_sig_id]] %>%
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Store negative significant results
+cor_lipid_gene_sig_bmi_neg[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05 & estimate < 0)
+cor_lipid_gene_sig_bmi_neg_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_bmi_neg[[lipid_sig_id]] %>%
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Record the number of genes positively significantly associated with lipids
+number_lipid_gene_sig_pos[lipid_sig_id] <- nrow(cor_lipid_gene_sig_bmi_pos[[lipid_sig_id]])
+number_lipid_gene_sig_pos_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_bmi_pos_BH[[lipid_sig_id]])
+
+# Record the number of genes negatively significantly associated with lipids
+number_lipid_gene_sig_neg[lipid_sig_id] <- nrow(cor_lipid_gene_sig_bmi_neg[[lipid_sig_id]])
+number_lipid_gene_sig_neg_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_bmi_neg_BH[[lipid_sig_id]])
+}
+```
+
+## Create a heatmap
+```{r}
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+# 87 patients
+jpeg("heatmap_continuous_bmi_Oct8.2.jpeg", width = 52, height = 20, units = "cm", res = 300)
+heatmap_con_bmi <- Heatmap(lipid_bmi_test_sig, 
+                           name = "Ranked \nExpression", 
+                           cluster_rows = FALSE, 
+                           cluster_columns = FALSE, 
+                           column_title = "Body Mass Index",
+                           column_title_gp = gpar(fontsize = 20, fontface = "bold"),
+                           show_column_names = FALSE,
+                           col = col_fun, 
+                           column_gap = unit(3, "mm"),
+                           border = TRUE,
+                           width = unit(30, "cm"), 
+                           height = unit(16, "cm"),
+                           right_annotation = rowAnnotation("Number of significant lipid-metabolism genes \npositively associated with deregulation of lipid expression \nin two bmi fat states" = anno_barplot(number_lipid_gene_sig_pos)),
+                           left_annotation = rowAnnotation("Number of significant lipid-metabolism genes \nnegatively associated with deregulation of lipid expression \nin two bmi fat states" = anno_barplot(number_lipid_gene_sig_neg,                                                          axis_param = list(direction = "reverse"))))
+
+draw(heatmap_con_bmi)
+dev.off()
+```
+
+# Relationships between categorical body mass index (kg/m2) and lipids
+## Create a heatmap
+
+### Lipid ~ normalweight/underweight vs overweight/obese ~ 87 patients
+```{r}
+# Use map_dfr to repeatedly derive the relationship between binary BMI and each lipid
+# data_full <- data_full
+
+# For binary
+test_res <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(test_fun, dataset = data_full[c(-61)], outcome = "BMI.cat2") %>%
+  janitor::clean_names()
+
+test_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+test_sig <- test_res %>% select(lipid_name, everything()) %>% filter(p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, test_sig$lipid_name])
+lipid_bmi_test_sig <- lipid_ffa_MM_final[c(-61), test_sig$lipid_name] %>% apply(2, rank) %>% t() # Remove ID = 1836 who misses BMI
+rownames(lipid_bmi_test_sig) <- lipid_label
+names(rownames(lipid_bmi_test_sig)) <- NULL
+lipid_sig_binary_bmi <- rownames(lipid_bmi_test_sig) 
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+bmi_cat2_no_missing <- data_full %>% 
+  filter(`Sample ID` != "1836") %>% 
+  select(BMI.cat2)
+
+jpeg("heatmap_binary_bmi_Welch_Oct8.jpeg", width = 40, height = 18, units = "cm", res = 300)
+heatmap_binary_bmi <- Heatmap(lipid_bmi_test_sig, 
+                              name = "Ranked \nExpression", 
+                              cluster_rows = FALSE, 
+                              cluster_columns = FALSE, 
+                              column_split = bmi_cat2_no_missing, 
+                              column_title_gp = gpar(fontsize = 20),
+                              show_column_names = FALSE,
+                              col = col_fun,
+                              column_gap = unit(3, "mm"),
+                              # rect_gp = gpar(col = "white", lwd = 1),
+                              border = TRUE,
+                              width = unit(30, "cm"), 
+                              height = unit(16, "cm"))
+draw(heatmap_binary_bmi)
+dev.off()
+```
+
+
+```{r}
+# For table 2
+test_res_2 <- test_res
+test_res_2$lipid_name <- label(lipid_ffa_MM_final)[-1]
+test_sig_2 <- test_res_2 %>% select(lipid_name, everything()) %>% filter(p_value < 0.05)
+test_sig_2$adjusted_p_value <- p.adjust(test_sig_2$p_value, method = "BH")
+test_sig_2$p_value <- test_sig_2$p_value %>% round(3)
+test_sig_2$adjusted_p_value <- test_sig_2$adjusted_p_value %>% round(3)
+
+dat <- cbind(lipid_ffa_MM_final[c(-61), test_sig$lipid_name], bmi_cat2_no_missing)
+
+lipid_bmi_test_sig_mean <- dat %>%
+  group_by(BMI.cat2) %>%
+  summarise(across(everything(), mean)) %>%
+  select(-BMI.cat2) %>%
+  round(1) %>%
+  t() 
+
+lipid_bmi_test_sig_sd <- dat %>%
+  group_by(BMI.cat2) %>%
+  summarise(across(everything(), sd)) %>%
+  select(-BMI.cat2) %>%
+  round(1) %>%
+  t() 
+
+
+lipid_bmi_test_sig_mean_sd_NrmlUw <- paste0(lipid_bmi_test_sig_mean[, 1], "±", lipid_bmi_test_sig_sd[, 1])
+lipid_bmi_test_sig_mean_sd_OwOb <- paste0(lipid_bmi_test_sig_mean[, 2], "±", lipid_bmi_test_sig_sd[, 2])
+
+lipid_bmi_test_sig_final <- data.frame(lipid_name = test_sig_2$lipid_name, 
+                                       NrmlUw = lipid_bmi_test_sig_mean_sd_NrmlUw,
+                                       OwOb = lipid_bmi_test_sig_mean_sd_OwOb,
+                                       p_value = test_sig_2$p_value,
+                                       adjusted_p_value = test_sig_2$adjusted_p_value)
+
+write_csv(lipid_bmi_test_sig_final, file = "table2_lipid_bmi_test_sig.csv")
+```
+
+#### Gene ~ bmi ~ 80 patients
+```{r}
+# data_full_2: top_var_lipid_gene + clinical_data
+# Generate the Welch t test results
+test_res <- names(top_var_lipid_gene)[-1214] %>% 
+  map_dfr(test_fun, dataset = data_full_2[-c(58), ], outcome = "BMI.cat2") %>%
+  janitor::clean_names()
+
+# Create a column that records the gene name
+test_res$gene_name <- names(top_var_lipid_gene)[-1214]
+
+# Store significant results
+test_sig <- test_res %>% select(gene_name, everything()) %>% filter(p_value < 0.05)
+
+# Store significant gene names
+gene_sig_binary_bmi <- c(test_sig$gene_name)
+```
+
+#### Significant lipid ~ significant gene ~ 80 patients
+```{r warning=FALSE}
+# data_full_3: lipid_eligible_MM_final + top_var_lipid_gene
+# Use eligible dataset to output the correlation results
+
+number_lipid_gene_sig_pos <- vector(length = length(lipid_sig_binary_bmi))
+number_lipid_gene_sig_pos_BH <- vector(length = length(lipid_sig_binary_bmi))
+number_lipid_gene_sig_neg <- vector(length = length(lipid_sig_binary_bmi))
+number_lipid_gene_sig_neg_BH <- vector(length = length(lipid_sig_binary_bmi))
+
+cor_result <- vector(mode = "list", length = length(lipid_sig_binary_bmi))
+cor_lipid_gene_sig_bmi_pos <- vector(mode = "list", length = length(lipid_sig_binary_bmi))
+cor_lipid_gene_sig_bmi_pos_BH <- vector(mode = "list", length = length(lipid_sig_binary_bmi))
+cor_lipid_gene_sig_bmi_neg <- vector(mode = "list", length = length(lipid_sig_binary_bmi))
+cor_lipid_gene_sig_bmi_neg_BH <- vector(mode = "list", length = length(lipid_sig_binary_bmi))
+
+for (lipid_sig_id in 1:length(lipid_sig_binary_bmi)) {
+  cor_result[[lipid_sig_id]] <- gene_sig_binary_bmi %>% 
+    map_dfr(cor_fun, dataset = data_full_3[c(-58), ], outcome = lipid_sig_binary_bmi[lipid_sig_id]) %>%
+    janitor::clean_names()
+  cor_result[[lipid_sig_id]]$gene_name <- gene_sig_binary_bmi # Revise
+  cor_result[[lipid_sig_id]]$adjusted_p_value <- p.adjust(cor_result[[lipid_sig_id]]$p_value, method = "BH") # Benjamini & Hochberg
+  
+  # Store positive significant results
+  cor_lipid_gene_sig_bmi_pos[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+    select(gene_name, everything()) %>% 
+    filter(p_value < 0.05 & estimate > 0)
+  cor_lipid_gene_sig_bmi_pos_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_bmi_pos[[lipid_sig_id]] %>%
+    select(gene_name, everything()) %>% 
+    filter(adjusted_p_value < 0.05)
+  
+  # Store negative significant results
+  cor_lipid_gene_sig_bmi_neg[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+    select(gene_name, everything()) %>% 
+    filter(p_value < 0.05 & estimate < 0)
+  cor_lipid_gene_sig_bmi_neg_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_bmi_neg[[lipid_sig_id]] %>%
+    select(gene_name, everything()) %>% 
+    filter(adjusted_p_value < 0.05)
+  
+  # Record the number of genes positively significantly associated with lipids
+  number_lipid_gene_sig_pos[lipid_sig_id] <- nrow(cor_lipid_gene_sig_bmi_pos[[lipid_sig_id]])
+  number_lipid_gene_sig_pos_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_bmi_pos_BH[[lipid_sig_id]])
+  
+  # Record the number of genes negatively significantly associated with lipids
+  number_lipid_gene_sig_neg[lipid_sig_id] <- nrow(cor_lipid_gene_sig_bmi_neg[[lipid_sig_id]])
+  number_lipid_gene_sig_neg_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_bmi_neg_BH[[lipid_sig_id]])
+  
+}
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+# 87 patients
+jpeg("heatmap_binary_bmi_Welch_Oct8.jpeg", width = 52, height = 20, units = "cm", res = 300)
+heatmap_cat_bmi <- Heatmap(lipid_bmi_test_sig, 
+                           name = "Ranked \nExpression", 
+                           cluster_rows = FALSE, 
+                           cluster_columns = FALSE, 
+                           column_split = bmi_cat2_no_missing, 
+                           column_title_gp = gpar(fontsize = 20),
+                           show_column_names = FALSE,
+                           col = col_fun, 
+                           column_gap = unit(3, "mm"),
+                           # rect_gp = gpar(col = "white", lwd = 1),
+                           border = TRUE,
+                           width = unit(30, "cm"), 
+                           height = unit(16, "cm"),
+                           right_annotation = rowAnnotation("Number of significant lipid-metabolism genes \npositively associated with deregulation of lipid expression \nin two BMI states" = anno_barplot(number_lipid_gene_sig_pos)),
+                           left_annotation = rowAnnotation(
+                               "Number of significant lipid-metabolism genes \nnegatively associated with deregulation of lipid expression \nin two BMI states" = anno_barplot(number_lipid_gene_sig_neg, axis_param = list(direction = "reverse"))))
+
+draw(heatmap_cat_bmi)
+dev.off()
+```
+
+### Other categorization
+#### Binary
+```{r}
+# Modify the previous user-written function which outputs organized Welch t test results (CLT)
+test_fun_bmi <- function(lipid_name, dataset, outcome) {
+  dataset_new <- dataset %>% filter(!is.na(bmi_cat))
+  t.test(getElement(dataset_new, lipid_name) ~ getElement(dataset_new, outcome),
+         data = dataset_new,
+         var.equal = FALSE)} %>%
+  tidy()
+
+# Dichotomy
+data_full$bmi_cat <- ifelse(data_full$BMI > median(data_full$BMI, na.rm = TRUE), "High BMI", "Low BMI")
+bmi_binary_no_missing <- data_full %>% filter(`Sample ID` != "1836") %>% select(bmi_cat)
+bmi_binary_no_missing <- with(bmi_binary_no_missing, 
+                              factor(bmi_cat, levels = c("Low BMI", "High BMI"), 
+                                     labels = c("BMI ≤ 26.1", "BMI > 26.1"), 
+                                     order = TRUE))
+
+# For binary
+test_res <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(test_fun_bmi, dataset = data_full, outcome = "bmi_cat") %>%
+  janitor::clean_names()
+
+test_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+test_sig <- test_res %>% select(lipid_name, everything()) %>% filter(p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, test_sig$lipid_name])
+lipid_bmi_test_sig <- lipid_ffa_MM_final[c(-61), test_sig$lipid_name] %>% apply(2, rank) %>% t() # Remove ID = 1836 who misses BMI
+rownames(lipid_bmi_test_sig) <- lipid_label
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+# For binary
+jpeg("heatmap_binary_bmi_Welch2_Sep30.jpeg", width = 40, height = 16, units = "cm", res = 300)
+heatmap_binary_bmi <- Heatmap(lipid_bmi_test_sig, 
+                              name = "Ranked \nExpression", 
+                              cluster_rows = FALSE, 
+                              cluster_columns = FALSE, 
+                              column_split = bmi_binary_no_missing, 
+                              column_title_gp = gpar(fontsize = 20),
+                              show_column_names = FALSE,
+                              col = col_fun, 
+                              column_gap = unit(3, "mm"),
+                              # rect_gp = gpar(col = "white", lwd = 1),
+                              border = TRUE,
+                              width = unit(30, "cm"), 
+                              height = unit(14, "cm"))
+draw(heatmap_binary_bmi)
+dev.off()
+```
+
+#### > 2 categories
+```{r}
+# For > 2 categories
+test_fun_bmi_2 <- function(lipid_name, dataset, outcome) {
+  dataset_new <- dataset %>% filter(!is.na(bmi_cat))
+  kruskal.test(getElement(dataset, lipid_name) ~ getElement(dataset, outcome), 
+               data = dataset_new)} %>% 
+  tidy()
+
+# Tertile
+data_full <- data_full %>%
+  mutate(tertiles = ntile(BMI, 3)) %>%
+  mutate(bmi_cat = if_else(tertiles == 1, "18.0 ≤ BMI ≤ 23.5", 
+                           if_else(tertiles == 2, "23.5 < BMI ≤ 28.3", "28.3 < BMI ≤ 42")))
+bmi_tertile_no_missing <- data_full %>% filter(`Sample ID` != "1836") %>% select(bmi_cat)
+bmi_tertile_no_missing <- with(bmi_tertile_no_missing, 
+                               factor(bmi_cat, levels = c("18.0 ≤ BMI ≤ 23.5", "23.5 < BMI ≤ 28.3", "28.3 < BMI ≤ 42"), order = TRUE))
+## Show the break points
+quantile(data_full$BMI, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+
+# Quartile
+data_full <- data_full %>%
+  mutate(quartile = ntile(BMI, 4)) %>%
+  mutate(bmi_cat = case_when(quartile == 1 ~ "18.0 ≤ BMI ≤ 22.4", 
+                             quartile == 2 ~ "22.4 < BMI ≤ 26.1", 
+                             quartile == 3 ~ "26.1 < BMI ≤ 29.1",
+                             quartile == 4 ~ "29.1 < BMI ≤ 42.0"))
+bmi_quartile_no_missing <- data_full %>% filter(`Sample ID` != "1836") %>% select(bmi_cat)
+## Factorize and order the variable
+bmi_quartile_no_missing <- with(bmi_quartile_no_missing, 
+                                factor(bmi_cat, levels = c("18.0 ≤ BMI ≤ 22.4", "22.4 < BMI ≤ 26.1", "26.1 < BMI ≤ 29.1", "29.1 < BMI ≤ 42.0"), order = TRUE))
+## Show the break points
+quantile(data_full$BMI, probs = c(0, 1/4, 1/2, 3/4, 1), na.rm = TRUE)
+
+# Quintile
+data_full <- data_full %>%
+  mutate(quintile = ntile(BMI, 5)) %>%
+  mutate(bmi_cat = case_when(quintile == 1 ~ "18.0 ≤ BMI ≤ 21.8", 
+                             quintile == 2 ~ "21.8 < BMI ≤ 24.6", 
+                             quintile == 3 ~ "24.6 < BMI ≤ 27.8",
+                             quintile == 4 ~ "27.8 < BMI ≤ 30.6",
+                             quintile == 5 ~ "30.6 < BMI ≤ 42"))
+bmi_quintile_no_missing <- data_full %>% filter(`Sample ID` != "1836") %>% select(bmi_cat)
+## Show the break points
+quantile(data_full$BMI, probs = c(0, 1/5, 2/5, 3/5, 4/5, 1), na.rm = TRUE)
+```
+
+
+```{r}
+#### REPEAT
+test_res <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(test_fun_bmi_2, dataset = data_full, outcome = "bmi_cat") %>%
+  janitor::clean_names()
+
+test_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+test_sig <- test_res %>% select(lipid_name, everything()) %>% filter(p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, test_sig$lipid_name])
+lipid_bmi_test_sig <- lipid_ffa_MM_final[c(-61), test_sig$lipid_name] %>% apply(2, rank) %>% t() # Remove ID = 1836 who misses BMI
+rownames(lipid_bmi_test_sig) <- lipid_label
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+# For > 2 categories
+jpeg("heatmap_cat_bmi_kruskal_Sep30.jpeg", width = 40, height = 16, units = "cm", res = 300)
+heatmap_cat_bmi <- Heatmap(lipid_bmi_test_sig, 
+                           name = "Ranked \nExpression", 
+                           cluster_rows = FALSE, 
+                           cluster_columns = FALSE, 
+                           column_split = bmi_quintile_no_missing, # Revise
+                           column_title_gp = gpar(fontsize = 20),
+                           show_column_names = FALSE,
+                           col = col_fun, 
+                           column_gap = unit(3, "mm"),
+                           # rect_gp = gpar(col = "white", lwd = 1),
+                           border = TRUE,
+                           width = unit(30, "cm"), 
+                           height = unit(14, "cm"))
+draw(heatmap_cat_bmi)
+dev.off()
+```
+
+
+# Relationships between binary dyslipidemia and lipids [discarded]
+
+```{r eval=FALSE}
+# table(clinical_data$Dyslipidemia)
+# 
+#  No Yes 
+#  75  11 
+```
+
+## Wilcoxon rank sum test and heatmap
+
+```{r eval=FALSE}
+# Use map_dfr to repeatedly derive the relationship between binary dyslipidemia and each lipid
+wilcox_res <- names(lipid_ffa_MM_final)[-1] %>% map_dfr(wilcox_fun, dataset = data_full, outcome = "Dyslipidemia") %>% janitor::clean_names()
+
+wilcox_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+wilcox_sig <- wilcox_res %>% select(lipid_name, everything()) %>% filter(p_value <= 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, wilcox_sig$lipid_name])
+lipid_dyslipidemia_wilcox_sig <- lipid_ffa_MM_final[, wilcox_sig$lipid_name] %>% apply(2, rank) %>% t()
+rownames(lipid_dyslipidemia_wilcox_sig) <- lipid_label
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 88), c("green", "white", "red")) 
+col_fun(seq(-3, 3))
+dyslipidemia <- data.frame(Dyslipidemia = clinical_data$Dyslipidemia)
+
+jpeg("heatmap_binary_dyslipidemia.jpeg", width = 40, height = 16, units = "cm", res = 300)
+heatmap_binary_dyslipidemia <- Heatmap(lipid_dyslipidemia_wilcox_sig, name = "Ranked \nExpression", cluster_rows = FALSE, cluster_columns = FALSE, column_split = dyslipidemia, col = col_fun, width = unit(30, "cm"), height = unit(14, "cm"))
+draw(heatmap_binary_dyslipidemia)
+dev.off()
+```
+
+# Relationships between continuous adipocyte diameter and lipids
+## QQ plot of adipocyte diameter
+
+```{r eval=FALSE}
+qq_plot_adipocytediameter <- c("AdipocyteDiameter") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_adipocytediameter[1], ncol = 2)))
+```
+
+## Spearman correlation - lipid
+
+Since the distributions of adipocyte diameter and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with adipocyte diameter.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous adipocyte diameter and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "AdipocyteDiameter") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_adipocytediameter_1 <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_adipocytediameter_2 <- cor_sig_adipocytediameter_1 %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, names(cor_sig_adipocytediameter_1$lipid_name)])
+lipid_adipocytediameter_test_sig <- lipid_ffa_MM_final[, names(cor_sig_adipocytediameter_1$lipid_name)] %>% apply(2, rank) %>% t()
+rownames(lipid_adipocytediameter_test_sig) <- lipid_label
+names(rownames(lipid_adipocytediameter_test_sig)) <- NULL
+
+# Store significant lipid names
+names(cor_sig_adipocytediameter_1$lipid_name) <- NULL
+lipid_sig_continuous_adipocytediameter <- c(cor_sig_adipocytediameter_1$lipid_name) 
+
+# Sort the column names of lipid_adipocytediameter_test_sig based on the increasing order of adipocytediameter fat percent
+lipid_adipocytediameter_test_sig <- lipid_adipocytediameter_test_sig[, order(clinical_data$AdipocyteDiameter)]
+```
+
+## Spearman correlation - gene
+
+```{r warning=FALSE, eval=FALSE}
+# Use eligible dataset to output the correlation results
+cor_result <- names(top_var_lipid_gene)[-1214] %>% 
+  map_dfr(cor_fun, dataset = data_full_2, outcome = "AdipocyteDiameter") %>%
+  janitor::clean_names()
+cor_result$gene_name <- names(top_var_lipid_gene)[-1214] # Revise
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store significant results
+cor_sig_adipocytediameter_3 <- cor_result %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_adipocytediameter_4 <- cor_sig_adipocytediameter_3 %>% 
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Store significant gene names
+gene_sig_continuous_adipocytediameter <- c(cor_sig_adipocytediameter_3$gene_name) 
+```
+
+## Significant lipid ~ significant gene ~ 81 patients
+
+```{r warning=FALSE}
+# data_full_3: lipid_eligible_MM_final + top_var_lipid_gene
+# Use eligible dataset to output the correlation results
+
+number_lipid_gene_sig_pos <- vector(length = length(lipid_sig_continuous_adipocytediameter))
+number_lipid_gene_sig_pos_BH <- vector(length = length(lipid_sig_continuous_adipocytediameter))
+number_lipid_gene_sig_neg <- vector(length = length(lipid_sig_continuous_adipocytediameter))
+number_lipid_gene_sig_neg_BH <- vector(length = length(lipid_sig_continuous_adipocytediameter))
+
+cor_result <- vector(mode = "list", length = length(lipid_sig_continuous_adipocytediameter))
+cor_lipid_gene_sig_adipocytediameter_pos <- vector(mode = "list", length = length(lipid_sig_continuous_adipocytediameter))
+cor_lipid_gene_sig_adipocytediameter_pos_BH <- vector(mode = "list", length = length(lipid_sig_continuous_adipocytediameter))
+cor_lipid_gene_sig_adipocytediameter_neg <- vector(mode = "list", length = length(lipid_sig_continuous_adipocytediameter))
+cor_lipid_gene_sig_adipocytediameter_neg_BH <- vector(mode = "list", length = length(lipid_sig_continuous_adipocytediameter))
+  
+for (lipid_sig_id in 1:length(lipid_sig_continuous_adipocytediameter)) {
+  cor_result[[lipid_sig_id]] <- gene_sig_continuous_adipocytediameter %>% 
+    map_dfr(cor_fun, dataset = data_full_3, outcome = lipid_sig_continuous_adipocytediameter[lipid_sig_id]) %>%
+    janitor::clean_names()
+  cor_result[[lipid_sig_id]]$gene_name <- gene_sig_continuous_adipocytediameter # Revise
+  cor_result[[lipid_sig_id]]$adjusted_p_value <- p.adjust(cor_result[[lipid_sig_id]]$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store positive significant results
+cor_lipid_gene_sig_adipocytediameter_pos[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05 & estimate > 0)
+cor_lipid_gene_sig_adipocytediameter_pos_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_adipocytediameter_pos[[lipid_sig_id]] %>%
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Store negative significant results
+cor_lipid_gene_sig_adipocytediameter_neg[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+  select(gene_name, everything()) %>% 
+  filter(p_value < 0.05 & estimate < 0)
+cor_lipid_gene_sig_adipocytediameter_neg_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_adipocytediameter_neg[[lipid_sig_id]] %>%
+  select(gene_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+
+# Record the number of genes positively significantly associated with lipids
+number_lipid_gene_sig_pos[lipid_sig_id] <- nrow(cor_lipid_gene_sig_adipocytediameter_pos[[lipid_sig_id]])
+number_lipid_gene_sig_pos_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_adipocytediameter_pos_BH[[lipid_sig_id]])
+
+# Record the number of genes negatively significantly associated with lipids
+number_lipid_gene_sig_neg[lipid_sig_id] <- nrow(cor_lipid_gene_sig_adipocytediameter_neg[[lipid_sig_id]])
+number_lipid_gene_sig_neg_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_adipocytediameter_neg_BH[[lipid_sig_id]])
+}
+```
+
+## Create a heatmap
+```{r}
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+# 88 patients
+jpeg("heatmap_continuous_adipocyte_Oct8.jpeg", width = 52, height = 20, units = "cm", res = 300)
+heatmap_con_adipocyte <- Heatmap(lipid_adipocytediameter_test_sig, 
+                             name = "Ranked \nExpression", 
+                             cluster_rows = FALSE, 
+                             cluster_columns = FALSE, 
+                             column_title = "Adipocyte Diameter",
+                             column_title_gp = gpar(fontsize = 20, fontface = "bold"),
+                             col = col_fun, 
+                             column_gap = unit(3, "mm"),
+                             border = TRUE,
+                             width = unit(30, "cm"), 
+                             height = unit(16, "cm"),
+                             right_annotation = rowAnnotation("Number of significant lipid-metabolism genes \npositively associated with deregulation of lipid expression \nin two adipocyte fat states" = anno_barplot(number_lipid_gene_sig_pos)),
+                             left_annotation = rowAnnotation(
+                               "Number of significant lipid-metabolism genes \nnegatively associated with deregulation of lipid expression \nin two adipocyte fat states" = anno_barplot(number_lipid_gene_sig_neg,                                                                                                     axis_param = list(direction = "reverse"))))
+
+draw(heatmap_con_adipocyte)
+dev.off()
+```
+
+## Integrate the final lipid dataset with the final gene dataset
+
+```{r eval=FALSE, warning=FALSE}
+# Load and filter the lipid dataset using sample id affiliated to the gene dataset
+lipid_ffa_MM_final_2 <- lipid_ffa_MM_final[lipid_ffa_MM_final$`Sample ID` %in% sample_id_intersect_count, ]
+
+# Merge the final lipid dataset with the final gene dataset 
+data_full_3 <- merge(x = lipid_ffa_MM_final_2, 
+                     y = top_var_lipid_gene, 
+                     by.x = "Sample ID", 
+                     by.y = "Sample ID")
+```
+
+## Spearman correlation - lipid & gene [outdated]
+```{r}
+# Use eligible dataset to output the correlation results
+
+
+############# BUG ##################
+# getElement(data_full_3, cor_sig_adipocytediameter_1$lipid_name)
+# Error in .subset2(x, i, exact = exact) : no such index at level 1
+# Sol: remove labels
+
+# Do not repeat the following commented codes
+# names(data_full_3)[1:195] <- label(data_full_3)[1:195]
+# clear_labels <- function(x) {
+#   if(is.list(x)) {
+#     for(i in 1 : length(x)) class(x[[i]]) <- setdiff(class(x[[i]]), "labelled") 
+#     for(i in 1 : length(x)) attr(x[[i]], "label") <- NULL
+#   }
+#   else {
+#     class(x) <- setdiff(class(x), "labelled")
+#     attr(x, "label") <- NULL
+#   }
+#   return(x)
+# }
+# data_full_3 <- clear_labels(data_full_3)
+names(cor_sig_adipocytediameter_1$lipid_name) <- NULL
+
+# Modify a user-written function to output organized correlation results
+cor_fun <- function(lipid_name, dataset, outcome) {
+  cor.test(getElement(dataset, outcome), getElement(dataset, lipid_name), 
+           method = "spearman")} %>% 
+  tidy()
+
+cor_result <- cor_sig_adipocytediameter_3$gene %>% 
+  map_dfr(cor_fun, dataset = data_full_3, outcome = cor_sig_adipocytediameter_1$lipid_name[1] ) %>%
+  janitor::clean_names()
+cor_result$gene <- cor_sig_adipocytediameter_3$gene
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH") # Benjamini & Hochberg
+
+# Store significant results
+cor_sig_adipocytediameter_5 <- cor_result %>% 
+  select(gene, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_adipocytediameter_6 <- cor_sig_adipocytediameter_5 %>% 
+  select(gene, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+# Relationships between categorical adipocyte diameter and lipids
+
+## QQ normal plot and shapiro test
+```{r}
+c("AdipocyteDiameter") %>% map(.f = qqplot_shapiro, dataset = data_full)
+```
+
+## Create a heatmap
+### Binary adipocyte diameter
+#### Lipid ~ adipocyte diameter ~ 88 patients
+```{r}
+# Dichotomy
+data_full$adipocytediameter_cat <- ifelse(data_full$AdipocyteDiameter > median(data_full$AdipocyteDiameter), "Adipocyte diameter > 102.1", "Adipocyte diameter ≤ 102.1")
+# Factorize and order the variable
+adipocytediameter_cat <- with(data_full, 
+                               factor(adipocytediameter_cat, 
+                                      levels = c("Adipocyte diameter ≤ 102.1", "Adipocyte diameter > 102.1"),
+                                      ordered = TRUE)) 
+# For binary
+test_res <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(test_fun, dataset = data_full, outcome = "adipocytediameter_cat") %>%
+  janitor::clean_names()
+
+test_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+test_sig <- test_res %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, test_sig$lipid_name])
+lipid_adipocytediameter_test_sig <- lipid_ffa_MM_final[, test_sig$lipid_name] %>% apply(2, rank) %>% t()
+rownames(lipid_adipocytediameter_test_sig) <- lipid_label
+names(rownames(lipid_adipocytediameter_test_sig)) <- NULL
+lipid_sig_binary_adipocytediameter <- rownames(lipid_adipocytediameter_test_sig) 
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 88), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+adipocytediameter_cat <- data.frame(adipocytediameter_cat = data_full$adipocytediameter_cat)
+
+jpeg("heatmap_cat_adipocytediameter_Welch_Sep30.jpeg", width = 40, height = 16, units = "cm", res = 300)
+heatmap_cat_adipocytediameter <- Heatmap(lipid_adipocytediameter_test_sig, 
+                                         name = "Ranked \nExpression", 
+                                         cluster_rows = FALSE, 
+                                         cluster_columns = FALSE, 
+                                         column_split = adipocytediameter_cat, 
+                                         column_title_gp = gpar(fontsize = 20),
+                                         show_column_names = FALSE,
+                                         col = col_fun, 
+                                         column_gap = unit(3, "mm"),
+                                         # rect_gp = gpar(col = "white", lwd = 1),
+                                         border = TRUE,
+                                         width = unit(30, "cm"), 
+                                         height = unit(14, "cm"))
+draw(heatmap_cat_adipocytediameter)
+dev.off()
+```
+
+#### Gene ~ adipocyte diameter ~ 81 patients
+```{r}
+# data_full_2: top_var_lipid_gene + clinical_data
+# Dichotomy
+data_full_2$adipocytediameter_cat <- ifelse(data_full_2$AdipocyteDiameter > median(data_full_2$AdipocyteDiameter), "Adipocyte diameter ≤ 102.1", "Adipocyte diameter > 102.1") 
+# Factorize and order the variable
+adipocytediameter_cat <- with(data_full_2, 
+                              factor(adipocytediameter_cat, levels = c("Adipocyte diameter ≤ 102.1", "Adipocyte diameter > 102.1"), 
+                                     order = TRUE))
+
+# Generate the Welch t test results
+test_res <- names(top_var_lipid_gene)[-1214] %>% 
+  map_dfr(test_fun, dataset = data_full_2, outcome = "adipocytediameter_cat") %>%
+  janitor::clean_names()
+
+# Create a column that records the gene name
+test_res$gene_name <- names(top_var_lipid_gene)[-1214]
+
+# Store significant results
+test_sig <- test_res %>% select(gene_name, everything()) %>% filter(p_value < 0.05)
+
+# Store significant gene names
+gene_sig_binary_adipocytediameter <- c(test_sig$gene_name)
+```
+
+#### Significant lipid ~ significant gene ~ 81 patients
+```{r warning=FALSE}
+# data_full_3: lipid_eligible_MM_final + top_var_lipid_gene
+# Use eligible dataset to output the correlation results
+
+number_lipid_gene_sig_pos <- vector(length = length(lipid_sig_binary_adipocytediameter))
+number_lipid_gene_sig_pos_BH <- vector(length = length(lipid_sig_binary_adipocytediameter))
+number_lipid_gene_sig_neg <- vector(length = length(lipid_sig_binary_adipocytediameter))
+number_lipid_gene_sig_neg_BH <- vector(length = length(lipid_sig_binary_adipocytediameter))
+
+cor_result <- vector(mode = "list", length = length(lipid_sig_binary_adipocytediameter))
+cor_lipid_gene_sig_adipocytediameter_pos <- vector(mode = "list", length = length(lipid_sig_binary_adipocytediameter))
+cor_lipid_gene_sig_adipocytediameter_pos_BH <- vector(mode = "list", length = length(lipid_sig_binary_adipocytediameter))
+cor_lipid_gene_sig_adipocytediameter_neg <- vector(mode = "list", length = length(lipid_sig_binary_adipocytediameter))
+cor_lipid_gene_sig_adipocytediameter_neg_BH <- vector(mode = "list", length = length(lipid_sig_binary_adipocytediameter))
+
+for (lipid_sig_id in 1:length(lipid_sig_binary_adipocytediameter)) {
+  cor_result[[lipid_sig_id]] <- gene_sig_binary_adipocytediameter %>% 
+    map_dfr(cor_fun, dataset = data_full_3, outcome = lipid_sig_binary_adipocytediameter[lipid_sig_id]) %>%
+    janitor::clean_names()
+  cor_result[[lipid_sig_id]]$gene_name <- gene_sig_binary_adipocytediameter # Revise
+  cor_result[[lipid_sig_id]]$adjusted_p_value <- p.adjust(cor_result[[lipid_sig_id]]$p_value, method = "BH") # Benjamini & Hochberg
+  
+  # Store positive significant results
+  cor_lipid_gene_sig_adipocytediameter_pos[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+    select(gene_name, everything()) %>% 
+    filter(p_value < 0.05 & estimate > 0)
+  cor_lipid_gene_sig_adipocytediameter_pos_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_adipocytediameter_pos[[lipid_sig_id]] %>%
+    select(gene_name, everything()) %>% 
+    filter(adjusted_p_value < 0.05)
+  
+  # Store negative significant results
+  cor_lipid_gene_sig_adipocytediameter_neg[[lipid_sig_id]] <- cor_result[[lipid_sig_id]] %>% 
+    select(gene_name, everything()) %>% 
+    filter(p_value < 0.05 & estimate < 0)
+  cor_lipid_gene_sig_adipocytediameter_neg_BH[[lipid_sig_id]] <- cor_lipid_gene_sig_adipocytediameter_neg[[lipid_sig_id]] %>%
+    select(gene_name, everything()) %>% 
+    filter(adjusted_p_value < 0.05)
+  
+  # Record the number of genes positively significantly associated with lipids
+  number_lipid_gene_sig_pos[lipid_sig_id] <- nrow(cor_lipid_gene_sig_adipocytediameter_pos[[lipid_sig_id]])
+  number_lipid_gene_sig_pos_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_adipocytediameter_pos_BH[[lipid_sig_id]])
+  
+  # Record the number of genes negatively significantly associated with lipids
+  number_lipid_gene_sig_neg[lipid_sig_id] <- nrow(cor_lipid_gene_sig_adipocytediameter_neg[[lipid_sig_id]])
+  number_lipid_gene_sig_neg_BH[lipid_sig_id] <- nrow(cor_lipid_gene_sig_adipocytediameter_neg_BH[[lipid_sig_id]])
+  
+}
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+
+# 88 patients
+adipocytediameter_cat <- with(data_full, 
+                              factor(adipocytediameter_cat, levels = c("Adipocyte diameter ≤ 102.1", "Adipocyte diameter > 102.1"), order = TRUE))
+
+
+jpeg("heatmap_binary_adipocyte_Welch_Oct5.jpeg", width = 52, height = 18, units = "cm", res = 300)
+heatmap_cat_adipocyte <- Heatmap(lipid_adipocytediameter_test_sig, 
+                             name = "Ranked \nExpression", 
+                             cluster_rows = FALSE, 
+                             cluster_columns = FALSE, 
+                             column_split = adipocytediameter_cat, 
+                             column_title_gp = gpar(fontsize = 20),
+                             col = col_fun, 
+                             column_gap = unit(3, "mm"),
+                             # rect_gp = gpar(col = "white", lwd = 1),
+                             border = TRUE,
+                             width = unit(30, "cm"), 
+                             height = unit(14, "cm"),
+                             right_annotation = rowAnnotation("Number of significant lipid-metabolism genes \npositively associated with deregulation of lipid expression \nin two adipocyte sizes" = anno_barplot(number_lipid_gene_sig_pos)),
+                             left_annotation = rowAnnotation("Number of significant lipid-metabolism genes \nnegatively associated with deregulation of lipid expression \nin two adipocyte sizes" = anno_barplot(number_lipid_gene_sig_neg,                                                                                                     axis_param = list(direction = "reverse"))))
+
+draw(heatmap_cat_adipocyte)
+dev.off()
+```
+
+### > 2 categories
+```{r}
+# Tertile
+data_full <- data_full %>%
+  mutate(tertiles = ntile(AdipocyteDiameter, 3)) %>%
+  mutate(adipocytediameter_cat = if_else(tertiles == 1, "51.1 ≤ AD ≤ 94.1", 
+                                         if_else(tertiles == 2, "94.1 < AD ≤ 106.7", 
+                                                 "106.7 < AD ≤ 145.1")))
+# Factor and order the variable
+adipocytediameter_cat <- with(data_full, 
+                            factor(adipocytediameter_cat, levels = c("51.1 ≤ AD ≤ 94.1", "94.1 < AD ≤ 106.7", "106.7 < AD ≤ 145.1"),
+                                   ordered = TRUE))
+## Show the break points
+quantile(data_full$AdipocyteDiameter, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+
+# Quartile
+data_full <- data_full %>%
+  mutate(quartile = ntile(AdipocyteDiameter, 4)) %>%
+  mutate(adipocytediameter_cat = case_when(quartile == 1 ~ "51.1 ≤ AD ≤ 90.3", 
+                                           quartile == 2 ~ "90.3 < AD ≤ 102.1", 
+                                           quartile == 3 ~ "102.1 < AD ≤ 111.5",
+                                           quartile == 4 ~ "111.5 < AD ≤ 145.1"))
+# Factorize and order the variable
+adipocytediameter_cat <- with(data_full, 
+                            factor(adipocytediameter_cat, levels = c("51.1 ≤ AD ≤ 90.3", "90.3 < AD ≤ 102.1", "102.1 < AD ≤ 111.5", "111.5 < AD ≤ 145.1"),
+                                   ordered = TRUE))
+## Show the break points
+quantile(data_full$AdipocyteDiameter, probs = c(0, 1/4, 1/2, 3/4, 1), na.rm = TRUE)
+
+# Quintile
+data_full <- data_full %>%
+  mutate(quintile = ntile(AdipocyteDiameter, 5)) %>%
+  mutate(adipocytediameter_cat = case_when(quintile == 1 ~ "51.1 ≤ AD ≤ 86.4", 
+                                           quintile == 2 ~ "86.4 < AD ≤ 96.6", 
+                                           quintile == 3 ~ "96.6 < AD ≤ 105.4",
+                                           quintile == 4 ~ "105.4 < AD ≤ 113.4",
+                                           quintile == 5 ~ "113.4 < AD ≤ 145.1"))
+# Factorize and order the variable
+adipocytediameter_cat <- with(data_full, 
+                            factor(adipocytediameter_cat, levels = c("51.1 ≤ AD ≤ 86.4", "86.4 < AD ≤ 96.6", "96.6 < AD ≤ 105.4", "105.4 < AD ≤ 113.4", "113.4 < AD ≤ 145.1"),
+                                   ordered = TRUE))
+## Show the break points
+quantile(data_full$AdipocyteDiameter, probs = c(0, 1/5, 2/5, 3/5, 4/5, 1), na.rm = TRUE)
+```
+
+```{r}
+### REPEAT
+# For > 2 categories
+test_res <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(test_fun_2, dataset = data_full, outcome = "adipocytediameter_cat") %>%
+  janitor::clean_names()
+
+test_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+test_sig <- test_res %>% select(lipid_name, everything()) %>% filter(p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, test_sig$lipid_name])
+lipid_adipocytediameter_test_sig <- lipid_ffa_MM_final[, test_sig$lipid_name] %>% apply(2, rank) %>% t()
+rownames(lipid_adipocytediameter_test_sig) <- lipid_label
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 88), c("green", "black", "red")) 
+col_fun(seq(-3, 3))
+adipocytediameter_cat <- data.frame(adipocytediameter_cat = data_full$adipocytediameter_cat)
+
+jpeg("heatmap_cat_adipocytediameter_kruskal_Sep30.jpeg", width = 43, height = 16, units = "cm", res = 300)
+heatmap_cat_adipocytediameter <- Heatmap(lipid_adipocytediameter_test_sig, 
+                                         name = "Ranked \nExpression", 
+                                         cluster_rows = FALSE, 
+                                         cluster_columns = FALSE, 
+                                         column_split = adipocytediameter_cat, 
+                                         column_title_gp = gpar(fontsize = 20),
+                                         col = col_fun, 
+                                         column_gap = unit(3, "mm"),
+                                         # rect_gp = gpar(col = "white", lwd = 1),
+                                         border = TRUE,
+                                         width = unit(33, "cm"), 
+                                         height = unit(14, "cm"))
+draw(heatmap_cat_adipocytediameter)
+dev.off()
+```
+
+# Relationships between categorical tumor subtype and lipids
+
+## Wilcoxon rank sum test and heatmap
+```{r}
+# Use map_dfr to repeatedly derive the relationship between categorical subtype and each lipid
+data_full_gs_subtype <- data_full_gs %>% filter(!(is.na(Subtype) | Subtype == "TripleNeg"))
+
+
+wilcox_fun <- function(lipid_name, dataset, outcome) {
+  wilcox.test(getElement(dataset, lipid_name) ~ getElement(dataset, outcome), 
+              data = dataset)} %>% 
+  tidy()
+
+wilcox_res <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(wilcox_fun, dataset = data_full_gs_subtype, outcome = "Subtype") %>%
+  janitor::clean_names()
+
+wilcox_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+wilcox_sig <- wilcox_res %>% select(lipid_name, everything()) %>% filter(p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, wilcox_sig$lipid_name])
+lipid_subtype_wilcox_sig <- lipid_ffa_MM_final[c(-which(is.na(data_full_gs$Subtype)), -55), wilcox_sig$lipid_name] %>% apply(2, rank) %>% t() # Remove IDs who miss the subtype and who show the TripleNeg
+rownames(lipid_subtype_wilcox_sig) <- lipid_label
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "white", "red")) 
+col_fun(seq(-3, 3))
+subtype_no_missing <- data.frame(Subtype = data_full_gs_subtype$Subtype)
+
+jpeg("heatmap_binary_subtype.jpeg", width = 40, height = 16, units = "cm", res = 300)
+heatmap_binary_subtype <- Heatmap(lipid_subtype_wilcox_sig, name = "Ranked \nExpression", cluster_rows = FALSE, cluster_columns = FALSE, column_split = subtype_no_missing, col = col_fun, width = unit(30, "cm"), height = unit(14, "cm"))
+draw(heatmap_binary_subtype)
+dev.off()
+```
+
+
+# Relationships between binary invasiveness and lipids
+
+## Wilcoxon rank sum test and heatmap
+
+```{r eval=FALSE}
+# Use map_dfr to repeatedly derive the relationship between binary crown-like structure of the breast and each lipid
+wilcox_res <- names(lipid_ffa_MM_final)[-1] %>% map_dfr(wilcox_fun, dataset = data_full_gs, outcome = "Invasive") %>% janitor::clean_names()
+
+wilcox_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+wilcox_sig <- wilcox_res %>% select(lipid_name, everything()) %>% filter(p_value < 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, wilcox_sig$lipid_name])
+lipid_invasive_wilcox_sig <- lipid_ffa_MM_final[, wilcox_sig$lipid_name] %>% apply(2, rank) %>% t()
+rownames(lipid_invasive_wilcox_sig) <- lipid_label
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "white", "red")) 
+col_fun(seq(-3, 3))
+invasive <- data.frame(Invasive = clinical_data$Invasive)
+
+jpeg("heatmap_binary_invasive.jpeg", width = 40, height = 16, units = "cm", res = 300)
+heatmap_binary_invasive <- Heatmap(lipid_invasive_wilcox_sig, name = "Ranked \nExpression", cluster_rows = FALSE, cluster_columns = FALSE, column_split = invasive, col = col_fun, width = unit(30, "cm"), height = unit(14, "cm"))
+draw(heatmap_binary_invasive)
+dev.off()
+```
+
+# Relationships between continuous crown-like structure of the breast (cm2) and lipids
+## QQ plot of crown-like structure of the breast
+
+```{r eval=FALSE}
+qq_plot_clsbcm2 <- c("CLSB.cm2") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_clsbcm2[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of crown-like structure of the breast (cm2) and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with crown-like structure of the breast (cm2).
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous crown-like structure of the breast (cm2) and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "CLSB.cm2") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_clsbcm2 <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_clsbcm2_2 <- cor_sig_clsbcm2 %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_clsbcm2_2$CLSB.cm2 <- rep("Crown-like structure (cm2)", times = 4) 
+cor_heatmap_clsbcm2 <- cor_heatmap_fun(dataset = cor_sig_clsbcm2_2, outcome = "CLSB.cm2")
+grid.arrange(cor_heatmap_clsbcm2, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between binary crown-like structure of the breast and lipids
+
+## Wilcoxon rank sum test and heatmap
+
+```{r eval=FALSE}
+# Use map_dfr to repeatedly derive the relationship between binary crown-like structure of the breast and each lipid
+# Create a user-written function to output organized Wilcoxon rank sum test results
+wilcox_fun <- function(lipid_name, dataset, outcome) {wilcox.test(getElement(dataset, lipid_name) ~ getElement(dataset, outcome), data = dataset)} %>% tidy()
+
+
+wilcox_res <- names(lipid_ffa_MM_final)[-1] %>% map_dfr(wilcox_fun, dataset = data_full_gs, outcome = "CLSB") %>% janitor::clean_names()
+
+wilcox_res$lipid_name <- names(lipid_ffa_MM_final)[-1]
+
+# Store significant results
+wilcox_sig <- wilcox_res %>% select(lipid_name, everything()) %>% filter(p_value <= 0.05)
+
+# Relabel the lipid species
+lipid_label <- label(lipid_ffa_MM_final[, wilcox_sig$lipid_name])
+lipid_clsb_wilcox_sig <- lipid_ffa_MM_final[, wilcox_sig$lipid_name] %>% apply(2, rank) %>% t()
+rownames(lipid_clsb_wilcox_sig) <- lipid_label
+
+# Plot and save the heatmap
+col_fun <- colorRamp2(c(1, 44, 87), c("green", "white", "red")) 
+col_fun(seq(-3, 3))
+clsb <- data.frame(CLSB = clinical_data$CLSB)
+
+jpeg("heatmap_binary_clsb.jpeg", width = 40, height = 16, units = "cm", res = 300)
+heatmap_binary_clsb <- Heatmap(lipid_clsb_wilcox_sig, name = "Ranked \nExpression", cluster_rows = FALSE, cluster_columns = FALSE, column_split = clsb, col = col_fun, width = unit(30, "cm"), height = unit(14, "cm"))
+draw(heatmap_binary_clsb)
+dev.off()
+```
+
+
+# Relationships between continuous exercise (MET-hours/week) and lipids
+## QQ plot of exercise
+
+```{r eval=FALSE}
+qq_plot_exercise <- c("TMetHr") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_exercise[1], ncol = 2)))
+```
+
+
+## Spearman correlation
+
+Since the distributions of exercise (MET-hours/week) and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with exercise (MET-hours/week).
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous exercise (MET-hours/week) and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "TMetHr") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_exercise <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_exercise_2 <- cor_sig_exercise %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) # No significant lipids after Benjamini & Hochberg adjustments
+```
+
+
+# Obesity-related conditions: combined Spearman correlation matrix heatmap (before & after BH)
+```{r eval=FALSE}
+# Body mass index
+cor_sig_bmi$outcome <- rep("Body mass index", times = nrow(cor_sig_bmi)) 
+cor_sig_bmi <- cor_sig_bmi %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_bmi_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Total fat percent
+cor_sig_totalfatpercent$outcome <- rep("Total body fat", times = nrow(cor_sig_totalfatpercent)) 
+cor_sig_totalfatpercent <- cor_sig_totalfatpercent %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_totalfatpercent_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Total fat mass
+cor_sig_totalfatmass$outcome <- rep("Total fat mass", times = nrow(cor_sig_totalfatmass)) 
+cor_sig_totalfatmass <- cor_sig_totalfatmass %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_totalfatmass_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Total lean mass
+cor_sig_totalleanmass$outcome <- rep("Total lean mass", times = nrow(cor_sig_totalleanmass)) 
+cor_sig_totalleanmass <- cor_sig_totalleanmass %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_totalleanmass_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Fat:lean ratio
+cor_sig_fatleanratio$outcome <- rep("Fat:lean ratio", times = nrow(cor_sig_fatleanratio))
+cor_sig_fatleanratio <- cor_sig_fatleanratio %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_fatleanratio_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Trunk fat
+cor_sig_trunkfatpercent$outcome <- rep("Trunk fat", times = nrow(cor_sig_trunkfatpercent))
+cor_sig_trunkfatpercent <- cor_sig_trunkfatpercent %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_trunkfatpercent_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Trunk fat mass
+cor_sig_trunkfatmass$outcome <- rep("Trunk fat mass", times = nrow(cor_sig_trunkfatmass))
+cor_sig_trunkfatmass <- cor_sig_trunkfatmass %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_trunkfatmass_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Waist:hip ratio
+cor_sig_waisthipratio$outcome <- rep("Waist:hip ratio", times = nrow(cor_sig_waisthipratio))
+cor_sig_waisthipratio <- cor_sig_waisthipratio %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_waisthipratio_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Adipocyte diameter
+cor_sig_adipocytediameter$outcome <- rep("Adipocyte diameter", times = nrow(cor_sig_adipocytediameter))
+cor_sig_adipocytediameter <- cor_sig_adipocytediameter %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_adipocytediameter_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Crown-like structure of the breast
+cor_sig_clsbcm2$outcome <- rep("Crown-like structure", times = nrow(cor_sig_clsbcm2))
+cor_sig_clsbcm2 <- cor_sig_clsbcm2 %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_clsbcm2_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Exercise
+cor_sig_exercise$outcome <- rep("Exercise", times = nrow(cor_sig_exercise)) 
+cor_sig_exercise <- cor_sig_exercise %>% 
+  mutate(BH = ifelse(lipid_name %in% cor_sig_exercise_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Organize a data frame for plotting
+cor_sig_body_fat <- rbind(cor_sig_bmi, cor_sig_totalfatpercent, cor_sig_exercise, cor_sig_totalfatmass, cor_sig_totalleanmass, cor_sig_fatleanratio, cor_sig_trunkfatpercent, cor_sig_trunkfatmass, cor_sig_waisthipratio, cor_sig_adipocytediameter, cor_sig_clsbcm2)
+
+# Order the outcome
+cor_sig_body_fat$outcome <- factor(cor_sig_body_fat$outcome, 
+                                   levels = c("Body mass index", "Total body fat", "Total fat mass", "Total lean mass", "Fat:lean ratio", "Trunk fat", "Trunk fat mass", "Waist:hip ratio", "Adipocyte diameter", "Crown-like structure", "Exercise"), 
+                                   ordered = TRUE)
+```
+
+
+```{r eval=FALSE}
+# Modify the previous user-written heatmap function
+library(cowplot) 
+library(patchwork) 
+library(ggstar)
+cor_heatmap_fun_2 <- function(dataset, variable) {
+  p_nolegend <- ggplot(data = dataset, aes(x = lipid_name, y = get(variable), fill = estimate, size = -log(p_value))) +
+    geom_star(aes(starshape = BH)) +  
+    scale_starshape_manual(name = "", values = c(14, 15)) + # Square; circle
+    scale_shape_manual(values = c(21, 24)) + 
+    labs(y = "", x = "Lipid Species", fill = "Spearman's Rho", shape = "", size = "-Log(P Value)") + 
+    theme_bw() + 
+    theme(panel.background = element_rect(fill = "white", colour = "white"), # fill = "oldlace"
+          axis.ticks = element_blank(),  
+          axis.text.x = element_text(size = 8, angle = 90, hjust = 1, color = "black", vjust = 0.5),
+          axis.text.y = element_text(color = "black"),
+          legend.direction = "vertical", 
+          legend.box = "horizontal",
+          legend.position = "none") + 
+    scale_fill_gradient2(low = "darkgreen", mid = "khaki", high = "red3", na.value = "grey50") + 
+    guides(size = guide_legend(override.aes = list(shape = 18)))
+    
+
+  p_fill <- ggplot(data = dataset, aes(x = lipid_name, y = get(variable), fill = estimate)) +
+    geom_point(shape = 21) +  
+    labs(y = "", x = "Lipid Species") + 
+    theme_bw() + 
+    theme(panel.background = element_rect(fill = "white", colour = "white"), # fill = "oldlace"
+          axis.ticks = element_blank(),  
+          axis.text.x = element_text(size = 8, angle = 90, hjust = 1, color = "black"),
+          axis.text.y = element_text(color = "black"),
+          legend.direction = "vertical", 
+          legend.box = "vertical") + 
+    scale_fill_gradient2(name = "Spearman's Rho", low = "darkgreen", mid = "khaki", high = "red3", na.value = "grey50")
+
+  p_size <- ggplot(data = dataset, aes(x = lipid_name, y = get(variable), size = -log(p_value))) +
+    geom_point(shape = 21) +  
+    labs(y = "", x = "Lipid Species") + 
+    theme_bw() + 
+    theme(panel.background = element_rect(fill = "white", colour = "white"), # fill = "oldlace"
+          axis.ticks = element_blank(),  
+          axis.text.x = element_text(size = 8, angle = 90, hjust = 1, color = "black"),
+          axis.text.y = element_text(color = "black"),
+          legend.direction = "vertical", 
+          legend.box = "vertical") + 
+    scale_size_continuous(name = "-Log(P Value)") + 
+    guides(size = guide_legend(override.aes = list(shape = 18)))
+
+  p_shape <- ggplot(data = dataset, aes(x = lipid_name, y = get(variable))) +
+    geom_star(aes(starshape = BH)) +  
+    labs(y = "", x = "Lipid Species") + 
+    theme_bw() + 
+    theme(panel.background = element_rect(fill = "white", colour = "white"), # fill = "oldlace"
+          axis.ticks = element_blank(),  
+          axis.text.x = element_text(size = 8, angle = 90, hjust = 1, color = "black"),
+          axis.text.y = element_text(color = "black"),
+          legend.direction = "vertical", 
+          legend.box = "vertical") + 
+    scale_starshape_manual(name = "", values = c(14, 15))
+
+  leg_fill <- get_legend(p_fill)
+  leg_size <- get_legend(p_size)
+  leg_shape <- get_legend(p_shape)
+
+  # Create a blank plot for legend alignment 
+  blank_p <- plot_spacer() + theme_void()
+  # Combine legends fill and size
+  leg12 <- plot_grid(leg_fill, leg_size, blank_p,
+                     nrow = 3, rel_heights = c(1, 1, 0.3))
+  # Combine legend shape & blank plot
+  leg30 <- plot_grid(leg_shape, blank_p, blank_p, 
+                     nrow = 3, rel_heights = c(1, 1, 0.3))
+  # Combine all legends
+  leg123 <- plot_grid(leg12, leg30, ncol = 2)
+
+  plot_grid(p_nolegend, leg123,
+            nrow = 1, align = "h", axis = "t", rel_widths = c(1, 0.3))
+}
+```
+
+```{r}
+cor_heatmap_body_fat <- cor_heatmap_fun_2(dataset = cor_sig_body_fat, variable = "outcome")
+# grid.arrange(cor_heatmap_body_fat, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+ggsave("cor_heatmap_body_fat_2022Sep30.png", width = 36, height = 10, units = "cm")
+```
+
+
+# Obesity-related conditions: combined Spearman correlation matrix heatmap (after BH) [outdated]
+```{r}
+colnames(cor_sig_totalfatpercent_2)[8] <- "outcome"
+colnames(cor_sig_totalfatmass_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_fatleanratio_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_trunkfatpercent_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_trunkfatmass_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_bmi_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_adipocytediameter_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_clsbcm2_2) <- colnames(cor_sig_totalfatpercent_2)
+
+cor_sig_body_fat <- rbind(cor_sig_totalfatpercent_2, cor_sig_totalfatmass_2, cor_sig_fatleanratio_2, cor_sig_trunkfatpercent_2, cor_sig_trunkfatmass_2, cor_sig_bmi_2, cor_sig_adipocytediameter_2, cor_sig_clsbcm2_2)
+cor_sig_body_fat$outcome <- as.factor(cor_sig_body_fat$outcome)
+
+
+cor_heatmap_body_fat <- cor_heatmap_fun_2(dataset = cor_sig_body_fat, variable = "outcome")
+grid.arrange(cor_heatmap_body_fat, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Obesity-related protein biomarkers
+
+* hsCRP
+* IL6
+* leptin
+* adiponectin
+* leptin:adiponectin ratio
+* glucose
+* triglycerides
+* HDL cholesterol
+* insulin
+* SHBG
+
+# Relationships between continuous high sensitivity C-reactive protein and lipids
+## QQ plot of high sensitivity C-reactive protein
+
+```{r eval=FALSE}
+qq_plot_hsCRP <- c("hsCRP") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_hsCRP[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of high sensitivity C-reactive protein and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with high sensitivity C-reactive protein.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous high sensitivity C-reactive protein and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "hsCRP") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_hsCRP <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_hsCRP_2 <- cor_sig_hsCRP %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_hsCRP_2$hsCRP <- rep("hsCRP", times = 18) 
+cor_heatmap_hsCRP <- cor_heatmap_fun(dataset = cor_sig_hsCRP_2, outcome = "hsCRP")
+grid.arrange(cor_heatmap_hsCRP, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between continuous interleukin-6 and lipids
+## QQ plot of interleukin-6
+
+```{r eval=FALSE}
+qq_plot_IL6 <- c("IL.6") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_IL6[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of interleukin-6 and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with interleukin-6.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous interleukin-6 and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "IL.6") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_IL6 <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_IL6_2 <- cor_sig_IL6 %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_IL6_2$IL6 <- rep("IL6", times = 3) 
+cor_heatmap_IL6 <- cor_heatmap_fun(dataset = cor_sig_IL6_2, outcome = "IL6")
+grid.arrange(cor_heatmap_IL6, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+
+# Relationships between continuous leptin and lipids
+## QQ plot of leptin
+
+```{r eval=FALSE}
+qq_plot_leptin <- c("Leptin") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_leptin[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of leptin and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with leptin.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous leptin and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "Leptin") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_leptin <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_leptin_2 <- cor_sig_leptin %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_leptin_2$Leptin <- rep("Leptin", times = 4) 
+cor_heatmap_leptin <- cor_heatmap_fun(dataset = cor_sig_leptin_2, outcome = "Leptin")
+grid.arrange(cor_heatmap_leptin, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between continuous adiponectin and lipids
+## QQ plot of adiponectin
+
+```{r eval=FALSE}
+qq_plot_adiponectin <- c("Adiponectin") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_adiponectin[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of adiponectin and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with adiponectin.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous adiponectin and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "Adiponectin") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_adiponectin <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_adiponectin_2 <- cor_sig_adiponectin %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_adiponectin_2$Adiponectin <- rep("Adiponectin", times = 6) 
+cor_heatmap_adiponectin <- cor_heatmap_fun(dataset = cor_sig_adiponectin_2, outcome = "Adiponectin")
+grid.arrange(cor_heatmap_adiponectin, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between continuous adiponectin and lipids
+## QQ plot of adiponectin
+
+```{r eval=FALSE}
+qq_plot_adiponectin <- c("Adiponectin") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_adiponectin[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of adiponectin and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with adiponectin.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous adiponectin and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "Adiponectin") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_adiponectin <- cor_result %>% 
+  select(lipid_name, everything()) %>% filter(p_value < 0.05)
+cor_sig_adiponectin_2 <- cor_sig_adiponectin %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_adiponectin_2$Adiponectin <- rep("Adiponectin", times = 6) 
+cor_heatmap_adiponectin <- cor_heatmap_fun(dataset = cor_sig_adiponectin_2, outcome = "Adiponectin")
+grid.arrange(cor_heatmap_adiponectin, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between continuous adiponectin:leptin ratio and lipids
+## QQ plot of adiponectin:leptin ratio
+
+```{r eval=FALSE}
+data_full$adiponectin_leptin_ratio <- data_full$Adiponectin/data_full$Leptin
+qq_plot_adiponectin_leptin <- c("adiponectin_leptin_ratio") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_adiponectin_leptin[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of adiponectin:leptin ratio and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with adiponectin:leptin ratio.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous adiponectin:leptin ratio and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "adiponectin_leptin_ratio") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_adiponectin_leptin <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_adiponectin_leptin_2 <- cor_sig_adiponectin_leptin %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05)
+```
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_adiponectin_leptin_2$adiponectin_leptin_ratio <- rep("Adiponectin:leptin ratio", times = 7) 
+cor_heatmap_adiponectin_leptin <- cor_heatmap_fun(dataset = cor_sig_adiponectin_leptin_2, outcome = "adiponectin_leptin_ratio")
+grid.arrange(cor_heatmap_adiponectin_leptin, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between continuous insulin and lipids
+## QQ plot of insulin
+
+```{r eval=FALSE}
+qq_plot_insulin <- c("Insulin") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_insulin[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of insulin and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with insulin.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous insulin and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "Insulin") %>% janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_insulin <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_insulin_2 <- cor_sig_insulin %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) # No significant lipids after BH adjustments
+```
+
+# Relationships between continuous HOMA2-B (beta cell function) and lipids
+## QQ plot of HOMA2-B
+
+```{r eval=FALSE}
+qq_plot_HOMA2B <- c("HOMA2..B") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_HOMA2B[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of HOMA2-B and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with HOMA2-B.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous HOMA2-B and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "HOMA2..B") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_HOMA2B <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_HOMA2B_2 <- cor_sig_HOMA2B %>% 
+  select(lipid_name, everything()) %>% filter(adjusted_p_value < 0.05) # No significant lipids after BH adjustments
+```
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_HOMA2B_2$HOMA2B <- rep("Beta cell function", times = 5) 
+cor_heatmap_HOMA2B <- cor_heatmap_fun(dataset = cor_sig_HOMA2B_2, outcome = "HOMA2B")
+grid.arrange(cor_heatmap_HOMA2B, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between continuous HOMA2-IR (insulin resistance) and lipids
+## QQ plot of HOMA2-B
+
+```{r eval=FALSE}
+qq_plot_HOMA2IR <- c("HOMA2.IR") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_HOMA2IR[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of HOMA2-IR and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with HOMA2-IR.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous HOMA2-IR and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "HOMA2.IR") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_HOMA2IR <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_HOMA2IR_2 <- cor_sig_HOMA2IR %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) # No significant lipids after BH adjustments
+```
+
+# Relationships between continuous SHBG (sex hormone binding globulin) and lipids
+## QQ plot of SHBG
+
+```{r eval=FALSE}
+qq_plot_SHBG <- c("SHBG") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_SHBG[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of SHBG and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with SHBG.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous SHBG and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "SHBG") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_SHBG <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_SHBG_2 <- cor_sig_SHBG %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) # No significant lipids after BH adjustments
+```
+
+# Relationships between continuous glucose and lipids
+## QQ plot of glucose
+
+```{r eval=FALSE}
+qq_plot_glucose <- c("Glucose") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_glucose[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of glucose and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with glucose.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous glucose and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "Glucose") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_glucose <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_glucose_2 <- cor_sig_glucose %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) 
+```
+
+## Correlation heatmap
+
+```{r eval=FALSE}
+cor_sig_glucose_2$Glucose <- rep("Glucose", times = 1) 
+cor_heatmap_glucose <- cor_heatmap_fun(dataset = cor_sig_glucose_2, outcome = "Glucose")
+grid.arrange(cor_heatmap_glucose, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+# Relationships between continuous aromatase and lipids
+## QQ plot of aromatase
+
+```{r eval=FALSE}
+qq_plot_aromatase <- c("RQ.Aromatase") %>% map(.f = qqplot_shapiro, dataset = data_full)
+grid.arrange(do.call("arrangeGrob", c(qq_plot_aromatase[1], ncol = 2)))
+```
+
+## Spearman correlation
+
+Since the distributions of aromatase and most lipids apparently violate the normality assumption indicated by the above QQ plots, we perform the Spearman's rank correlation test to identify the lipids significantly in association with aromatase.
+
+```{r warning=FALSE, eval=FALSE}
+# Use map_dfr to repeatedly calculate the strength and direction of the relationship between continuous aromatase and each lipid
+cor_result <- names(lipid_ffa_MM_final)[-1] %>% 
+  map_dfr(cor_fun, dataset = data_full, outcome = "RQ.Aromatase") %>% 
+  janitor::clean_names()
+cor_result$lipid_name <- label(lipid_ffa_MM_final[-1])
+cor_result$adjusted_p_value <- p.adjust(cor_result$p_value, method = "BH")
+
+# Store significant results
+cor_sig_aromatase <- cor_result %>% 
+  select(lipid_name, everything()) %>% 
+  filter(p_value < 0.05)
+cor_sig_aromatase_2 <- cor_sig_aromatase %>% 
+  select(lipid_name, everything()) %>% 
+  filter(adjusted_p_value < 0.05) 
+```
+
+# Obesity-related conditions: combined Spearman correlation matrix heatmap (before & after BH)
+
+```{r}
+# hsCRP
+cor_sig_hsCRP$outcome <- rep("hsCRP", times = nrow(cor_sig_hsCRP)) 
+cor_sig_hsCRP <- cor_sig_hsCRP %>% mutate(BH = ifelse(lipid_name %in% cor_sig_hsCRP_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# IL6
+cor_sig_IL6$outcome <- rep("IL6", times = nrow(cor_sig_IL6)) 
+cor_sig_IL6 <- cor_sig_IL6 %>% mutate(BH = ifelse(lipid_name %in% cor_sig_IL6_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Leptin
+cor_sig_leptin$outcome <- rep("Leptin", times = nrow(cor_sig_leptin)) 
+cor_sig_leptin <- cor_sig_leptin %>% mutate(BH = ifelse(lipid_name %in% cor_sig_leptin_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Adiponectin
+cor_sig_adiponectin$outcome <- rep("Adiponectin", times = nrow(cor_sig_adiponectin)) 
+cor_sig_adiponectin <- cor_sig_adiponectin %>% mutate(BH = ifelse(lipid_name %in% cor_sig_adiponectin_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Adiponectin:leptin ratio
+cor_sig_adiponectin_leptin$outcome <- rep("Adiponectin:leptin ratio", times = nrow(cor_sig_adiponectin_leptin)) 
+cor_sig_adiponectin_leptin <- cor_sig_adiponectin_leptin %>% mutate(BH = ifelse(lipid_name %in% cor_sig_adiponectin_leptin_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Glucose
+cor_sig_glucose$outcome <- rep("Glucose", times = nrow(cor_sig_glucose)) 
+cor_sig_glucose <- cor_sig_glucose %>% mutate(BH = ifelse(lipid_name %in% cor_sig_glucose_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Insulin
+cor_sig_insulin$outcome <- rep("Insulin", times = nrow(cor_sig_insulin)) 
+cor_sig_insulin <- cor_sig_insulin %>% mutate(BH = ifelse(lipid_name %in% cor_sig_insulin_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Beta cell function
+cor_sig_HOMA2B$outcome <- rep("Beta cell function", times = nrow(cor_sig_HOMA2B)) 
+cor_sig_HOMA2B <- cor_sig_HOMA2B %>% mutate(BH = ifelse(lipid_name %in% cor_sig_HOMA2B_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Insulin resistance
+cor_sig_HOMA2IR$outcome <- rep("Insulin resistance", times = nrow(cor_sig_HOMA2IR)) 
+cor_sig_HOMA2IR <- cor_sig_HOMA2IR %>% mutate(BH = ifelse(lipid_name %in% cor_sig_HOMA2IR_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# SHGB
+cor_sig_SHBG$outcome <- rep("SHBG", times = nrow(cor_sig_SHBG)) 
+cor_sig_SHBG <- cor_sig_SHBG %>% mutate(BH = ifelse(lipid_name %in% cor_sig_SHBG_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Aromatase
+cor_sig_aromatase$outcome <- rep("Aromatase", times = nrow(cor_sig_aromatase)) 
+cor_sig_aromatase <- cor_sig_aromatase %>% mutate(BH = ifelse(lipid_name %in% cor_sig_aromatase_2$lipid_name, "Significant after BH", "Significant before BH"))
+
+# Organize a data frame for plotting
+cor_sig_protein <- rbind(cor_sig_hsCRP, cor_sig_IL6, cor_sig_leptin, cor_sig_adiponectin, cor_sig_adiponectin_leptin, cor_sig_glucose, cor_sig_insulin, cor_sig_HOMA2B, cor_sig_HOMA2IR, cor_sig_SHBG, cor_sig_aromatase)
+
+# Order the outcome
+cor_sig_protein$outcome <- factor(cor_sig_protein$outcome, 
+                                  levels = c("Adiponectin", "Leptin", "Adiponectin:leptin ratio", "Insulin", "Beta cell function", "Insulin resistance", "Glucose", "IL6", "hsCRP", "SHBG", "Aromatase"), 
+                                   ordered = TRUE)
+
+
+
+cor_heatmap_protein <- cor_heatmap_fun_2(dataset = cor_sig_protein, variable = "outcome")
+# grid.arrange(cor_heatmap_body_fat, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+ggsave("cor_heatmap_protein_2022Sep30.png", width = 48, height = 10, units = "cm")
+```
+
+
+# Obesity-related protein biomarkers: combined Spearman correlation matrix heatmap (after BH)
+
+```{r}
+colnames(cor_sig_hsCRP_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_IL6_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_leptin_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_adiponectin_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_adiponectin_leptin_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_HOMA2B_2) <- colnames(cor_sig_totalfatpercent_2)
+colnames(cor_sig_glucose_2) <- colnames(cor_sig_totalfatpercent_2)
+
+cor_sig_protein <- rbind(cor_sig_hsCRP_2, cor_sig_IL6_2, cor_sig_leptin_2, cor_sig_adiponectin_2, cor_sig_adiponectin_leptin_2, cor_sig_HOMA2B_2, cor_sig_glucose_2)
+cor_sig_protein$outcome <- as.factor(cor_sig_protein$outcome)
+
+cor_heatmap_protein <- cor_heatmap_fun_2(dataset = cor_sig_protein, variable = "outcome")
+grid.arrange(cor_heatmap_protein, ncol = 1, widths = unit(18, "cm"), heights = unit(8, "cm"))
+```
+
+
