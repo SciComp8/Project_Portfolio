@@ -1,6 +1,6 @@
 ---
 title: "Lipidomic Project - Section: Lipidomic Profiling in Women at High Risk or Diagnosed with Breast Cancer Highlights Obesity-Related Changes in Lipid Composition"
-author: "Anni Liu, B.M., D.M.Sc., M.Sc."
+author: "Anni Liu"
 date: "October 9, 2022"
 output:
   word_document:
