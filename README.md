@@ -12,3 +12,4 @@ This repository contains codes affiliated with multiple collaborative and indivi
   - MDCAsian_ALiu.Rmd
   - TNBC_ALiu.Rmd
 - Next-generation sequencing pipeline development (use Python-based snakefile)
+  - NGS_DEPipeline_ALiu.Rmd
