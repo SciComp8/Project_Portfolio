@@ -9,7 +9,7 @@ This repository contains codes affiliated with multiple collaborative and indivi
 - Breast cancer surgery analysis (use R)
   - MDCAsian_ALiu.Rmd
   - TNBC_ALiu.Rmd
-- Next-generation sequencing differential expression analysis pipeline (use Python-based snakefile)
+- Single cell differential expression analysis pipeline (use Python-based snakefile and R)
   - NGS_DEPipeline_ALiu.Rmd
 - Lipidomics and transcriptomics analysis (use R)
   - LipidomicTranscriptomic_ALiu.Rmd
