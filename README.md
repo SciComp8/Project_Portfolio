@@ -1,6 +1,6 @@
 # Coding collection for diverse research projects
 
-This repository contains codes affiliated with multiple projects.
+This repository contains codes affiliated with multiple collaborative and individual projects.
 
 - Lipidomics and transcriptomics analysis (using R)
   - LipidomicTranscriptomic_ALiu.Rmd
