@@ -9,4 +9,5 @@ This repository contains codes affiliated with multiple projects.
 - Bayesian model averaging for RNA-Seq data (using R)
   - BayesianModelAveraging_voom_limma_edgeR_DESeq2_ALiu.Rmd
 - Breast cancer surgery analysis (using R)
+  - MDCAsian_ALiu.Rmd
 - Next-generation sequencing pipeline development (using Python-based snakefile)
