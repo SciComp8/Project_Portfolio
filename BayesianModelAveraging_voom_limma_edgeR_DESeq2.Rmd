@@ -86,10 +86,10 @@ t1 - t0
 ```{r uni.test}
 t0 <- Sys.time()
 output.uni.test <- BMAseq.uni(dat.expr.counts = dat.expr.test, 
-                         dat.pheno = dat.pheno.test, 
-                         var.pool = vars, 
-                         cut.BF = 1, 
-                         cut.FDR = 0.25) 
+                              dat.pheno = dat.pheno.test, 
+                              var.pool = vars, 
+                              cut.BF = 1, 
+                              cut.FDR = 0.25) 
 t1 <- Sys.time()
 t1 - t0
 # Time difference of 3.865847 mins
@@ -293,7 +293,6 @@ y.train <- mclapply(1:length(vars),
                                         lib.size = colSums(dat.expr.train)) %>% 
                       estimateGLMTrendedDisp(design.train[[i]]),
                     mc.cores = 10L) 
-# I may recommend use calcNormFactors() to convert raw library sizes into effective library sizes, before the step of estimating the trended dispersions
 
 # Estimate the quasi-likelihood (QL) dispersion
 fit.train <- mclapply(1:length(vars),
