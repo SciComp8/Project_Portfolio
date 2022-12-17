@@ -1,4 +1,4 @@
-# Coding collection for diverse research projects
+# Coding collection of diverse research projects
 
 This repository contains coding work affiliated with multiple research projects.
 
