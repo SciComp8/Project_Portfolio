@@ -1,6 +1,6 @@
 # Coding collection of diverse research projects
 
-This repository contains coding work affiliated with multiple research projects.
+This repository contains my coding work affiliated with multiple research projects.
 
 - **Bayesian model averaging for bulk RNA-Seq data (use R)**
   - [BayesianModelAveraging_voom_limma_edgeR_DESeq2.Rmd](BayesianModelAveraging_voom_limma_edgeR_DESeq2.Rmd)
