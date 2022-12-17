@@ -1,5 +1,5 @@
 ---
-title: "Next-Generation Sequencing Differential Expression Analysis Pipeline"
+title: "Next-Generation Sequencing Single Cell Differential Expression Analysis Pipeline"
 author: "Anni Liu"
 date: "June 19, 2022"
 output: 
