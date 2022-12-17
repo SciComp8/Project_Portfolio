@@ -4,7 +4,7 @@ This repository contains codes affiliated with multiple collaborative and indivi
 
 - Bayesian integrative clustering of multi-omics data (use R)
   - BayesClustering_ALiu.Rmd
-- Bayesian model averaging for RNA-Seq data (use R)
+- Bayesian model averaging for bulk RNA-Seq data (use R)
   - BayesianModelAveraging_voom_limma_edgeR_DESeq2_ALiu.Rmd
 - Breast cancer surgery analysis (use R)
   - MDCAsian_ALiu.Rmd
