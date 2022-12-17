@@ -1,6 +1,6 @@
 # Coding collection for diverse research projects
 
-This repository contains codes affiliated with multiple collaborative and individual projects.
+This repository contains coding work affiliated with multiple collaborative and individual research projects.
 
 - Bayesian integrative clustering of multi-omics data (use R)
   - BayesClustering_ALiu.Rmd
