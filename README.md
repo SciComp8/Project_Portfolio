@@ -3,7 +3,7 @@
 This repository contains coding work affiliated with multiple research projects.
 
 - **Bayesian integrative clustering of multi-omics data (use R)**
-  - BayesClustering.Rmd
+  - [BayesClustering.Rmd](BayesClustering.Rmd)
   
 - **Bayesian model averaging for bulk RNA-Seq data (use R)**
   - BayesianModelAveraging_voom_limma_edgeR_DESeq2.Rmd
