@@ -8,7 +8,7 @@ This repository contains coding work affiliated with multiple research projects.
   - BayesianModelAveraging_voom_limma_edgeR_DESeq2.Rmd
 - Breast cancer surgery analysis (use R)
   - MDCAsian.Rmd
-  - TNBC_ALiu.Rmd
+  - TNBC.Rmd
 - Single cell differential expression analysis pipeline (use Python-based snakefile and R)
   - NGS_DEPipeline.Rmd
 - Lipidomics and transcriptomics analysis (use R)
