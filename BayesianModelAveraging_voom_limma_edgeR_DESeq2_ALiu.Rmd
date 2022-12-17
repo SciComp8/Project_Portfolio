@@ -456,7 +456,7 @@ uni_ana <- function(seed.num = 999) {
                                                        label_alpha = 0, label_color = "white") + 
                                            theme(legend.position = "none", 
                                                  plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                                         gtitle(x) 
+                                         ggtitle(x) 
                        )
   grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
   
