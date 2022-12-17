@@ -225,8 +225,6 @@ clinical_data <- readRDS(file = "clinical_data_clean.RDS")
 
 # iClusterBayes
 
-Guide: [Bioconductor of iClusterBayes](https://www.bioconductor.org/packages/release/bioc/html/iClusterPlus.html)
-
 ```{r eval=FALSE}
 # Install packages
 if (!require("BiocManager", quietly = TRUE))
