@@ -5,6 +5,7 @@ This repository contains codes affiliated with multiple projects.
 - Lipidomics and transcriptomics analysis (using R)
   - LipidomicTranscriptomic_ALiu.Rmd
 - Bayesian integrative clustering of multi-omics data (using R)
+  - BayesClustering_ALiu.Rmd
 - Bayesian model averaging for RNA-Seq data (using R)
   - BayesianModelAveraging_voom_limma_edgeR_DESeq2_ALiu.Rmd
 - Breast cancer surgery analysis (using R)
