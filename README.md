@@ -14,7 +14,7 @@ This is a list of my coding work affiliated with multiple collaborative and indi
 - **Lipidomics and transcriptomics analysis (use R)**
   - [LipidomicTranscriptomic.Rmd](LipidomicTranscriptomic.Rmd)
 
-- **Breast cancer surgery analysis (use R)**
+- **Breast cancer surgery analysis (use R and Python)**
   - [MDCAsian.Rmd](MDCAsian.Rmd)
   - [TNBC.Rmd](TNBC.Rmd)
   - [Micromets.Rmd](Micromets.Rmd)
