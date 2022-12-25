@@ -9,7 +9,7 @@ This is a list of my coding work affiliated with multiple collaborative and indi
 - **Bayesian integrative clustering for multi-omics data (use R)**
   - [BayesClustering.Rmd](BayesClustering.Rmd)
   
-- **Single cell differential expression analysis pipeline (use Python-based snakefile and R)**
+- **Differential expression analysis pipeline for single cell data (use Python-based snakefile and R)**
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
   
 - **Lipidomics and transcriptomics analysis (use R)**
