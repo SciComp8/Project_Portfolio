@@ -6,7 +6,7 @@ This is a list of my coding work affiliated with multiple collaborative and indi
   - [UniBMA_voom_limma_edgeR_DESeq2.Rmd](UniBMA_voom_limma_edgeR_DESeq2.Rmd)
   - [MultiBMA_voom_limma_edgeR_DESeq2.Rmd](MultiBMA_voom_limma_edgeR_DESeq2.Rmd)
 
-- **Bayesian integrative clustering of multi-omics data (use R)**
+- **Bayesian integrative clustering for multi-omics data (use R)**
   - [BayesClustering.Rmd](BayesClustering.Rmd)
   
 - **Single cell differential expression analysis pipeline (use Python-based snakefile and R)**
@@ -15,7 +15,7 @@ This is a list of my coding work affiliated with multiple collaborative and indi
 - **Lipidomics and transcriptomics analysis (use R)**
   - [LipidomicTranscriptomic.Rmd](LipidomicTranscriptomic.Rmd)
 
-- **Breast cancer surgery analysis (use R and Python)**
+- **Statistical analysis for breast cancer surgery clinical data (use R and Python)**
   - [MDCAsian.Rmd](MDCAsian.Rmd)
   - [TNBC.Rmd](TNBC.Rmd)
   - [Micromets.Rmd](Micromets.Rmd)
