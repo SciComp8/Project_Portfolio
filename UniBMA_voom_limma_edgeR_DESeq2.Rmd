@@ -708,10 +708,4 @@ uni_ana <- function(seed.num = 999) {
 ```
 
   
-## Trial 2
-```{r}
-uni_ana(seed.num = 186890)
-```
-
-
 
