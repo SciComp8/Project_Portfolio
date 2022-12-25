@@ -5,13 +5,13 @@ This is a list of my coding work affiliated with multiple collaborative and indi
 - **Bayesian model averaging for bulk RNA-Seq data (use R)**
   - [UniBMA_voom_limma_edgeR_DESeq2.Rmd](UniBMA_voom_limma_edgeR_DESeq2.Rmd)
   - [MultiBMA_voom_limma_edgeR_DESeq2.Rmd](MultiBMA_voom_limma_edgeR_DESeq2.Rmd)
-
-- **Bayesian integrative clustering for multi-omics data (use R)**
-  - [BayesClustering.Rmd](BayesClustering.Rmd)
   
 - **Differential expression analysis pipeline for single cell data (use Python-based snakefile and R)**
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
-  
+
+- **Bayesian integrative clustering for multi-omics data (use R)**
+  - [BayesClustering.Rmd](BayesClustering.Rmd)
+ 
 - **Lipidomics and transcriptomics analysis (use R)**
   - [LipidomicTranscriptomic.Rmd](LipidomicTranscriptomic.Rmd)
 
