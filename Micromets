@@ -1,0 +1,1152 @@
+---
+title: "Micrometastatic Axillary Nodal Disease Project"
+author: "Anni Liu"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+knit: knitautomator::knit_filename
+output:
+  word_document:
+    fig_caption: no
+    fig_height: 4
+    fig_width: 4
+    highlight: null
+    toc: yes
+    reference_docx: manuscript_style_V0.docx
+  html_document: default
+params:
+  date.analysis: !r format(Sys.Date(), "%Y%B%D")
+  plot.fig: TRUE
+  results.folder: FALSE
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r shorcut, include=FALSE}
+#################################################################
+##                  RStudio keyboard shortcut                  ##
+#################################################################
+# Cursor at the beginning of a command line: Ctrl+A
+# Cursor at the end of a command line: Ctrl+E
+# Clear all the code from your console: Ctrl+L
+# Create a pipe operator %>%: Ctrl+Shift+M (Windows) or Cmd+Shift+M (Mac)
+# Knit a document (knitr): Ctrl+Shift+K (Windows) or Cmd+Shift+K (Mac)
+# Comment or uncomment current selection: Ctrl+Shift+C (Windows) or Cmd+Shift+C (Mac)
+```
+
+
+```{r analysis_plan, include=FALSE}
+#################################################################
+##                        Analysis plan                        ##
+#################################################################
+
+##------New update------
+# Use the Axillary micromets v3.xlsx dataset, which excludes patients with bilateral cancer at the time of diagnosis and those who received neoadjuvant therapy. The sample size is 102.
+
+##------Previous update------
+# Use the univariate log-rank test and Cox-proportional hazards model to investigate the association between each potential predictor (i.e., age, gender, adjuvant radiation) on the composite outcomes of interest (i.e., axillary/local/distant recurrence and death)
+## Review the distributions of recurrence and death
+## table(dat0$Axillary_recurrence_2 , dat0$Death_2, useNA = "ifany")
+##       No Yes
+## No   115   5
+## Yes    1   1
+## <NA>   6   0
+## table(dat0$Local_recurrence_2, dat0$Death_2, useNA = "ifany")
+##       No Yes
+## No   108   4
+## Yes    8   2
+## <NA>   6   0
+## table(dat0$Distant_recurrence_2, dat0$Death_2, useNA = "ifany")
+##       No Yes
+## No   106   0
+## Yes   11   6
+## <NA>   5   0
+##
+## Add the following variables:
+## ARDeath: 1 if Axillary_recurrence_2 == "Yes" or Death_2 == "Yes"
+##          0 if Axillary_recurrence_2 == "No" and Death_2 == "No"
+##          NA if Axillary_recurrence_2 == NA
+## LRDeath: 1 if Local_recurrence_2 == "Yes" or Death_2 == "Yes"
+##          0 if Local_recurrence_2 == "No" and Death_2 == "No"
+##          NA if Local_recurrence_2 == NA
+## DRDeath: 1 if Distant_recurrence_2 == "Yes" or Death_2 == "Yes"
+##          0 if Distant_recurrence_2 == "No" and Death_2 == "No"
+##          NA if Distant_recurrence_2 == NA
+## T2ARDeath: `Time_to_AXR` if Axillary_recurrence_2 == "Yes" and Death_2 == "No"
+##            `Time_to_AXR` if Axillary_recurrence_2 == "Yes" and Death_2 == "Yes"
+##            `Time_to_death` if Death_2 == "Yes" and Axillary_recurrence_2 == "No"
+##            `Follow_up_time..days.` if ARDeath == 0
+##            NA if ARDeath == NA
+## T2LRDeath: `Time_to_LR` if Local_recurrence_2 == "Yes" and Death_2 == "No"
+##            `Time_to_LR` if Local_recurrence_2 == "Yes" and Death_2 == "Yes"
+##            `Time_to_death` if Death_2 == "Yes" and Local_recurrence_2 == "No"
+##            `Follow_up_time..days.` if LRDeath == 0
+##            NA if LRDeath == NA
+## T2DRDeath: `Time_to_DR` if Distant_recurrence_2 == "Yes" and Death_2 == "No"
+##            `Time_to_DR` if Distant_recurrence_2 == "Yes" and Death_2 == "Yes"
+##            `Time_to_death` if Death_2 == "Yes" and Distant_recurrence_2 == "No"
+##            `Follow_up_time..days.` if DRDeath == 0
+##            NA if DRDeath == NA
+## Note: 1 means the composite endpoint occurs; 0 means the censoring occurs
+```
+
+
+```{r attach_libraries, include=FALSE}
+##################################################################
+##                        Attach libraries                      ##
+##################################################################
+easypackages::libraries("BTKR", "multcomp", "readxl", "tidyverse", 
+                        "bannerCommenter", "survival")
+
+source("../BTKR_function/fsmry.dmgrph.rowprop.R")
+```
+
+
+```{r check_data, include=FALSE}
+##################################################################
+##                    Load data for checking                    ##
+##################################################################
+dat0 = dat.work = dget("../data/derived/2022Dec24_dat_micromets.Rdata")
+```
+
+
+```{r global_options, include=FALSE}
+#################################################################
+##                          Automator                          ##
+#################################################################
+if (params$plot.fig) {
+  dir.fig <- paste0("../report/figs_", params$date)
+  
+  if (!dir.exists(dir.fig)) { 
+    # If the figure directory does not exist, we create a new directory under the folder report using the name figs + current date passed from the params$date in YAML
+    dir.create(dir.fig) 
+  }
+  
+  knitr::opts_chunk$set( # Setting parameters when figures are plotted
+    fig.width = 6, fig.height = 6, fig.path = dir.fig, dev = "png", dpi = 300,
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+  
+} else { # Setting parameters when figures are not plotted
+  knitr::opts_chunk$set(
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+}
+
+if (params$results.folder) { # Suitable when the results need to be stored outside the microsoft word report
+  dir.result <- paste0("../report/results_", params$date)
+  
+  if (!dir.exists(dir.result)) {
+    # If the directory does not exist, we create a new directory under the folder report using the name results + current date passed from the params$date in YAML 
+    
+    dir.create(dir.result)
+  }
+}
+
+loc.perl <- "C:/cygwin64/bin/perl" 
+```
+
+
+# Data preparation
+
+```{r, clean_data_start, eval=FALSE}
+##################################################################
+##                          Clean data                          ##
+##################################################################
+# table(dat0$Age_Dx_Grp_2, useNA = "ifany")
+dat0 <- readxl::read_xlsx(
+  "../data/raw/Axillary micromets\ v3.xlsx", # \ escape
+  sheet = "Coded v3",
+  range = c("A1:BA129"),
+  col_names = T,
+  na = c("Unknown", "unknown", "N/A", "n/a")
+) %>%
+  mutate(
+    Age_dx_grp_1 = case_when(Age_Dx_10yr_Groups == 2 ~ "20-29",
+                             Age_Dx_10yr_Groups == 3 ~ "30-39",
+                             Age_Dx_10yr_Groups == 4 ~ "40-49",
+                             Age_Dx_10yr_Groups == 5 ~ "50-59",
+                             Age_Dx_10yr_Groups == 6 ~ "60-69",
+                             Age_Dx_10yr_Groups == 7 ~ "70-79",
+                             Age_Dx_10yr_Groups == 8 ~ "80-89",
+                             Age_Dx_10yr_Groups == 9 ~ "90+") %>% 
+      factor(levels = c("20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90+")
+  )) %>%
+  mutate(
+    Age_dx_grp_2 = ifelse(Age_Dx < 40, "<40", "≥40") %>% 
+      factor(levels = c("<40", "≥40")
+  )) %>%
+  mutate(
+    Age_dx_grp_3 = ifelse(Age_Dx < 45, "<45", "≥45") %>% 
+      factor(levels = c("<45", "≥45")
+  )) %>%
+  mutate(
+    Age_dx_grp_4 = ifelse(Age_Dx < 50, "<50", "≥50") %>% 
+      factor(levels = c("<50", "≥50")
+  )) %>%
+  mutate(
+    Race_2 = case_when(Race == 0 ~ "Asian",
+                       Race == 1 ~ "Non-hispanic black",
+                       Race == 2 ~ "Non-hispanic white",
+                       Race == 3 ~ "Hispanic",
+                       Race == 4 ~ "Other",
+                       Race == 5 ~ as.character(NA)) %>%
+      factor(levels = c("Asian", "Non-hispanic black", "Non-hispanic white", "Hispanic", "Other")
+  )) %>%
+  mutate(
+    Sex_2 = ifelse(Sex == 0, "Female", "Male") %>%
+      factor(levels = c("Female", "Male")
+  )) %>% 
+  mutate(
+    Menopausal_2 = case_when(Menopausal == 0 ~ "Pre",
+                             Menopausal == 1 ~ "Post",
+                             Menopausal == 2 ~ as.character(NA)) %>%
+      factor(levels = c("Pre", "Post")
+  )) %>% 
+  mutate(
+    Screened_2 = case_when(Screened == 0 ~ "No",
+                           Screened == 1 ~ "Yes",
+                           Screened == 2 ~ as.character(NA)) %>% 
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Multiple_index_2 = ifelse(Multiple_index == 0, "No", "Yes") %>%  
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Bilateral_cancer_2 = ifelse(Bilateral_Cancer == 0, "No", "Yes") %>% 
+      factor(levels = c("No", "Yes")
+  )) %>%
+  mutate(
+    Index_status_2 = ifelse(Idx_status == 0, "New primary cancer", "Local recurrence") %>% 
+    factor(levels = c("New primary cancer", "Local recurrence")
+  )) %>%
+  mutate(
+    Prior_breast_cancer_2 = ifelse(Prior_breast_Ca == 0, "No", "Yes") %>% 
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Tumor_type_2 = case_when(Tumor_type == 0 ~ "DCIS",
+                             Tumor_type == 1 ~ "IDC",
+                             Tumor_type == 2 ~ "ILC",
+                             Tumor_type == 3 ~ "IDC/ILC",
+                             Tumor_type == 4 ~ "Mammary",
+                             Tumor_type == 5 ~ "Other") %>% 
+      factor(levels = c("DCIS", "IDC", "ILC", "IDC/ILC", "Mammary", "Other")
+  )) %>% 
+  mutate(
+    Nodal_mets_dx_2 = ifelse(`Nodal_mets _at_Dx` == 0, "No", "Yes") %>%
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Histo_grade_2 = case_when(Histo_grade == 1 ~ "Grade1",
+                              Histo_grade == 2 ~ "Grade2",
+                              Histo_grade == 3 ~ "Grade3",
+                              Histo_grade == 4 ~ as.character(NA)) %>% 
+      factor(levels = c("Grade1", "Grade2", "Grade3")
+  )) %>%
+  mutate(
+    ER_2 = case_when(ER == 0 ~ "Negative",
+                     ER == 1 ~ "Positive",
+                     ER == 2 ~ as.character(NA)) %>% 
+      factor(levels = c("Negative", "Positive")
+  )) %>% 
+  mutate(
+    PR_2 = case_when(PR == 0 ~ "Negative",
+                     PR == 1 ~ "Positive",
+                     PR == 2 ~ as.character(NA)) %>% 
+      factor(levels = c("Negative", "Positive")
+  )) %>% 
+  mutate(
+    HER2_2 = case_when(HER2 == 0 ~ "Negative",
+                       HER2 == 1 ~ "Positive",
+                       HER2 == 2 ~ as.character(NA)) %>% 
+      factor(levels = c("Negative", "Positive")
+  )) %>% 
+  mutate(
+    TNBC = case_when( 
+      
+      # Check the distributions of estrogen receptor, progesterone receptor, and protein HER2
+      # with(dat0, table(ER_2, PR_2, HER2_2, useNA = "ifany"))
+      
+      is.na(ER_2) & is.na(PR_2) & HER2_2 %in% c("Negative", NA) ~ as.character(NA),
+      ER_2 == "Negative" & PR_2 == "Negative" & HER2_2 == "Negative" ~ "Triple negative",
+      TRUE ~ "Non-triple negative") %>% 
+      factor(levels = c("Triple negative", "Non-triple negative")
+  )) %>% 
+  mutate(
+    Ki67_2 = case_when(Ki_67 == 0 ~ "Ki67≤10%",
+                       Ki_67 == 1 ~ "Ki67>10%",
+                       Ki_67 == 2 ~ as.character(NA)) %>% 
+      factor(levels = c("Ki67≤10%", "Ki67>10%")
+  )) %>% 
+  mutate(
+    LVI_2 = case_when(LVI == 0 ~ "No",
+                      LVI == 1 ~ "Yes",
+                      LVI == 2 ~ as.character(NA)) %>% 
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    ALND_2 = case_when(Completion_ALND == 0 ~ "No",
+                       Completion_ALND == 1 ~ "Yes",
+                       Completion_ALND == 2 ~ as.character(NA)) %>% 
+      factor(levels = c("No", "Yes")
+  )) %>%
+  mutate(
+    N_clinical_2 = gsub("c1|c2A", "c1/c2", `N Class - Clinical`) %>% 
+    factor(levels = c("c0", "c1/c2", "cX"),
+           labels = c("cN0", "cN1/cN2", "cNX") # Large sample size -> reference group
+    )) %>%
+  mutate(
+    T_clinical_2 = gsub("1|c0|c1|c1A|c1b|c1B|c1c|c1C|c1mi|c2|cTis|pIS|Tis", "T0/Tis/T1/T2",
+                        gsub("c3|c4D", "T3/T4",
+                             gsub("cx|cX", "TX", `T Class - Clinical`))) %>%
+   factor(levels = c("T0/Tis/T1/T2", "T3/T4", "TX")) # Large sample size -> reference group
+  ) %>% 
+  mutate(
+    Neoadjuvant_chemo_2 = case_when(Neoadjuvent_Chemo == 0 ~ "No",
+                                    Neoadjuvent_Chemo == 1 ~ "Yes",
+                                    Neoadjuvent_Chemo == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Neoadjuvant_endocrine_2 = case_when(Neoadjuvent_endocrine == 0 ~ "No",
+                                        Neoadjuvent_endocrine == 1 ~ "Yes",
+                                        Neoadjuvent_endocrine == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Neoadjuvant_treatment = case_when(Neoadjuvant_chemo_2 == "Yes" ~ "ChemoYes",
+                                      Neoadjuvant_endocrine_2 == "Yes" ~ "EndocrineYes",
+                                      Neoadjuvant_chemo_2 == "Yes" & Neoadjuvant_endocrine_2 == "Yes" ~ "Both",
+                                      Neoadjuvant_chemo_2 == "No" & Neoadjuvant_endocrine_2 == "No" ~ "Neither") %>% 
+      factor(levels = c("ChemoYes", "EndocrineYes", "Both", "Neither")
+  )) %>% 
+  mutate(
+    Neoadjuvant_antiHER2_2 = case_when(`Neoadjuvent_anti-HER2` == 0 ~ "No",
+                                       `Neoadjuvent_anti-HER2` == 1 ~ "Yes",
+                                       `Neoadjuvent_anti-HER2` == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Neoadjuvant_XRT_2 = case_when(Neoadjuvent_XRT == 0 ~ "No",
+                                  Neoadjuvent_XRT == 1 ~ "Yes",
+                                  Neoadjuvent_XRT == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Adjuvant_chemo_2 = case_when(Adjuvent_Chemo == 0 ~ "No",
+                                 Adjuvent_Chemo == 1 ~ "Yes",
+                                 Adjuvent_Chemo == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Adjuvant_endocrine_2 = case_when(Adjuvent_Endocrine == 0 ~ "No",
+                                     Adjuvent_Endocrine == 1 ~ "Yes",
+                                     Adjuvent_Endocrine == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Adjuvant_treatment = case_when(Adjuvant_chemo_2 == "Yes" ~ "ChemoYes",
+                                   Adjuvant_endocrine_2 == "Yes" ~ "EndocrineYes",
+                                   Adjuvant_chemo_2 == "Yes" & Adjuvant_endocrine_2 == "Yes" ~ "Both",
+                                   Adjuvant_chemo_2 == "No" & Adjuvant_endocrine_2 == "No" ~ "Neither") %>% 
+      factor(levels = c("ChemoYes", "EndocrineYes", "Both", "Neither")
+  )) %>% 
+  mutate(
+    Adjuvant_antiHER2_2 = case_when(`Adjuvent_anti-HER2` == 0 ~ "No",
+                                    `Adjuvent_anti-HER2` == 1 ~ "Yes",
+                                    `Adjuvent_anti-HER2` == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+  )) %>% 
+  mutate(
+    Adjuvant_XRT_2 = case_when(Adjuvent_XRT == 0 ~ "No",
+                               Adjuvent_XRT == 1 ~ "Yes",
+                               Adjuvent_XRT == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+  )) %>%
+  mutate(
+    Local_recurrence_2 = case_when(`Local recurrence` == 0 ~ "No",
+                                   `Local recurrence` == 1 ~ "Yes",
+                                   `Local recurrence` == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+    )) %>% 
+  mutate(
+    Axillary_recurrence_2 = case_when(`Axillary Recurrence` == 0 ~ "No",
+                                      `Axillary Recurrence` == 1 ~ "Yes",
+                                      `Axillary Recurrence` == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+    )) %>%
+  mutate(
+    Distant_recurrence_2 = case_when(DR == 0 ~ "No",
+                                     DR == 1 ~ "Yes",
+                                     DR == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+    )) %>%
+  mutate(
+    New_breast_cancer_2 = case_when(NewBC == 0 ~ "No",
+                                    NewBC == 1 ~ "Yes",
+                                    NewBC == 2 ~ as.character(NA)) %>%
+      factor(levels = c("No", "Yes")
+    )) %>%
+  mutate(
+    Addition_pos_node_2 = ifelse(`how many additional positive nodes removed` %in% c(NA, 0), "No", "Yes") %>% 
+      factor(levels = c("No", "Yes")
+  )) %>%
+  mutate(
+    ALND_adjuvantXRT = case_when(ALND_2 == "No" & Adjuvant_XRT_2 == "No" ~ "No ALND, no adjuvant XRT",
+                                 ALND_2 == "No" & Adjuvant_XRT_2 == "Yes" ~ "No ALND, yes adjuvant XRT",
+                                 ALND_2 == "Yes" & Adjuvant_XRT_2 == "No" ~ "Yes ALND, no adjuvant XRT",
+                                 ALND_2 == "Yes" & Adjuvant_XRT_2 == "Yes" ~ "Yes ALND, yes adjuvant XRT") %>% 
+      factor(levels = c("No ALND, no adjuvant XRT", 
+                        "No ALND, yes adjuvant XRT",
+                        "Yes ALND, no adjuvant XRT",
+                        "Yes ALND, yes adjuvant XRT")
+  )) %>%
+  mutate(
+    ALND_age40 = case_when(ALND_2 == "No" & Age_dx_grp_2 == "<40" ~ "No ALND, age<40",
+                           ALND_2 == "No" & Age_dx_grp_2 == "≥40" ~ "No ALND, age≥40",
+                           ALND_2 == "Yes" & Age_dx_grp_2 == "<40" ~ "Yes ALND, age<40",
+                           ALND_2 == "Yes" & Age_dx_grp_2 == "≥40" ~ "Yes ALND, age≥40") %>% 
+      factor(levels = c("No ALND, age<40",
+                        "No ALND, age≥40",
+                        "Yes ALND, age<40",
+                        "Yes ALND, age≥40")
+  )) %>% 
+  mutate(
+    ALND_age45 = case_when(ALND_2 == "No" & Age_dx_grp_3 == "<45" ~ "No ALND, age<45",
+                           ALND_2 == "No" & Age_dx_grp_3 == "≥45" ~ "No ALND, age≥45",
+                           ALND_2 == "Yes" & Age_dx_grp_3 == "<45" ~ "Yes ALND, age<45",
+                           ALND_2 == "Yes" & Age_dx_grp_3 == "≥45" ~ "Yes ALND, age≥45") %>% 
+      factor(levels = c("No ALND, age<45",
+                        "No ALND, age≥45",
+                        "Yes ALND, age<45",
+                        "Yes ALND, age≥45")
+  )) %>% 
+  mutate(
+    ALND_age50 = case_when(ALND_2 == "No" & Age_dx_grp_4 == "<50" ~ "No ALND, age<50",
+                           ALND_2 == "No" & Age_dx_grp_4 == "≥50" ~ "No ALND, age≥50",
+                           ALND_2 == "Yes" & Age_dx_grp_4 == "<50" ~ "Yes ALND, age<50",
+                           ALND_2 == "Yes" & Age_dx_grp_4 == "≥50" ~ "Yes ALND, age≥50") %>% 
+      factor(levels = c("No ALND, age<50",
+                        "No ALND, age≥50",
+                        "Yes ALND, age<50",
+                        "Yes ALND, age≥50")
+  )) %>% 
+  mutate(
+    ALND_adjuvantXRT_age40 = case_when(
+      ALND_adjuvantXRT == "No ALND, no adjuvant XRT" & Age_dx_grp_2 == "<40" ~ "No ALND, no adjuvant XRT, age<40",
+      ALND_adjuvantXRT == "No ALND, no adjuvant XRT" & Age_dx_grp_2 == "≥40" ~ "No ALND, no adjuvant XRT, age≥40",
+      ALND_adjuvantXRT == "No ALND, yes adjuvant XRT" & Age_dx_grp_2 == "<40" ~ "No ALND, yes adjuvant XRT, age<40",
+      ALND_adjuvantXRT == "No ALND, yes adjuvant XRT" & Age_dx_grp_2 == "≥40" ~ "No ALND, yes adjuvant XRT, age≥40",
+      ALND_adjuvantXRT == "Yes ALND, no adjuvant XRT" & Age_dx_grp_2 == "<40" ~ "Yes ALND, no adjuvant XRT, age<40",
+      ALND_adjuvantXRT == "Yes ALND, no adjuvant XRT" & Age_dx_grp_2 == "≥40" ~ "Yes ALND, no adjuvant XRT, age≥40",
+      ALND_adjuvantXRT == "Yes ALND, yes adjuvant XRT" & Age_dx_grp_2 == "<40" ~ "Yes ALND, Yes adjuvant XRT, age<40",
+      ALND_adjuvantXRT == "Yes ALND, yes adjuvant XRT" & Age_dx_grp_2 == "≥40" ~ "Yes ALND, Yes adjuvant XRT, age≥40") %>% 
+      factor(levels = c("No ALND, no adjuvant XRT, age<40", 
+                        "No ALND, no adjuvant XRT, age≥40",
+                        "No ALND, yes adjuvant XRT, age<40",
+                        "No ALND, yes adjuvant XRT, age≥40",
+                        "Yes ALND, no adjuvant XRT, age<40",
+                        "Yes ALND, no adjuvant XRT, age≥40",
+                        "Yes ALND, Yes adjuvant XRT, age<40",
+                        "Yes ALND, Yes adjuvant XRT, age≥40")
+  )) %>%
+  mutate(
+    ALND_adjuvantXRT_age45 = case_when(
+      ALND_adjuvantXRT == "No ALND, no adjuvant XRT" & Age_dx_grp_3 == "<45" ~ "No ALND, no adjuvant XRT, age<45",
+      ALND_adjuvantXRT == "No ALND, no adjuvant XRT" & Age_dx_grp_3 == "≥45" ~ "No ALND, no adjuvant XRT, age≥45",
+      ALND_adjuvantXRT == "No ALND, yes adjuvant XRT" & Age_dx_grp_3 == "<45" ~ "No ALND, yes adjuvant XRT, age<45",
+      ALND_adjuvantXRT == "No ALND, yes adjuvant XRT" & Age_dx_grp_3 == "≥45" ~ "No ALND, yes adjuvant XRT, age≥45",
+      ALND_adjuvantXRT == "Yes ALND, no adjuvant XRT" & Age_dx_grp_3 == "<45" ~ "Yes ALND, no adjuvant XRT, age<45",
+      ALND_adjuvantXRT == "Yes ALND, no adjuvant XRT" & Age_dx_grp_3 == "≥45" ~ "Yes ALND, no adjuvant XRT, age≥45",
+      ALND_adjuvantXRT == "Yes ALND, yes adjuvant XRT" & Age_dx_grp_3 == "<45" ~ "Yes ALND, Yes adjuvant XRT, age<45",
+      ALND_adjuvantXRT == "Yes ALND, yes adjuvant XRT" & Age_dx_grp_3 == "≥45" ~ "Yes ALND, Yes adjuvant XRT, age≥45") %>% 
+      factor(levels = c("No ALND, no adjuvant XRT, age<45", 
+                        "No ALND, no adjuvant XRT, age≥45",
+                        "No ALND, yes adjuvant XRT, age<45",
+                        "No ALND, yes adjuvant XRT, age≥45",
+                        "Yes ALND, no adjuvant XRT, age<45",
+                        "Yes ALND, no adjuvant XRT, age≥45",
+                        "Yes ALND, Yes adjuvant XRT, age<45",
+                        "Yes ALND, Yes adjuvant XRT, age≥45")
+  )) %>%
+  mutate(
+    ALND_adjuvantXRT_age50 = case_when(
+      ALND_adjuvantXRT == "No ALND, no adjuvant XRT" & Age_dx_grp_4 == "<50" ~ "No ALND, no adjuvant XRT, age<50",
+      ALND_adjuvantXRT == "No ALND, no adjuvant XRT" & Age_dx_grp_4 == "≥50" ~ "No ALND, no adjuvant XRT, age≥50",
+      ALND_adjuvantXRT == "No ALND, yes adjuvant XRT" & Age_dx_grp_4 == "<50" ~ "No ALND, yes adjuvant XRT, age<50",
+      ALND_adjuvantXRT == "No ALND, yes adjuvant XRT" & Age_dx_grp_4 == "≥50" ~ "No ALND, yes adjuvant XRT, age≥50",
+      ALND_adjuvantXRT == "Yes ALND, no adjuvant XRT" & Age_dx_grp_4 == "<50" ~ "Yes ALND, no adjuvant XRT, age<50",
+      ALND_adjuvantXRT == "Yes ALND, no adjuvant XRT" & Age_dx_grp_4 == "≥50" ~ "Yes ALND, no adjuvant XRT, age≥50",
+      ALND_adjuvantXRT == "Yes ALND, yes adjuvant XRT" & Age_dx_grp_4 == "<50" ~ "Yes ALND, Yes adjuvant XRT, age<50",
+      ALND_adjuvantXRT == "Yes ALND, yes adjuvant XRT" & Age_dx_grp_4 == "≥50" ~ "Yes ALND, Yes adjuvant XRT, age≥50") %>% 
+      factor(levels = c("No ALND, no adjuvant XRT, age<50", 
+                        "No ALND, no adjuvant XRT, age≥50",
+                        "No ALND, yes adjuvant XRT, age<50",
+                        "No ALND, yes adjuvant XRT, age≥50",
+                        "Yes ALND, no adjuvant XRT, age<50",
+                        "Yes ALND, no adjuvant XRT, age≥50",
+                        "Yes ALND, Yes adjuvant XRT, age<50",
+                        "Yes ALND, Yes adjuvant XRT, age≥50")
+  )) %>%
+  mutate(Death_2 = ifelse(Death_from_BC == 0, "No", "Yes") %>% 
+           factor(levels = c("No", "Yes")
+  )) %>% 
+  data.frame()
+
+##################################################################
+##                Recode ARDeath/LRDeath/DRDeath                ##
+##################################################################
+table(dat0$Axillary_recurrence_2 , dat0$Death_2, useNA = "ifany")
+  #       No Yes
+  # No   115   5
+  # Yes    1   1
+  # <NA>   6   0
+dat0$ARDeath <- NA
+dat0$ARDeath[dat0$Axillary_recurrence_2 == "Yes" | dat0$Death_2 == "Yes"] <- 1
+dat0$ARDeath[dat0$Axillary_recurrence_2 == "No" & dat0$Death_2 == "No"] <- 0
+table(dat0$ARDeath, useNA = "ifany")
+ #   0    1 <NA> 
+ # 115    7    6 
+
+table(dat0$Local_recurrence_2 , dat0$Death_2, useNA = "ifany")
+  #       No Yes
+  # No   108   4
+  # Yes    8   2
+  # <NA>   6   0
+dat0$LRDeath <- NA
+dat0$LRDeath[dat0$Local_recurrence_2 == "Yes" | dat0$Death_2 == "Yes"] <- 1
+dat0$LRDeath[dat0$Local_recurrence_2 == "No" & dat0$Death_2 == "No"] <- 0
+table(dat0$LRDeath, useNA = "ifany")
+ #   0    1 <NA> 
+ # 108   14    6 
+
+table(dat0$Distant_recurrence_2 , dat0$Death_2, useNA = "ifany")
+  #       No Yes
+  # No   106   0
+  # Yes   11   6
+  # <NA>   5   0
+dat0$DRDeath <- NA
+dat0$DRDeath[dat0$Distant_recurrence_2 == "Yes" | dat0$Death_2 == "Yes"] <- 1
+dat0$DRDeath[dat0$Distant_recurrence_2 == "No" & dat0$Death_2 == "No"] <- 0
+table(dat0$DRDeath, useNA = "ifany")
+ #   0    1 <NA> 
+ # 106   17    5 
+
+  
+##################################################################
+##             Recode T2ARDeath/T2LRDeath/T2DRDeath             ##
+##################################################################
+dat0 <- dat0 %>%
+  mutate(
+    T2ARDeath = case_when(
+      (Axillary_recurrence_2 == "Yes" & Death_2 == "No") ~ `Time_to_AXR`,
+      (Axillary_recurrence_2 == "Yes" & Death_2 == "Yes") ~ `Time_to_AXR`, 
+      (Death_2 == "Yes" & Axillary_recurrence_2 == "No") ~ `Time_to_death`,
+      ARDeath == 0 ~ `Follow_up_time..days.`)) 
+
+# Check the number of patients not at risk
+summary(dat0$T2ARDeath)
+   # Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+   #  122    1337    2706    2780    4017    6230       6 
+
+dat0 <- dat0 %>%
+  mutate(
+    T2LRDeath = case_when(
+      (Local_recurrence_2 == "Yes" & Death_2 == "No") ~ `Time_to_LR`,
+      (Local_recurrence_2 == "Yes" & Death_2 == "Yes") ~ `Time_to_LR`, 
+      (Death_2 == "Yes" & Local_recurrence_2 == "No") ~ `Time_to_death`,
+      LRDeath == 0 ~ `Follow_up_time..days.`)) 
+summary(dat0$T2LRDeath)
+   # Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+   #  122    1199    2536    2696    3941    6230       6 
+
+dat0 <- dat0 %>%
+  mutate(
+    T2DRDeath = case_when(
+      (Distant_recurrence_2 == "Yes" & Death_2 == "No") ~ `Time_to_DR`,
+      (Distant_recurrence_2 == "Yes" & Death_2 == "Yes") ~ `Time_to_DR`, 
+      (Death_2 == "Yes" & Distant_recurrence_2 == "No") ~ `Time_to_death`,
+      DRDeath == 0 ~ `Follow_up_time..days.`)) 
+summary(dat0$T2DRDeath)
+   # Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+   #  122    1193    2573    2704    3904    6230       5 
+
+#################################################################
+##                 Fix column names and orders                 ##
+#################################################################
+names(dat0) <- 
+  sapply(strsplit(names(dat0), split = "\\."), function(x)
+    paste(x[x != ""], collapse = "."))
+
+dat0 <- dat0 %>% 
+  select(
+  "Record.ID", everything()
+  )
+
+#################################################################
+##                          Save data                          ##
+#################################################################
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+dput(dat0, paste0("../data/derived/", date.analysis, "_dat_micromets.Rdata"))
+write.csv(dat0, paste0("../data/derived/", date.analysis, "_dat_micromets.csv"), row.names = F)
+```
+
+
+```{r load_cleaned_data}
+##################################################################
+##                  Load cleaned data in Rdata                  ##
+##################################################################
+dat.work <- dget("../data/derived/2022Dec24_dat_micromets.Rdata")
+```
+
+
+```{r, results="hide"}
+#################################################################
+##                     Set study variables                     ##
+#################################################################
+vars.all <- c(
+
+  ### Demographical variables
+  # "Age_Dx",
+  "Age_dx_grp_1", "Age_dx_grp_2", "Age_dx_grp_3", "Age_dx_grp_4",
+  "Race_2", "Sex_2", "Menopausal_2", "Follow_up_time.days",
+  
+  ### Disease history variables
+  "T_clinical_2", "N_clinical_2",
+  "ER_2", "PR_2", "HER2_2", "TNBC",
+  "Tumor_Size.mm",
+  "Tumor_type_2",
+  "Nodal_mets_dx_2",
+  "Histo_grade_2",
+  "Ki67_2",
+  "LVI_2",
+  "Multiple_index_2",
+  "Bilateral_cancer_2",
+  "Index_status_2",
+  "Prior_breast_cancer_2",
+  
+  ### Screening/diagnosis/treatment variables
+  "Screened_2", 
+  "ALND_2", 
+  "ALND_age40", "ALND_age45", "ALND_age50",
+  "Addition_pos_node_2", 
+  "Adjuvant_XRT_2", "Adjuvant_treatment", 
+  "Adjuvant_chemo_2", "Adjuvant_endocrine_2", "Adjuvant_antiHER2_2", 
+  "Neoadjuvant_XRT_2", "Neoadjuvant_treatment",
+  "Neoadjuvant_chemo_2", "Neoadjuvant_endocrine_2", "Neoadjuvant_antiHER2_2", 
+  "ALND_adjuvantXRT",
+  "ALND_adjuvantXRT_age40", "ALND_adjuvantXRT_age45", "ALND_adjuvantXRT_age50",
+
+  ### Disease outcome variables
+  "Axillary_recurrence_2", "Local_recurrence_2", "Distant_recurrence_2",
+  "New_breast_cancer_2"
+)
+
+# Create an indicator [0, 1] for all categorical variables 
+vars.cat <- rep(1, length(vars.all))
+vars.cat[vars.all %in% c("Age_Dx", "Follow_up_time.days", "Tumor_Size.mm")] <- 0
+```
+
+The association between a categorical variable and a grouping variable (i.e., completion of axillary lymph node dissection (ALND)) was examined using the Fisher’s exact test. Difference in the value of a continuous variable among patients of different groups was examined using the Wilcoxon rank sum test (p-value is aligned with the median (IQR) summmaries in the following table). For variable with missing values, the difference in the proportion of missingness across different groups was also examined.
+
+In our univariate survival analysis, the axillary/local/distant recurrence-free survival time is defined as a composite endpoint which combines the time to axillary/local/distant recurrence, time to death, and time to last follow-up into a univariate time to the first event or censoring. To illustrate how this combination of time works, we enumerate different scenarios for calculating the axillary recurrence-free survival time. The same logic applies to the other two types of recurrence (i.e., local recurrence and distant recurrence).
+
+For axillary recurrence-free survival time:
+
+* Given that 1 patient has the axillary recurrence but does not die, the time to axillary recurrence is treated as the survival time.
+* Given that 5 patients die without the axillary recurrence, the time to death is treated as their survival time.
+* Given that 1 patient first has the axillary recurrence and then dies, the time to axillary recurrence is treated as the survival time.
+* Given that 115 patients neither have the axillary recurrence or die, the time to last follow-up is treated as their survival time.
+* Given that 6 patients die but miss the information on the axillary recurrence, their survival time is treated as not available.
+
+# Patient characteristics tables
+
+## Patients characteristics by axillary lymph node dissection (column proportion)
+
+```{r, results="hide"}
+# Create a summary table by ALND_2
+vars.cat.rm <- which(vars.all %in% c(
+  "ALND_2",
+  "ALND_adjuvantXRT",
+  "ALND_age40",
+  "ALND_age45",
+  "ALND_age50",
+  "ALND_adjuvantXRT_age40",
+  "ALND_adjuvantXRT_age45",
+  "ALND_adjuvantXRT_age50"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "ALND_2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Patients characteristics by axillary lymph node dissection (row proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c(
+  "ALND_2",
+  "ALND_adjuvantXRT",
+  "ALND_age40",
+  "ALND_age45",
+  "ALND_age50",
+  "ALND_adjuvantXRT_age40",
+  "ALND_adjuvantXRT_age45",
+  "ALND_adjuvantXRT_age50",
+  "Neoadjuvant_treatment")) # Error in fisher.test(y.by.grp, simulate.p.value = TRUE) : need 2 or more non-zero row marginals
+out <- fsmry.dmgrph.rowprop(dat = dat.work,
+                            vars = vars.all[-vars.cat.rm],
+                            vars.cat = vars.cat[-vars.cat.rm],
+                            by = "ALND_2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Patients characteristics by post-mastectomy radiation therapy (column proportion)
+```{r, results="hide"}
+# Create a summary table by Adjuvant_XRT_2
+vars.cat.rm <- which(vars.all %in% c(
+  "Adjuvant_XRT_2",
+  "ALND_adjuvantXRT",
+  "ALND_age40",
+  "ALND_age45",
+  "ALND_age50",
+  "ALND_adjuvantXRT_age40",
+  "ALND_adjuvantXRT_age45",
+  "ALND_adjuvantXRT_age50"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Adjuvant_XRT_2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Patients characteristics by post-mastectomy radiation therapy (row proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c(
+  "ALND_2",
+  "ALND_adjuvantXRT",
+  "ALND_age40",
+  "ALND_age45",
+  "ALND_age50",
+  "ALND_adjuvantXRT_age40",
+  "ALND_adjuvantXRT_age45",
+  "ALND_adjuvantXRT_age50",
+  "Neoadjuvant_treatment")) # Error in fisher.test(y.by.grp, simulate.p.value = TRUE) : need 2 or more non-zero row marginals
+out <- fsmry.dmgrph.rowprop(dat = dat.work,
+                            vars = vars.all[-vars.cat.rm],
+                            vars.cat = vars.cat[-vars.cat.rm],
+                            by = "Adjuvant_XRT_2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Patients characteristics by axillary lymph node dissection and post-mastectomy radiation therapy
+```{r, results="hide"}
+# Create a summary table by ALND_adjuvantXRT
+vars.all2 <- c(
+  # "Age_Dx",
+  "Age_dx_grp_1", "Age_dx_grp_2", "Age_dx_grp_3", "Age_dx_grp_4",
+  "Race_2", "Sex_2", "Menopausal_2",
+  # "Follow_up_time.days",
+  
+  "T_clinical_2", "N_clinical_2",
+  "ER_2", "PR_2", "HER2_2", "TNBC",
+  # "Tumor_Size.mm",
+  "Tumor_type_2",
+  "Nodal_mets_dx_2",
+  "Histo_grade_2",
+  "Ki67_2",
+  "LVI_2",
+  "Multiple_index_2",
+  "Bilateral_cancer_2",
+  "Index_status_2",
+  "Prior_breast_cancer_2",
+  
+  "Screened_2",
+  "ALND_2", 
+  "ALND_age40", "ALND_age45", "ALND_age50",
+  "Addition_pos_node_2",
+  "Adjuvant_XRT_2", "Adjuvant_treatment", 
+  "Adjuvant_chemo_2", "Adjuvant_endocrine_2", "Adjuvant_antiHER2_2", 
+  "Neoadjuvant_XRT_2", "Neoadjuvant_treatment",
+  "Neoadjuvant_chemo_2", "Neoadjuvant_endocrine_2", "Neoadjuvant_antiHER2_2", 
+  "ALND_adjuvantXRT",
+  "ALND_adjuvantXRT_age40", "ALND_adjuvantXRT_age45", "ALND_adjuvantXRT_age50",
+  
+  
+  "Axillary_recurrence_2", "Local_recurrence_2", "Distant_recurrence_2",
+  "New_breast_cancer_2"
+)
+vars.cat.rm <- which(vars.all2 %in% c(
+    "Adjuvant_XRT_2",
+    "ALND_adjuvantXRT",
+    "ALND_age40",
+    "ALND_age45",
+    "ALND_age50",
+    "ALND_adjuvantXRT_age40",
+    "ALND_adjuvantXRT_age45",
+    "ALND_adjuvantXRT_age50"))
+
+#################################################################
+##                           Problem                           ##
+#################################################################
+# Error in wilcox.test.default(y1, y2, exact = F) : 
+#   not enough (non-missing) 'x' observations
+# In addition: Warning messages:
+# 1: In `==.default`(grp, grp.names1) :
+#   longer object length is not a multiple of shorter object length
+# 2: In is.na(e1) | is.na(e2) :
+#   longer object length is not a multiple of shorter object length
+
+# Create an indicator [0, 1] for all categorical variables 
+vars.cat <- rep(1, length(vars.all2))
+vars.cat[vars.all2 %in% c("Age_Dx", "Follow_up_time.days", "Tumor_Size.mm")] <- 0
+
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all2[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "ALND_adjuvantXRT")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Patients characteristics by axillary lymph node dissection and age (<40 versus ≥40)
+```{r, results="hide"}
+# Create a summary table by ALND_age40
+vars.cat.rm.2 <- c(
+  vars.cat.rm,
+  which(vars.all2 %in% c("Age_dx_grp_1", "Age_dx_grp_2", "Age_dx_grp_3", "Age_dx_grp_4")))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all2[-vars.cat.rm.2],
+                    vars.cat = vars.cat[-vars.cat.rm.2],
+                    by = "ALND_age40")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Patients characteristics by axillary lymph node dissection, post-mastectomy radiation therapy, and age (<40 versus ≥40)
+```{r, results="hide"}
+# Create a summary table by ALND_adjuvantXRT_age40
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all2[-vars.cat.rm.2],
+                    vars.cat = vars.cat[-vars.cat.rm.2],
+                    by = "ALND_adjuvantXRT_age40")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Patients characteristics by axillary lymph node dissection and age (<45 versus ≥45)
+```{r, results="hide"}
+# Create a summary table by ALND_age45
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all2[-vars.cat.rm.2],
+                    vars.cat = vars.cat[-vars.cat.rm.2],
+                    by = "ALND_age45")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Patients characteristics by axillary lymph node dissection, post-mastectomy radiation therapy, and age (<45 versus ≥45)
+```{r, results="hide"}
+# Create a summary table by ALND_adjuvantXRT_age45
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all2[-vars.cat.rm.2],
+                    vars.cat = vars.cat[-vars.cat.rm.2],
+                    by = "ALND_adjuvantXRT_age45")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Patients characteristics by axillary lymph node dissection and age (<50 versus ≥50)
+```{r, results="hide"}
+# Create a summary table by ALND_age50"
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all2[-vars.cat.rm.2],
+                    vars.cat = vars.cat[-vars.cat.rm.2],
+                    by = "ALND_age50")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Patients characteristics by axillary lymph node dissection, post-mastectomy radiation therapy, and age (<50 versus ≥50)
+```{r, results="hide"}
+# Create a summary table by ALND_adjuvantXRT_age50
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all2[-vars.cat.rm.2],
+                    vars.cat = vars.cat[-vars.cat.rm.2],
+                    by = "ALND_adjuvantXRT_age50")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+# Univariate analysis for recurrence free survival
+Note that patients without time to axillary/local/distant recurrence data were not included in the analysis. The association between each variable and axillary/local/distant recurrence free survival was assessed using the log rank test. The Cox-proportional hazards model was used to estimate the HR and corresponding 95% CI for each unit increase of a continuous variable, or with respect to the reference category for a categorical variable. For each variable, if there were missing values, the association between missingness and axillary/local/distant recurrence free survival was also examined.
+
+## Associations between variables and axillary recurrence
+```{r, results="hide"}
+##################################################################
+##            Reset the Age_dx_grp_1 reference level            ##
+##################################################################
+# In cox regression modeling, to prevent the 95% CI of HR estimate approximating infinity, the reference category of a covariate may have the **adequate sample size** and/or **adequate outcomes**.
+# How to define the **adequacy**?
+# An events per variable of 10 is widely advocated as the rule of thumb for multivariable Cox regression analyses.
+# Reference: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5045274/
+
+table(dat.work$Age_dx_grp_1, dat.work$Axillary_recurrence_2)
+  #       No Yes
+  # 40-49 39*   0*
+  # 20-29  6   0
+  # 30-39 16   0
+  # 50-59 26*   1*
+  # 60-69 20   0
+  # 70-79 13*   1*
+  # 80-89  0   0
+  # 90+    0   0
+# dat.work$Age_dx_grp_1 <- relevel(dat.work$Age_dx_grp_1, ref = "40-49")
+# |**Age_dx_grp_1**            |            |        |        |        |P=0.394 |
+# |40-49                       |reference   |        |        |        |        |
+# |20-29                       |1.00e+00    |0.00    |Inf     |P=1.000 |        |
+# |30-39                       |3.06e+08    |0.00    |Inf     |P=0.999 |        |
+# |50-59                       |3.79e+08    |0.00    |Inf     |P=0.999 |        |
+# |60-69                       |4.63e+08    |0.00    |Inf     |P=0.999 |        |
+# |70-79                       |7.29e+08    |0.00    |Inf     |P=0.999 |        |
+# |80-89                       |NA          |NA      |NA      |P=   NA |        |
+# |90+                         |NA          |NA      |NA      |P=   NA |        |
+  
+# dat.work$Age_dx_grp_1 <- relevel(dat.work$Age_dx_grp_1, ref = "50-59")
+# |**Age_dx_grp_1**            |            |        |        |        |P=0.394 |
+# |50-59                       |reference   |        |        |        |        |
+# |20-29                       |0.00        |0.00    |Inf     |P=0.999 |        |
+# |30-39                       |0.81        |0.07    |8.91    |P=0.861 |        |
+# |40-49                       |0.00        |0.00    |Inf     |P=0.999 |        |
+# |60-69                       |1.22        |0.17    |8.69    |P=0.841 |        |
+# |70-79                       |1.92        |0.27    |13.71   |P=0.514 |        |
+# |80-89                       |NA          |NA      |NA      |P=   NA |        |
+# |90+                         |NA          |NA      |NA      |P=   NA |        |
+  
+# dat.work$Age_dx_grp_1 <- factor(dat.work$Age_dx_grp_1,
+#                                 levels = c("20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90+")) # Recover the original level
+
+dat.work$Age_dx_grp_1 <- relevel(dat.work$Age_dx_grp_1, ref = "70-79")
+# |**Age_dx_grp_1**            |            |        |        |        |P=0.394 |
+# |70-79                       |reference   |        |        |        |        |
+# |20-29                       |0.00        |0.00    |Inf     |P=0.999 |        |
+# |30-39                       |0.42        |0.04    |4.65    |P=0.479 |        |
+# |40-49                       |0.00        |0.00    |Inf     |P=0.999 |        |
+# |50-59                       |0.52        |0.07    |3.70    |P=0.514 |        |
+# |60-69                       |0.64        |0.09    |4.53    |P=0.651 |        |
+# |80-89                       |NA          |NA      |NA      |P=   NA |        |
+# |90+                         |NA          |NA      |NA      |P=   NA |        |
+
+
+#################################################################
+##             !!!Reset the Race_2 reference level             ##
+#################################################################
+table(dat.work$Race_2, dat.work$Axillary_recurrence_2)
+  #                    No Yes
+  # Asian               5   0
+  # Non-hispanic black  7*   1*
+  # Non-hispanic white 93*   1*
+  # Hispanic            5   0
+  # Other               0   0
+dat.work$Race_2 <- factor(dat.work$Race_2, levels = c("Non-hispanic white", "Non-hispanic black", "Asian", "Hispanic", "Other"))
+# |**Race_2**                  |          |        |        |        |P=0.105 |
+# |Non-hispanic white          |reference |        |        |        |        |
+# |Non-hispanic black          |5.32      |1.03    |27.52   |P=0.046* |        |
+# |Asian                       |0.00      |0.00    |Inf     |P=0.999 |        |
+# |Hispanic                    |0.00      |0.00    |Inf     |P=0.999 |        |
+# |Other                       |NA        |NA      |NA      |P=   NA |        |
+# |*var.missing*               |          |        |        |        |P=0.466 |
+# |non.missing                 |reference |        |        |        |        |
+# |missing                     |0.00      |0.00    |Inf     |P=0.999 |        |
+
+# dat.work$Race_2 <- relevel(dat.work$Race_2, ref = "Non-hispanic black")
+# |**Race_2**                  |          |        |        |        |P=0.105 |
+# |Non-hispanic black          |reference |        |        |        |        |
+# |Non-hispanic white          |0.19      |0.04    |0.97    |P=0.046 |        |
+# |Asian                       |0.00      |0.00    |Inf     |P=0.999 |        |
+# |Hispanic                    |0.00      |0.00    |Inf     |P=0.999 |        |
+# |Other                       |NA        |NA      |NA      |P=   NA |        |
+
+# dat.work$Race_2 <- factor(dat.work$Race_2, levels = c("Asian", "Non-hispanic black", "Non-hispanic white", "Hispanic", "Other")) # Original factor level
+# !!! We lose significant findings for Non-hispanic black
+# |**Race_2**                  |          |        |        |        |P=0.105 |
+# |Asian                       |reference |        |        |        |        |
+# |Non-hispanic black          |2.20e+08  |0.00    |Inf     |P=0.999* |        |
+# |Non-hispanic white          |4.14e+07  |0.00    |Inf     |P=0.999 |        |
+# |Hispanic                    |1.00e+00  |0.00    |Inf     |P=1.000 |        |
+# |Other                       |NA        |NA      |NA      |P=   NA |        |
+# |*var.missing*               |          |        |        |        |P=0.466 |
+# |non.missing                 |reference |        |        |        |        |
+```
+
+```{r, results="hide"}
+vars.ana <- c(
+  "Age_Dx", "Age_dx_grp_1", "Age_dx_grp_2", "Age_dx_grp_3", "Age_dx_grp_4",
+  "Race_2", "Sex_2", "Menopausal_2",
+  
+  "T_clinical_2", "N_clinical_2",
+  "ER_2", "PR_2", "HER2_2", "TNBC",
+  
+  "Multiple_index_2",
+  "Bilateral_cancer_2",
+  "Index_status_2",
+  "Prior_breast_cancer_2",
+  "Tumor_type_2",
+  "Nodal_mets_dx_2",
+  "Histo_grade_2",
+  "Ki67_2",
+  "LVI_2",
+  "Tumor_Size.mm",
+  
+  "Screened_2",
+  "ALND_2",
+  "Addition_pos_node_2",
+  "Adjuvant_XRT_2", "Adjuvant_chemo_2", "Adjuvant_endocrine_2", "Adjuvant_treatment", "Adjuvant_antiHER2_2",
+  "Neoadjuvant_XRT_2", "Neoadjuvant_chemo_2", "Neoadjuvant_endocrine_2", "Neoadjuvant_treatment", "Neoadjuvant_antiHER2_2"
+)
+
+out <- vector(length = length(vars.ana), mode = "list")
+names(out) <- vars.ana
+for(i in 1:length(vars.ana)) {
+  var.name <- vars.ana[i]
+  var.self <- dat.work[, var.name]
+  var.missing <- ifelse(is.na(var.self), "missing", "non.missing") %>%
+    factor(levels = c("non.missing", "missing"))
+  model.exp <- paste0("Surv(T2ARDeath, ARDeath) ~ ", var.name)
+  model.exp.miss <- "Surv(T2ARDeath, ARDeath) ~ var.missing"
+  tmp <- coxph(formula(model.exp), data = dat.work)
+  if(sum(var.missing == "missing") > 0) {
+    tmp2 <- coxph(formula(model.exp.miss), data = dat.work)
+    out[[i]] <- list(tmp, tmp2)
+  } else {
+    out[[i]] <- list(tmp)
+  }
+}
+table(unlist(lapply(out, length)))
+
+out.stat <- lapply(out, function(x) lapply(x, fcphuni.stat))
+out.tbl <- lapply(out.stat, fcphuni.tbl)
+out.tbl <- do.call(rbind, out.tbl)
+row.names(out.tbl) <- NULL
+```
+
+```{r}
+knitr::kable(out.tbl)
+```
+
+
+## Associations between variables and local recurrence
+```{r, results="hide"}
+##################################################################
+##             Recover the original reference level             ##
+##################################################################
+dat.work$Age_dx_grp_1 <- factor(dat.work$Age_dx_grp_1,
+                                levels = c("20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90+"))
+```
+
+```{r, results="hide"}
+out <- vector(length = length(vars.ana), mode = "list")
+names(out) <- vars.ana
+for(i in 1:length(vars.ana)) {
+  var.name <- vars.ana[i]
+  var.self <- dat.work[, var.name]
+  var.missing <- ifelse(is.na(var.self), "missing", "non.missing") %>%
+    factor(levels = c("non.missing", "missing"))
+  model.exp <- paste0("Surv(T2LRDeath, LRDeath) ~ ", var.name)
+  model.exp.miss <- "Surv(T2LRDeath, LRDeath) ~ var.missing"
+  tmp <- coxph(formula(model.exp), data = dat.work)
+  if(sum(var.missing == "missing") > 0) {
+    tmp2 <- coxph(formula(model.exp.miss), data = dat.work)
+    out[[i]] <- list(tmp, tmp2)
+  } else {
+    out[[i]] <- list(tmp)
+  }
+}
+table(unlist(lapply(out, length)))
+
+out.stat <- lapply(out, function(x) lapply(x, fcphuni.stat))
+out.tbl <- lapply(out.stat, fcphuni.tbl)
+out.tbl <- do.call(rbind, out.tbl)
+row.names(out.tbl) <- NULL
+```
+
+```{r}
+knitr::kable(out.tbl)
+```
+
+
+## Associations between variables and distant recurrence
+```{r, results="hide"}
+out <- vector(length = length(vars.ana), mode = "list")
+names(out) <- vars.ana
+for(i in 1:length(vars.ana)) {
+  var.name <- vars.ana[i]
+  var.self <- dat.work[, var.name]
+  var.missing <- ifelse(is.na(var.self), "missing", "non.missing") %>%
+    factor(levels = c("non.missing", "missing"))
+  model.exp <- paste0("Surv(T2DRDeath, DRDeath) ~ ", var.name)
+  model.exp.miss <- "Surv(T2DRDeath, DRDeath) ~ var.missing"
+  tmp <- coxph(formula(model.exp), data = dat.work)
+  if(sum(var.missing == "missing") > 0) {
+    tmp2 <- coxph(formula(model.exp.miss), data = dat.work)
+    out[[i]] <- list(tmp, tmp2)
+  } else {
+    out[[i]] <- list(tmp)
+  }
+}
+table(unlist(lapply(out, length)))
+
+out.stat <- lapply(out, function(x) lapply(x, fcphuni.stat))
+out.tbl <- lapply(out.stat, fcphuni.tbl)
+out.tbl <- do.call(rbind, out.tbl)
+row.names(out.tbl) <- NULL
+```
+
+```{r}
+knitr::kable(out.tbl)
+```
+
+# Session info
+```{r}
+sessionInfo()
+```
+
+
+```{r analysis_plan_future, include=FALSE}
+##################################################################
+##        Future analysis plan of this micromets project        ##
+##################################################################
+## Investigate if the proportional hazards assumption of univariate log-rank test and Cox-proportional hazards model is satisfied
+## Think about the possibility to incorporate the proportional hazards assumption test into fplot.surv() in BTKR package
+## Try the component-wise weighting schemes that overcome the limitation by treating recurrence and death events on equal footing
+```
