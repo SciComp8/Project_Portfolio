@@ -1,5 +1,5 @@
 ---
-title: "Evaluate DE genes identified by univariate BMAseq, voom, limma, edgeR, and DESeq2"
+title: "Evaluate DE genes using univariate BMAseq, voom, limma, edgeR, and DESeq2"
 author: "Anni Liu"
 date: "`r Sys.Date()`"
 output: html_document
