@@ -4,6 +4,7 @@ This is a list of my coding work affiliated with multiple collaborative and indi
 
 - **Bayesian model averaging for bulk RNA-Seq data (use R)**
   - [UniBMA_voom_limma_edgeR_DESeq2.Rmd](UniBMA_voom_limma_edgeR_DESeq2.Rmd)
+  - [MultiBMA_voom_limma_edgeR_DESeq2.Rmd](MultiBMA_voom_limma_edgeR_DESeq2.Rmd)
 
 - **Bayesian integrative clustering of multi-omics data (use R)**
   - [BayesClustering.Rmd](BayesClustering.Rmd)
