@@ -1,21 +1,59 @@
 ---
-title: "Triple Negative Breast Cancer Surgery Data Analysis"
+title: "Triple Negative Breast Cancer Data Analysis"
 author: "Anni Liu"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
+knit: knitautomator::knit_filename
 output:
   word_document:
     fig_caption: no
-    fig_height: 4
-    fig_width: 4
+    fig_height: 6
+    fig_width: 6
     highlight: null
     toc: yes
+    reference_docx: manuscript_style_V0.docx
 params:
-  date.analysis: !r format(Sys.Date(), "%Y%B%D")
+  date: !r format(Sys.Date(), "%Y%b%d")
   plot.fig: TRUE
   results.folder: FALSE
 editor_options: 
   chunk_output_type: console
 ---
+
+```{r shorcut, include=FALSE}
+#################################################################
+##                  RStudio keyboard shortcut                  ##
+#################################################################
+# Cursor at the beginning of a command line: Ctrl + A
+# Cursor at the end of a command line: Ctrl + E
+# Clear all the code from your console: Ctrl + L
+# Create an assignment operator <-: Alt + - (Windows) or Option + - (Mac).
+# Create a pipe operator %>%: Ctrl + Shift + M (Windows) or Cmd + Shift + M (Mac)
+# Knit a document (knitr): Ctrl + Shift + K (Windows) or Cmd + Shift + K (Mac)
+# Comment or uncomment current selection: Ctrl + Shift + C (Windows) or Cmd + Shift + C (Mac)
+```
+
+
+```{r attach_libraries, include=FALSE}
+##################################################################
+##                        Attach libraries                      ##
+##################################################################
+easypackages::libraries("BTKR", "multcomp", "readxl", "tidyverse", 
+                        "bannerCommenter", "parallel", 
+                        "tidycmprsk", "ggsurvfit")
+```
+
+
+```{r check_data, include=FALSE}
+##################################################################
+##                    Load data for checking                    ##
+##################################################################
+dat0 <- dget("../data/derived/2022Dec21_dat0.Rdata")
+dat1 <- dget("../data/derived/2022Dec21_dat1.Rdata")
+dat2 <- dget("../data/derived/2022Dec21_dat2.Rdata")
+dat3 <- dget("../data/derived/2022Dec21_dat3.Rdata")
+dat.work <- dget("../data/derived/2022Dec21_dat_TNBC.Rdata")
+```
+
 
 ```{r analysis_plan_previous, include=FALSE}
 #################################################################
@@ -41,31 +79,31 @@ editor_options:
 ##       change to NA if no recurrence and time to last follow up since diagnosis less than 5 years  
 ## DR5y (5-year distant recurrence): defined in similar fashion as above
 ## NP5y (5-year new primary): defined in similar fashion as above
-```
 
 
-```{r analysis_plan_current, include=FALSE}
-#################################################################
-##                    Updated analysis plan                    ##
-#################################################################
 ## Use the cumulative incidence function to estimate the incidence rate of local recurrence which treats death as the competing risk
-### Add the following variables (lines starting from):
+### Add the following variables (lines starting from XXX):
 
 ### Death: "Yes" if Date.Death has the value
 ###        "No" if Date.Death has NA
 
-### LRDeath: NA if subjects are not at risk *
+### LRDeath: NA if subjects miss information on the outcome *
 ###          "LocRecur" if Local.Recurrence is Yes and Death is Yes or No
 ###          "Dead" if Death is Yes and Local.Recurrence is No
 ###          "Censored" if Local.Recurrence and Death are both No
+### table(paste(dat3$Local.Recurrence, 
+### ifelse(is.na(dat3$T2LR), "noT2LR", "T2LR"), 
+### ifelse(is.na(dat3$T2Death), "noT2D", "T2D"), 
+### ifelse(is.na(dat3$T2LFU), "noT2LFU", "T2LFU"), 
+### sep = ":"))
 ### * NA:noT2LR:noT2D:noT2LFU 6
 ###   NA:noT2LR:noT2D:T2LFU 75
 ###   NA:noT2LR:T2D:T2LFU 5
 ###   No:noT2LR:noT2D:noT2LFU 12
 ###   Yes:noT2LR:noT2D:T2LFU 2
-###   100 patients are not at risk  
+###   100 patients miss information on the outcome  
 
-### DRDeath: NA if subjects are not at risk * 
+### DRDeath: NA if subjects miss information on the outcome * 
 ###          "DisRecur" if Distant.Recurrence is Yes and Death is Yes or No
 ###          "Dead" if Death is Yes and Distant.Recurrence is No
 ###          "Censored" if Distant.Recurrence and Death are both No
@@ -76,9 +114,9 @@ editor_options:
 ###   Yes:noT2DR:noT2D:noT2LFU 1
 ###   Yes:noT2DR:noT2D:T2LFU 12
 ###   Yes:noT2DR:T2D:T2LFU 1
-###   105 patients are not at risk
+###   105 patients miss information on the outcome
 
-### NPDeath: NA if subjects are not at risk * 
+### NPDeath: NA if subjects miss information on the outcome * 
 ###          "NBP" if New.Breast.Primary is Yes and Death is Yes or No
 ###          "Dead" if Death is Yes and New.Breast.Primary is No
 ###          "Censored" if New.Breast.Primary and Death are both No
@@ -86,7 +124,7 @@ editor_options:
 ###   NA:noT2NP:noT2D:T2LFU 82
 ###   NA:noT2NP:T2D:T2LFU 6    
 ###   No:noT2NP:noT2D:noT2LFU 12
-###   106 patients are not at risk
+###   106 patients miss information on the outcome
 
 ### T2LRDeath: NA if LRDeath is NA
 ###            `T2LR` if LRDeath is LocRecur
@@ -102,147 +140,302 @@ editor_options:
 ###            `T2NP` if NPDeath is NBP
 ###            `T2Death` if NPDeath is Dead
 ###            `T2LFU` if NPDeath is Censored
+
+## ALiu: Create event and time variables where
+### 1) LR/NP with positive ER, LR/NP with negative ER, and dead are treated as competing risks; these variables are LRDeath.ER/NPDeath.ER/T2LRDeath.ER/T2NPDeath.ER
+### 2) LR/NP with positive PR, LR/NP with negative PR, and dead are treated as competing risks; these variables are LRDeath.PR/NPDeath.PR/T2LRDeath.PR/T2NPDeath.PR
+### 3) LR/NP with positive HER2, LR/NP with negative HER2, and dead are treated as competing risks; these variables are LRDeath.HER2/NPDeath.HER2/T2LRDeath.HER2/T2NPDeath.HER2
+
+### LRDeath.ER: NA if subjects miss information on the outcome*
+###             "LRYesERPos" if Local.Recurrence is Yes and ER.LR is Positive and Death is Yes or No
+###             "LRYesERNeg" if Local.Recurrence is Yes and ER.LR is Negative and Death is Yes or No
+###             "Dead" if Death is Yes and Local.Recurrence is No
+###             "Censored" if Local.Recurrence and Death are both No
+with(dat3, table(paste(Local.Recurrence, ER.LR, Death, # Load dat3 (refer back to the line 61)
+                       ifelse(is.na(T2LR), "noT2LR", "T2LR"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+# NA:Negative:No:noT2LR:noT2D:noT2LFU   NA:Negative:No:noT2LR:noT2D:T2LFU 
+#                                   6*                                  75* 
+#    NA:Negative:Yes:noT2LR:T2D:T2LFU         No:NA:No:noT2LR:noT2D:T2LFU 
+#                                   5*                                  12* 
+# No:Negative:No:noT2LR:noT2D:noT2LFU   No:Negative:No:noT2LR:noT2D:T2LFU 
+#                                  12*                                 407 
+#    No:Negative:Yes:noT2LR:T2D:T2LFU        Yes:NA:No:noT2LR:noT2D:T2LFU 
+#                                  15                                   1* 
+#           Yes:NA:Yes:T2LR:T2D:T2LFU    Yes:Negative:No:T2LR:noT2D:T2LFU 
+#                                   1*                                  54 
+#     Yes:Negative:Yes:T2LR:T2D:T2LFU  Yes:Positive:No:noT2LR:noT2D:T2LFU 
+#                                   7                                   1* 
+#    Yes:Positive:No:T2LR:noT2D:T2LFU     Yes:Positive:Yes:T2LR:T2D:T2LFU 
+#                                   7                                   1 
+# 113 (6+75+5+12+12+1+1+1) patients miss outcome information*
+
+
+### LRDeath.PR: NA if subjects miss information on the outcome*
+###             "LRYesPRPos" if Local.Recurrence is Yes and PR.LR is Positive and Death is Yes or No
+###             "LRYesPRNeg" if Local.Recurrence is Yes and PR.LR is Negative and Death is Yes or No
+###             "Dead" if Death is Yes and Local.Recurrence is No
+###             "Censored" if Local.Recurrence and Death are both No
+with(dat3, table(paste(Local.Recurrence, PR.LR, Death,
+                       ifelse(is.na(T2LR), "noT2LR", "T2LR"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+# NA:Negative:No:noT2LR:noT2D:noT2LFU   NA:Negative:No:noT2LR:noT2D:T2LFU 
+#                                   6*                                  75* 
+#    NA:Negative:Yes:noT2LR:T2D:T2LFU         No:NA:No:noT2LR:noT2D:T2LFU 
+#                                   5*                                  12* 
+# No:Negative:No:noT2LR:noT2D:noT2LFU   No:Negative:No:noT2LR:noT2D:T2LFU 
+#                                  12*                                 407 
+#    No:Negative:Yes:noT2LR:T2D:T2LFU        Yes:NA:No:noT2LR:noT2D:T2LFU 
+#                                  15                                   1* 
+#           Yes:NA:Yes:T2LR:T2D:T2LFU  Yes:Negative:No:noT2LR:noT2D:T2LFU 
+#                                   1*                                   1* 
+#    Yes:Negative:No:T2LR:noT2D:T2LFU     Yes:Negative:Yes:T2LR:T2D:T2LFU 
+#                                  56                                   8 
+#    Yes:Positive:No:T2LR:noT2D:T2LFU 
+#                                   5 
+# 113 (6+75+5+12+12+1+1+1) patients miss outcome information*
+
+
+### LRDeath.HER2: NA if subjects miss information on the outcome*
+###               "LRYesHER2Pos" if Local.Recurrence is Yes and HER2.LR is Positive and Death is Yes or No
+###               "LRYesHER2Neg" if Local.Recurrence is Yes and HER2.LR is Negative and Death is Yes or No
+###               "Dead" if Death is Yes and Local.Recurrence is No
+###               "Censored" if Local.Recurrence and Death are both No
+with(dat3, table(paste(Local.Recurrence, HER2.LR, Death,
+                       ifelse(is.na(T2LR), "noT2LR", "T2LR"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+# NA:Negative:No:noT2LR:noT2D:noT2LFU   NA:Negative:No:noT2LR:noT2D:T2LFU 
+#                                   6*                                  75* 
+#    NA:Negative:Yes:noT2LR:T2D:T2LFU         No:NA:No:noT2LR:noT2D:T2LFU 
+#                                   5*                                  12* 
+# No:Negative:No:noT2LR:noT2D:noT2LFU   No:Negative:No:noT2LR:noT2D:T2LFU 
+#                                  12*                                 407 
+#    No:Negative:Yes:noT2LR:T2D:T2LFU        Yes:NA:No:noT2LR:noT2D:T2LFU 
+#                                  15                                   1* 
+#          Yes:NA:No:T2LR:noT2D:T2LFU           Yes:NA:Yes:T2LR:T2D:T2LFU 
+#                                   4*                                   2* 
+#  Yes:Negative:No:noT2LR:noT2D:T2LFU    Yes:Negative:No:T2LR:noT2D:T2LFU 
+#                                   1*                                  56 
+#     Yes:Negative:Yes:T2LR:T2D:T2LFU    Yes:Positive:No:T2LR:noT2D:T2LFU 
+#                                   7                                   1 
+# 118 (6+75+5+12+12+1+4+2+1) patients miss outcome information*
+
+
+### NPDeath.ER: NA if subjects miss information on the outcome*
+###             "NPYesERPos" if New.Breast.Primary is Yes and ER.NP is Positive and Death is Yes or No
+###             "NPYesERNeg" if New.Breast.Primary is Yes and ER.NP is Negative and Death is Yes or No
+###             "Dead" if Death is Yes and New.Breast.Primary is No
+###             "Censored" if New.Breast.Primary and Death are both No
+with(dat3, table(paste(New.Breast.Primary, ER.NP, Death, 
+                       ifelse(is.na(T2NP), "noT2NP", "T2NP"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+#       NA:NA:No:noT2NP:noT2D:T2LFU NA:Negative:No:noT2NP:noT2D:noT2LFU 
+#                                 4*                                   6* 
+# NA:Negative:No:noT2NP:noT2D:T2LFU    NA:Negative:Yes:noT2NP:T2D:T2LFU 
+#                                78*                                   6* 
+#       No:NA:No:noT2NP:noT2D:T2LFU           No:NA:No:T2NP:noT2D:T2LFU 
+#                                54*                                   1* 
+#        No:NA:Yes:noT2NP:T2D:T2LFU No:Negative:No:noT2NP:noT2D:noT2LFU 
+#                                 7*                                  12* 
+# No:Negative:No:noT2NP:noT2D:T2LFU    No:Negative:Yes:noT2NP:T2D:T2LFU 
+#                               404                                  14 
+#        Yes:NA:No:T2NP:noT2D:T2LFU    Yes:Negative:No:T2NP:noT2D:T2LFU 
+#                                 1*                                   4 
+#   Yes:Negative:Yes:T2NP:T2D:T2LFU    Yes:Positive:No:T2NP:noT2D:T2LFU 
+#                                 2                                  11 
+# 169 (4+6+78+6+54+1+7+12+1) patients miss outcome information*
+
+
+### NPDeath.PR: NA if subjects miss information on the outcome*
+###             "NPYesPRPos" if New.Breast.Primary is Yes and PR.NP is Positive and Death is Yes or No
+###             "NPYesPRNeg" if New.Breast.Primary is Yes and PR.NP is Negative and Death is Yes or No
+###             "Dead" if Death is Yes and New.Breast.Primary is No
+###             "Censored" if New.Breast.Primary and Death are both No
+with(dat3, table(paste(New.Breast.Primary, PR.NP, Death,
+                       ifelse(is.na(T2NP), "noT2NP", "T2NP"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+#       NA:NA:No:noT2NP:noT2D:T2LFU NA:Negative:No:noT2NP:noT2D:noT2LFU 
+#                                 4*                                   6* 
+# NA:Negative:No:noT2NP:noT2D:T2LFU    NA:Negative:Yes:noT2NP:T2D:T2LFU 
+#                                78*                                   6* 
+#       No:NA:No:noT2NP:noT2D:T2LFU           No:NA:No:T2NP:noT2D:T2LFU 
+#                                54*                                   1* 
+#        No:NA:Yes:noT2NP:T2D:T2LFU No:Negative:No:noT2NP:noT2D:noT2LFU 
+#                                 7*                                  12* 
+# No:Negative:No:noT2NP:noT2D:T2LFU    No:Negative:Yes:noT2NP:T2D:T2LFU 
+#                               404                                  14 
+#        Yes:NA:No:T2NP:noT2D:T2LFU    Yes:Negative:No:T2NP:noT2D:T2LFU 
+#                                 1*                                   7 
+#   Yes:Negative:Yes:T2NP:T2D:T2LFU    Yes:Positive:No:T2NP:noT2D:T2LFU 
+#                                 2                                   8 
+# 169 (4+6+78+6+54+1+7+12+1) patients miss outcome information*
+
+
+### NPDeath.HER2: NA if subjects miss information on the outcome*
+###               "NPYesHER2Pos" if New.Breast.Primary is Yes and HER2.NP is Positive and Death is Yes or No
+###               "NPYesHER2Neg" if New.Breast.Primary is Yes and HER2.NP is Negative and Death is Yes or No
+###               "Dead" if Death is Yes and New.Breast.Primary is No
+###               "Censored" if New.Breast.Primary and Death are both No
+with(dat3, table(paste(New.Breast.Primary, HER2.NP, Death, 
+                       ifelse(is.na(T2NP), "noT2NP", "T2NP"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+#       NA:NA:No:noT2NP:noT2D:T2LFU NA:Negative:No:noT2NP:noT2D:noT2LFU 
+#                                 4*                                   6* 
+# NA:Negative:No:noT2NP:noT2D:T2LFU    NA:Negative:Yes:noT2NP:T2D:T2LFU 
+#                                78*                                   6* 
+#       No:NA:No:noT2NP:noT2D:T2LFU           No:NA:No:T2NP:noT2D:T2LFU 
+#                                54*                                   1* 
+#        No:NA:Yes:noT2NP:T2D:T2LFU No:Negative:No:noT2NP:noT2D:noT2LFU 
+#                                 7*                                  12* 
+# No:Negative:No:noT2NP:noT2D:T2LFU    No:Negative:Yes:noT2NP:T2D:T2LFU 
+#                               404                                  14 
+#        Yes:NA:No:T2NP:noT2D:T2LFU    Yes:Negative:No:T2NP:noT2D:T2LFU 
+#                                 2*                                  13 
+#   Yes:Negative:Yes:T2NP:T2D:T2LFU    Yes:Positive:No:T2NP:noT2D:T2LFU 
+#                                 2                                   1 
+# 170 (4+6+78+6+54+1+7+12+2) patients miss outcome information*
+
+### T2LRDeath.ER: NA if LRDeath.ER is NA
+###               `T2LR` if LRDeath.ER is LRYesERPos or LRYesERNeg
+###               `T2Death` if LRDeath.ER is Dead
+###               `T2LFU` if LRDeath.ER is Censored
+
+
+### T2LRDeath.PR: NA if LRDeath.PR is NA
+###               `T2LR` if LRDeath.PR is LRYesPRPos or LRYesPRNeg
+###               `T2Death` if LRDeath.PR is Dead
+###               `T2LFU` if LRDeath.PR is Censored
+
+
+### T2LRDeath.HER2: NA if LRDeath.HER2 is NA
+###                 `T2LR` if LRDeath.HER2 is LRYesHER2Pos or LRYesHER2Neg
+###                 `T2Death` if LRDeath.HER2 is Dead
+###                 `T2LFU` if LRDeath.HER2 is Censored
+
+
+### T2NPDeath.ER: NA if NPDeath.ER is NA
+###               `T2NP` if NPDeath.ER is NPYesERPos or NPYesERNeg
+###               `T2Death` if NPDeath.ER is Dead
+###               `T2LFU` if NPDeath.ER is Censored
+
+
+### T2NPDeath.PR: NA if NPDeath.PR is NA
+###               `T2NP` if NPDeath.PR is NPYesPRPos or NPYesPRNeg
+###               `T2Death` if NPDeath.PR is Dead
+###               `T2LFU` if NPDeath.PR is Censored
+
+
+### T2NPDeath.HER2: NA if NPDeath.HER2 is NA
+###                 `T2NP` if NPDeath.HER2 is NPYesHER2Pos or NPYesHER2Neg
+###                 `T2Death` if NPDeath.HER2 is Dead
+###                 `T2LFU` if NPDeath.HER2 is Censored
 ```
 
 
-```{r analysis_plan_future, include=FALSE}
-##################################################################
-##                     Future analysis plan                     ##
-##################################################################
-## Conceive the possibility of doing the machine learning survival analysis using the 604 observations of this TNBC project
+```{r analysis_plan_current, include=FALSE}
+#################################################################
+##                    Updated analysis plan                    ##
+#################################################################
+## ALiu: Create event variables where the dead and censored are combined as censor
+### LRDeath2: NA if LRDeath is NA
+###           "LocRecur" if LRDeath is LocRecur
+###           "censor" if LRDeath is Dead or Censored
+
+### DRDeath2: NA if DRDeath is NA
+###           "DisRecur" if DRDeath is DisRecur
+###           "censor" if DRDeath is Dead or Censored
+
+### NPDeath2: NA if NPDeath is NA
+###           "NBP" if NPDeath is NBP
+###           "censor" if NPDeath is Dead or Censored
+
+### LRDeath2.ER: NA if LRDeath.ER is NA
+###              "LRYesERPos" if LRDeath.ER is LRYesERPos
+###              "LRYesERNeg" if LRDeath.ER is LRYesERNeg
+###              "censor" if LRDeath.ER is Dead or Censored
+
+### LRDeath2.PR: NA if LRDeath.PR is NA
+###              "LRYesPRPos" if LRDeath.PR is LRYesPRPos
+###              "LRYesPRNeg" if LRDeath.PR is LRYesPRNeg
+###              "censor" if LRDeath.PR is Dead or Censored
+
+### LRDeath2.HER2: NA if LRDeath.HER2 is NA
+###                "LRYesHER2Pos" if LRDeath.HER2 is LRYesHER2Pos
+###                "LRYesHER2Neg" if LRDeath.HER2 is LRYesHER2Neg
+###                "censor" if LRDeath.HER2 is Dead or Censored
+
+### NPDeath2.ER: NA if NPDeath.ER is NA
+###              "NPYesERPos" if NPDeath.ER is NPYesERPos
+###              "NPYesERNeg" if NPDeath.ER is NPYesERNeg
+###              "censor" if NPDeath.ER is Dead or Censored
+
+### NPDeath2.PR: NA if NPDeath.PR is NA
+###              "NPYesPRPos" if NPDeath.PR is NPYesPRPos
+###              "NPYesPRNeg" if NPDeath.PR is NPYesPRNeg
+###              "censor" if NPDeath.PR is Dead or Censored
+
+### NPDeath2.HER2: NA if NPDeath.HER2 is NA
+###                "NPYesHER2Pos" if NPDeath.HER2 is NPYesHER2Pos
+###                "NPYesHER2Neg" if NPDeath.HER2 is NPYesHER2Neg
+###                "censor" if NPDeath.HER2 is Dead or Censored
 ```
 
 # Data preparation
 
-```{r shorcut, include=FALSE}
-#################################################################
-##                  RStudio keyboard shortcut                  ##
-#################################################################
-# Cursor at the beginning of a command line: Ctrl + A
-# Cursor at the end of a command line: Ctrl + E
-# Clear all the code from your console: Ctrl + L
-# Create an assignment operator <-: Alt + - (Windows) or Option + - (Mac).
-# Create a pipe operator %>%: Ctrl + Shift + M (Windows) or Cmd + Shift + M (Mac)
-# Knit a document (knitr): Ctrl + Shift + K (Windows) or Cmd + Shift + K (Mac)
-# Comment or uncomment current selection: Ctrl + Shift + C (Windows) or Cmd + Shift + C (Mac)
-```
-
-
-```{r include=FALSE, eval=FALSE}
-system.time(
-  list(range(dat3$T2Death, na.rm = TRUE), range(dat3$T2DR, na.rm = TRUE), range(dat3$T2NP, na.rm = TRUE), range(dat3$T2LFU, na.rm = TRUE))
-)
-   # user  system elapsed 
-   #    0       0       0 
-
-## If I simulate a large dataset...
-dat.sim <- data.frame(a = 1:10e6, b = 1:10e6, c = 1:10e6)
-system.time(
-    list(range(dat.sim$a, na.rm = TRUE), range(dat.sim$b, na.rm = TRUE), range(dat.sim$c, na.rm = TRUE))
-)
-  #  user  system elapsed 
-  # 0.403   0.025   0.428 
-
-system.time(
-  map(.x = list(dat.sim$a, dat.sim$b, dat.sim$c), 
-      .f = range, 
-      na.rm = T)
-)
-  #  user  system elapsed 
-  # 0.389   0.023   0.412 
-
-system.time(
-  dat.sim.mat <- as.matrix(dat.sim) 
-) 
-  #  user  system elapsed 
-  # 0.184   0.032   0.216 
-system.time(
-  apply(dat.sim.mat, 2, range)
-)
-  #  user  system elapsed 
-  # 0.299   0.010   0.310 
-# user time: 0.184 + 0.299 = 0.483
-
-system.time(
-  lapply(1:3, function(i){range(dat.sim[, i])})
-)
-  #  user  system elapsed 
-  # 0.275   0.000   0.275 
-
-library(parallel)
-system.time(
-  mclapply(1:3, 
-           function(i){range(dat.sim[, i])},
-           mc.cores = 4)
-)
-  #  user  system elapsed 
-  # 0.002   0.008   0.128 
-```
-
-
 ```{r global_options, include=FALSE}
 #################################################################
-##                       Parametrization                       ##
+##                          Automator                          ##
 #################################################################
-date.analysis <- params$date.analysis
-
 if (params$plot.fig) {
-  dir.fig <- paste0("figs_", date.analysis)
-  if (!dir.exists(dir.fig)) # If the directory does not exist, we create a new directory use the name figs + current date stored in the object date.analysis; this object gets the value passed from the date.analysis from YAML params
-    dir.create(dir.fig)
-  knitr::opts_chunk$set(
-    fig.width = 4,
-    fig.height = 4,
-    fig.path = dir.fig,
-    dev = "png",
-    dpi = 300,
-    echo = FALSE,
-    warning = FALSE,
-    message = FALSE,
+  dir.fig <- paste0("../report/figs_", params$date)
+  
+  if (!dir.exists(dir.fig)) { 
+    # If the figure directory does not exist, we create a new directory under the folder report using the name figs + current date passed from the params$date in YAML
+    dir.create(dir.fig) 
+  }
+  
+  knitr::opts_chunk$set( # Setting parameters when figures are plotted
+    fig.width = 6, fig.height = 6, fig.path = dir.fig, dev = "png", dpi = 300,
+    echo = FALSE, warning = FALSE, message = FALSE,
     cache = FALSE,
     comment = ""
   )
-} else {
+  
+} else { # Setting parameters when figures are not plotted
   knitr::opts_chunk$set(
-    echo = FALSE,
-    warning = FALSE,
-    message = FALSE,
+    echo = FALSE, warning = FALSE, message = FALSE,
     cache = FALSE,
     comment = ""
   )
 }
 
-if (params$results.folder) {
-  dir.result <- paste0("results_", date.analysis)
-  if (!dir.exists(dir.result))
+if (params$results.folder) { # Suitable when the results need to be stored outside the microsoft word report
+  dir.result <- paste0("../report/results_", params$date)
+  
+  if (!dir.exists(dir.result)) {
+    # If the directory does not exist, we create a new directory under the folder report using the name results + current date passed from the params$date in YAML 
+    
     dir.create(dir.result)
+  }
 }
 
-loc.perl <- "C:/cygwin64/bin/perl"
+loc.perl <- "C:/cygwin64/bin/perl" 
 ```
 
 
-```{r include=FALSE}
-##################################################################
-##                        Load libraries                        ##
-##################################################################
-easypackages::libraries("BTKR", "multcomp", "readxl", "tidyverse", "bannerCommenter", "tidycmprsk", "parallel")
-```
-
-
-```{r}
-##################################################################
-##                    Load data for checking                    ##
-##################################################################
-dat0 <- dget("../data/derived/2022Nov23_dat0.Rdata")
-dat1 <- dget("../data/derived/2022Nov23_dat1.Rdata")
-dat2 <- dget("../data/derived/2022Nov23_dat2.Rdata")
-dat3 <- dget("../data/derived/2022Nov23_dat3.Rdata")
-dat.work <- dget("../data/derived/2022Nov23_dat_TNBC.Rdata")
-```
-
-
-```{r eval=FALSE}
+```{r clean_data_start, eval=FALSE}
 ##################################################################
 ##                          Clean data                          ##
 ##################################################################
@@ -313,10 +506,10 @@ dat1 <- dat1 %>%
 
 dat2 <- rbind(dat0, dat1)
 
+
 ##################################################################
 ##                       Fix column names                       ##
 ##################################################################
-# If “.” matches any character, how do you match a literal “.”? You need to use an “escape” to tell the regular expression you want to match it exactly, not use its special behaviour. Like strings, regexps use the backslash, \, to escape special behaviour. So to match an ., you need the regexp \.. Unfortunately this creates a problem. We use strings to represent regular expressions, and \ is also used as an escape symbol in strings. So to create the regular expression \. we need the string "\\.".
 # Step1: strsplit(names(dat2), split = "\\.")
 # Step2: paste(x[x != ""], collapse = ".")
 # Step3: sapply
@@ -324,9 +517,8 @@ dat2 <- rbind(dat0, dat1)
 names(dat2) <- 
   sapply(strsplit(names(dat2), split = "\\."), function(x)
     paste(x[x != ""], collapse = "."))
-```
 
-```{r eval=FALSE}
+
 #################################################################
 ##                    Clean data (continue)                    ##
 #################################################################
@@ -355,8 +547,10 @@ dat3 <- dat2 %>%
                              gsub("T3|T4", "T3|T4", Clinical.T.Stage))) %>% 
   mutate(
     Clinical.N.Stage2 = gsub("N1|N2|N3", "N1|N2|N3", Clinical.N.Stage))
+```
 
 
+```{r code_complex_variable, eval=FALSE}
 #################################################################
 ##        Recode T2LR/T2DR/T2NP/T2Death/T2LFU (in days)        ##
 #################################################################
@@ -424,7 +618,7 @@ table(paste(dat3$Local.Recurrence,
 # NA:noT2LR:T2D:T2LFU 5
 # No:noT2LR:noT2D:noT2LFU 12
 # Yes:noT2LR:noT2D:T2LFU 2
-# 100 patients are not at risk
+# 100 patients miss outcome information
 
 dat3 <- dat3 %>%
   mutate(
@@ -438,7 +632,7 @@ dat3 <- dat3 %>%
 summary(dat3$LRFS.time)
    # Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
    #  0.0   557.2  1320.5  1739.5  2524.2 12694.0     100 
-# 100 patients are not at risk
+# 100 patients miss outcome information
 
 
 table(paste(dat3$Distant.Recurrence, 
@@ -453,7 +647,7 @@ table(paste(dat3$Distant.Recurrence,
 # Yes:noT2DR:noT2D:noT2LFU 1
 # Yes:noT2DR:noT2D:T2LFU 12
 # Yes:noT2DR:T2D:T2LFU 1
-# 105 patients are not at risk
+# 105 patients miss outcome information
 
 dat3 <- dat3 %>%
   mutate(
@@ -478,7 +672,7 @@ table(paste(dat3$New.Breast.Primary,
 # NA:noT2NP:noT2D:T2LFU 82
 # NA:noT2NP:T2D:T2LFU 6  
 # No:noT2NP:noT2D:noT2LFU 12
-# 106 patients are not at risk
+# 106 patients miss outcome information
 
 dat3 <- dat3 %>% 
   mutate(
@@ -492,7 +686,7 @@ dat3 <- dat3 %>%
 summary(dat3$NPFS.time)
 #  Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
 #    0.0   609.8  1351.0  1822.8  2697.2 13573.0     106 
-# 106 patients are not at risk
+# 106 patients miss outcome information
 
 #################################################################
 ##                    Recode LR5y/DR5y/NP5y                    ##
@@ -573,7 +767,7 @@ table(paste(dat3$Local.Recurrence,
 # NA:noT2LR:T2D:T2LFU 5
 # No:noT2LR:noT2D:noT2LFU 12
 # Yes:noT2LR:noT2D:T2LFU 2
-# 100 patients are not at risk
+# 100 patients miss outcome information
 
 table(dat3$Local.Recurrence, dat3$Death, useNA = "ifany")
 #       No Yes
@@ -625,7 +819,7 @@ table(paste(dat3$Distant.Recurrence,
 # Yes:noT2DR:noT2D:noT2LFU 1
 # Yes:noT2DR:noT2D:T2LFU 12
 # Yes:noT2DR:T2D:T2LFU 1
-# 105 patients are not at risk
+# 105 patients miss outcome information
 
 table(dat3$Distant.Recurrence, dat3$Death, useNA = "ifany")
 #       No Yes
@@ -679,7 +873,7 @@ table(paste(dat3$New.Breast.Primary,
 # NA:noT2NP:noT2D:T2LFU 82
 # NA:noT2NP:T2D:T2LFU 6  
 # No:noT2NP:noT2D:noT2LFU 12
-# 106 patients are not at risk
+# 106 patients miss outcome information
 
 table(dat3$New.Breast.Primary, dat3$Death, useNA = "ifany")
 #       No Yes
@@ -732,7 +926,7 @@ sum.na <- function(x) {is.na(x) %>% sum()}
 var <- c("T2LRDeath", "T2DRDeath", "T2NPDeath")
 mclapply(1:3, 
          function(i){sum.na(dat3[var[i]])},
-         mc.cores = 4)
+         mc.cores = 4L)
 
 # [[1]]
 # [1] 100
@@ -745,58 +939,428 @@ mclapply(1:3,
 
 
 #################################################################
-##                      Fix column orders                      ##
+##                      Recode LRDeath.ER                      ##
+#################################################################
+c1 <- with(dat3, formula("is.na(Local.Recurrence) & ER.LR == 'Negative' & Death == 'No' & is.na(T2LR) & is.na(T2Death) ~ as.character(NA)")) # NA:Negative:No:noT2LR:noT2D:noT2LFU & # NA:Negative:No:noT2LR:noT2D:T2LFU 
+
+c2 <- with(dat3, formula("is.na(Local.Recurrence) & ER.LR == 'Negative' & Death == 'Yes' & is.na(T2LR) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # NA:Negative:Yes:noT2LR:T2D:T2LFU
+
+c3 <- with(dat3, formula("Local.Recurrence == 'No' & is.na(ER.LR) & Death == 'No' & is.na(T2LR) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # No:NA:No:noT2LR:noT2D:T2LFU 
+
+c4 <- with(dat3, formula("Local.Recurrence == 'No' & ER.LR == 'Negative' & Death == 'No' & is.na(T2LR) & is.na(T2Death) & is.na(T2LFU) ~ as.character(NA)")) # No:Negative:No:noT2LR:noT2D:noT2LFU
+
+c5 <- with(dat3, formula("Local.Recurrence == 'Yes' & ER.LR %in% c(NA, 'Positive') & Death == 'No' & is.na(T2LR) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:No:noT2LR:noT2D:T2LFU & Yes:Positive:No:noT2LR:noT2D:T2LFU
+
+c6 <- with(dat3, formula("Local.Recurrence == 'Yes' & is.na(ER.LR) & Death == 'Yes' & !is.na(T2LR) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:Yes:T2LR:T2D:T2LFU
+
+dat3 <- dat3 %>% 
+  mutate(LRDeath.ER = case_when(c1, c2, c3, c4, c5, c6, # Conditions for patients not at risk
+                                Local.Recurrence == "Yes" & ER.LR == "Positive" & Death %in% c("Yes", "No") ~ "LRYesERPos",
+                                Local.Recurrence == "Yes" & ER.LR == "Negative" & Death %in% c("Yes", "No") ~ "LRYesERNeg",
+                                Death == "Yes" & Local.Recurrence == "No" ~ "Dead",
+                                Local.Recurrence == "No" & Death == "No" & !is.na(T2LFU) ~ "Censored") %>%
+           factor(levels = c("Censored", "LRYesERPos", "LRYesERNeg", "Dead")))
+                                
+
+table(dat3$LRDeath.ER, useNA = "ifany")
+  # Censored LRYesERPos LRYesERNeg       Dead 
+  #      407          8         61         15 
+  #     <NA> 
+  #      113 
+
+with(dat3, table(paste(LRDeath.ER, 
+                       ifelse(is.na(T2LR), "noT2LR", "T2LR"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+# Censored:noT2LR:noT2D:T2LFU       Dead:noT2LR:T2D:T2LFU 
+#                         407                          15 
+# LRYesERNeg:T2LR:noT2D:T2LFU   LRYesERNeg:T2LR:T2D:T2LFU 
+#                          54                           7 
+# LRYesERPos:T2LR:noT2D:T2LFU   LRYesERPos:T2LR:T2D:T2LFU 
+#                           7                           1 
+#     NA:noT2LR:noT2D:noT2LFU       NA:noT2LR:noT2D:T2LFU 
+#                          18                          89 
+#         NA:noT2LR:T2D:T2LFU           NA:T2LR:T2D:T2LFU 
+#                           5                           1 
+
+
+#################################################################
+##                      Recode LRDeath.PR                      ##
+#################################################################
+c1 <- with(dat3, formula("is.na(Local.Recurrence) & PR.LR == 'Negative' & Death == 'No' & is.na(T2LR) & is.na(T2Death) ~ as.character(NA)")) # NA:Negative:No:noT2LR:noT2D:noT2LFU & # NA:Negative:No:noT2LR:noT2D:T2LFU 
+c2 <- with(dat3, formula("is.na(Local.Recurrence) & PR.LR == 'Negative' & Death == 'Yes' & is.na(T2LR) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # NA:Negative:Yes:noT2LR:T2D:T2LFU  
+c3 <- with(dat3, formula("Local.Recurrence == 'No' & is.na(PR.LR) & Death == 'No' & is.na(T2LR) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # No:NA:No:noT2LR:noT2D:T2LFU 
+c4 <- with(dat3, formula("Local.Recurrence == 'No' & PR.LR == 'Negative' & Death == 'No' & is.na(T2LR) & is.na(T2Death) & is.na(T2LFU) ~ as.character(NA)")) # No:Negative:No:noT2LR:noT2D:noT2LFU
+c5 <- with(dat3, formula("Local.Recurrence == 'Yes' & PR.LR %in% c(NA, 'Negative') & Death == 'No' & is.na(T2LR) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:No:noT2LR:noT2D:T2LFU & Yes:Negative:No:noT2LR:noT2D:T2LFU
+c6 <- with(dat3, formula("Local.Recurrence == 'Yes' & is.na(PR.LR) & Death == 'Yes' & !is.na(T2LR) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:Yes:T2LR:T2D:T2LFU
+
+dat3 <- dat3 %>% 
+  mutate(LRDeath.PR = case_when(c1, c2, c3, c4, c5, c6, # Conditions for patients not at risk
+                                Local.Recurrence == "Yes" & PR.LR == "Positive" & Death %in% c("Yes", "No") ~ "LRYesPRPos",
+                                Local.Recurrence == "Yes" & PR.LR == "Negative" & Death %in% c("Yes", "No") ~ "LRYesPRNeg",
+                                Death == "Yes" & Local.Recurrence == "No" ~ "Dead",
+                                Local.Recurrence == "No" & Death == "No" & !is.na(T2LFU) ~ "Censored") %>%
+           factor(levels = c("Censored", "LRYesPRPos", "LRYesPRNeg", "Dead")))
+
+table(dat3$LRDeath.PR, useNA = "ifany") 
+  # Censored LRYesPRPos LRYesPRNeg       Dead       <NA> 
+  #      407          5         64         15        113 
+
+with(dat3, table(paste(LRDeath.PR, 
+                       ifelse(is.na(T2LR), "noT2LR", "T2LR"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+# Censored:noT2LR:noT2D:T2LFU       Dead:noT2LR:T2D:T2LFU 
+#                         407                          15 
+# LRYesPRNeg:T2LR:noT2D:T2LFU   LRYesPRNeg:T2LR:T2D:T2LFU 
+#                          56                           8 
+# LRYesPRPos:T2LR:noT2D:T2LFU     NA:noT2LR:noT2D:noT2LFU 
+#                           5                          18 
+#       NA:noT2LR:noT2D:T2LFU         NA:noT2LR:T2D:T2LFU 
+#                          89                           5 
+#           NA:T2LR:T2D:T2LFU 
+#                           1 
+
+
+#################################################################
+##                     Recode LRDeath.HER2                     ##
+#################################################################
+c1 <- with(dat3, formula("is.na(Local.Recurrence) & HER2.LR == 'Negative' & Death == 'No' & is.na(T2LR) & is.na(T2Death) ~ as.character(NA)")) # NA:Negative:No:noT2LR:noT2D:noT2LFU & # NA:Negative:No:noT2LR:noT2D:T2LFU 
+c2 <- with(dat3, formula("is.na(Local.Recurrence) & HER2.LR == 'Negative' & Death == 'Yes' & is.na(T2LR) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # NA:Negative:Yes:noT2LR:T2D:T2LFU  
+c3 <- with(dat3, formula("Local.Recurrence == 'No' & is.na(HER2.LR) & Death == 'No' & is.na(T2LR) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # No:NA:No:noT2LR:noT2D:T2LFU 
+c4 <- with(dat3, formula("Local.Recurrence == 'No' & HER2.LR == 'Negative' & Death == 'No' & is.na(T2LR) & is.na(T2Death) & is.na(T2LFU) ~ as.character(NA)")) # No:Negative:No:noT2LR:noT2D:noT2LFU
+c5 <- with(dat3, formula("Local.Recurrence == 'Yes' & HER2.LR %in% c(NA, 'Negative') & Death == 'No' & is.na(T2LR) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:No:noT2LR:noT2D:T2LFU & Yes:Negative:No:noT2LR:noT2D:T2LFU
+c6 <- with(dat3, formula("Local.Recurrence == 'Yes' & is.na(HER2.LR) & Death == 'Yes' & !is.na(T2LR) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:Yes:T2LR:T2D:T2LFU
+c7 <- with(dat3, formula("Local.Recurrence == 'Yes' & is.na(HER2.LR) & Death == 'No' & !is.na(T2LR) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:No:T2LR:noT2D:T2LFU
+dat3 <- dat3 %>% 
+  mutate(LRDeath.HER2 = case_when(c1, c2, c3, c4, c5, c6, c7, # Conditions for patients not at risk
+                                Local.Recurrence == "Yes" & HER2.LR == "Positive" & Death %in% c("Yes", "No") ~ "LRYesHER2Pos",
+                                Local.Recurrence == "Yes" & HER2.LR == "Negative" & Death %in% c("Yes", "No") ~ "LRYesHER2Neg",
+                                Death == "Yes" & Local.Recurrence == "No" ~ "Dead",
+                                Local.Recurrence == "No" & Death == "No" & !is.na(T2LFU) ~ "Censored") %>%
+           factor(levels = c("Censored", "LRYesHER2Pos", "LRYesHER2Neg", "Dead")))
+
+table(dat3$LRDeath.HER2, useNA = "ifany") 
+    # Censored LRYesHER2Pos LRYesHER2Neg         Dead         <NA> 
+    #      407            1           63           15          118 
+
+with(dat3, table(paste(LRDeath.HER2, 
+                       ifelse(is.na(T2LR), "noT2LR", "T2LR"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+#   Censored:noT2LR:noT2D:T2LFU         Dead:noT2LR:T2D:T2LFU 
+#                           407                            15 
+# LRYesHER2Neg:T2LR:noT2D:T2LFU   LRYesHER2Neg:T2LR:T2D:T2LFU 
+#                            56                             7 
+# LRYesHER2Pos:T2LR:noT2D:T2LFU       NA:noT2LR:noT2D:noT2LFU 
+#                             1                            18 
+#         NA:noT2LR:noT2D:T2LFU           NA:noT2LR:T2D:T2LFU 
+#                            89                             5 
+#           NA:T2LR:noT2D:T2LFU             NA:T2LR:T2D:T2LFU 
+#                             4                             2 
+
+
+#################################################################
+##                      Recode NPDeath.ER                      ##
+#################################################################
+c1 <- with(dat3, formula("is.na(New.Breast.Primary) & is.na(ER.NP) & Death == 'No' & is.na(T2NP) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # NA:NA:No:noT2NP:noT2D:T2LFU
+c2 <- with(dat3, formula("is.na(New.Breast.Primary) & ER.NP == 'Negative' & Death == 'No' & is.na(T2NP) & is.na(T2Death) ~ as.character(NA)")) # NA:Negative:No:noT2NP:noT2D:noT2LFU & # NA:Negative:No:noT2NP:noT2D:T2LFU 
+c3 <- with(dat3, formula("is.na(New.Breast.Primary) & ER.NP == 'Negative' & Death == 'Yes' & is.na(T2NP) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # NA:Negative:Yes:noT2NP:T2D:T2LFU
+c4 <- with(dat3, formula("New.Breast.Primary == 'No' & is.na(ER.NP) & Death == 'No' & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # No:NA:No:noT2NP:noT2D:T2LFU & # No:NA:No:T2NP:noT2D:T2LFU 
+c5 <- with(dat3, formula("New.Breast.Primary == 'No' & is.na(ER.NP) & Death == 'Yes' & is.na(T2NP) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # No:NA:Yes:noT2NP:T2D:T2LFU
+c6 <- with(dat3, formula("New.Breast.Primary == 'No' & ER.NP == 'Negative' & Death == 'No' & is.na(T2NP) & is.na(T2Death) & is.na(T2LFU) ~ as.character(NA)")) # No:Negative:No:noT2NP:noT2D:noT2LFU
+c7 <- with(dat3, formula("New.Breast.Primary == 'Yes' & is.na(ER.NP) & Death == 'No' & is.na(T2NP) & !is.na(T2Death) & is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:No:T2NP:noT2D:T2LFU
+dat3 <- dat3 %>% 
+  mutate(NPDeath.ER = case_when(c1, c2, c3, c4, c5, c6, c7, # Conditions for patients not at risk
+                                New.Breast.Primary == "Yes" & ER.NP == "Positive" & Death %in% c("Yes", "No") ~ "NPYesERPos",
+                                New.Breast.Primary == "Yes" & ER.NP == "Negative" & Death %in% c("Yes", "No") ~ "NPYesERNeg",
+                                Death == "Yes" & New.Breast.Primary == "No" ~ "Dead",
+                                New.Breast.Primary == "No" & Death == "No" & !is.na(T2LFU) ~ "Censored") %>%
+           factor(levels = c("Censored", "NPYesERPos", "NPYesERNeg", "Dead")))
+
+table(dat3$NPDeath.ER, useNA = "ifany")
+  # Censored NPYesERPos NPYesERNeg       Dead       <NA> 
+  #      404         11          6         14        169 
+
+with(dat3, table(paste(NPDeath.ER, 
+                       ifelse(is.na(T2NP), "noT2NP", "T2NP"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+# Censored:noT2NP:noT2D:T2LFU       Dead:noT2NP:T2D:T2LFU 
+#                         404                          14 
+#     NA:noT2NP:noT2D:noT2LFU       NA:noT2NP:noT2D:T2LFU 
+#                          18                         136 
+#         NA:noT2NP:T2D:T2LFU         NA:T2NP:noT2D:T2LFU 
+#                          13                           2 
+# NPYesERNeg:T2NP:noT2D:T2LFU   NPYesERNeg:T2NP:T2D:T2LFU 
+#                           4                           2 
+# NPYesERPos:T2NP:noT2D:T2LFU 
+#                          11 
+
+
+#################################################################
+##                      Recode NPDeath.PR                      ##
+#################################################################
+c1 <- with(dat3, formula("is.na(New.Breast.Primary) & is.na(PR.NP) & Death == 'No' & is.na(T2NP) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # NA:NA:No:noT2NP:noT2D:T2LFU
+c2 <- with(dat3, formula("is.na(New.Breast.Primary) & PR.NP == 'Negative' & Death == 'No' & is.na(T2NP) & is.na(T2Death) ~ as.character(NA)")) # NA:Negative:No:noT2NP:noT2D:noT2LFU & # NA:Negative:No:noT2NP:noT2D:T2LFU 
+c3 <- with(dat3, formula("is.na(New.Breast.Primary) & PR.NP == 'Negative' & Death == 'Yes' & is.na(T2NP) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # NA:Negative:Yes:noT2NP:T2D:T2LFU
+c4 <- with(dat3, formula("New.Breast.Primary == 'No' & is.na(PR.NP) & Death == 'No' & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # No:NA:No:noT2NP:noT2D:T2LFU & # No:NA:No:T2NP:noT2D:T2LFU 
+c5 <- with(dat3, formula("New.Breast.Primary == 'No' & is.na(PR.NP) & Death == 'Yes' & is.na(T2NP) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # No:NA:Yes:noT2NP:T2D:T2LFU
+c6 <- with(dat3, formula("New.Breast.Primary == 'No' & PR.NP == 'Negative' & Death == 'No' & is.na(T2NP) & is.na(T2Death) & is.na(T2LFU) ~ as.character(NA)")) # No:Negative:No:noT2NP:noT2D:noT2LFU
+c7 <- with(dat3, formula("New.Breast.Primary == 'Yes' & is.na(PR.NP) & Death == 'No' & is.na(T2NP) & !is.na(T2Death) & is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:No:T2NP:noT2D:T2LFU
+dat3 <- dat3 %>% 
+  mutate(NPDeath.PR = case_when(c1, c2, c3, c4, c5, c6, c7, # Conditions for patients not at risk
+                                New.Breast.Primary == "Yes" & PR.NP == "Positive" & Death %in% c("Yes", "No") ~ "NPYesPRPos",
+                                New.Breast.Primary == "Yes" & PR.NP == "Negative" & Death %in% c("Yes", "No") ~ "NPYesPRNeg",
+                                Death == "Yes" & New.Breast.Primary == "No" ~ "Dead",
+                                New.Breast.Primary == "No" & Death == "No" & !is.na(T2LFU) ~ "Censored") %>%
+           factor(levels = c("Censored", "NPYesPRPos", "NPYesPRNeg", "Dead")))
+
+table(dat3$NPDeath.PR, useNA = "ifany")
+  # Censored NPYesPRPos NPYesPRNeg       Dead       <NA> 
+  #      404          8          9         14        169 
+
+with(dat3, table(paste(NPDeath.PR, 
+                       ifelse(is.na(T2NP), "noT2NP", "T2NP"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+# Censored:noT2NP:noT2D:T2LFU       Dead:noT2NP:T2D:T2LFU     NA:noT2NP:noT2D:noT2LFU 
+#                         404                          14                          18 
+#       NA:noT2NP:noT2D:T2LFU         NA:noT2NP:T2D:T2LFU         NA:T2NP:noT2D:T2LFU 
+#                         136                          13                           2 
+# NPYesPRNeg:T2NP:noT2D:T2LFU   NPYesPRNeg:T2NP:T2D:T2LFU NPYesPRPos:T2NP:noT2D:T2LFU 
+#                           7                           2                           8 
+
+
+#################################################################
+##                     Recode NPDeath.HER2                     ##
+#################################################################
+c1 <- with(dat3, formula("is.na(New.Breast.Primary) & is.na(HER2.NP) & Death == 'No' & is.na(T2NP) & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # NA:NA:No:noT2NP:noT2D:T2LFU
+c2 <- with(dat3, formula("is.na(New.Breast.Primary) & HER2.NP == 'Negative' & Death == 'No' & is.na(T2NP) & is.na(T2Death) ~ as.character(NA)")) # NA:Negative:No:noT2NP:noT2D:noT2LFU & # NA:Negative:No:noT2NP:noT2D:T2LFU 
+c3 <- with(dat3, formula("is.na(New.Breast.Primary) & HER2.NP == 'Negative' & Death == 'Yes' & is.na(T2NP) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # NA:Negative:Yes:noT2NP:T2D:T2LFU
+c4 <- with(dat3, formula("New.Breast.Primary == 'No' & is.na(HER2.NP) & Death == 'No' & is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # No:NA:No:noT2NP:noT2D:T2LFU & # No:NA:No:T2NP:noT2D:T2LFU 
+c5 <- with(dat3, formula("New.Breast.Primary == 'No' & is.na(HER2.NP) & Death == 'Yes' & is.na(T2NP) & !is.na(T2Death) & !is.na(T2LFU) ~ as.character(NA)")) # No:NA:Yes:noT2NP:T2D:T2LFU
+c6 <- with(dat3, formula("New.Breast.Primary == 'No' & HER2.NP == 'Negative' & Death == 'No' & is.na(T2NP) & is.na(T2Death) & is.na(T2LFU) ~ as.character(NA)")) # No:Negative:No:noT2NP:noT2D:noT2LFU
+c7 <- with(dat3, formula("New.Breast.Primary == 'Yes' & is.na(HER2.NP) & Death == 'No' & is.na(T2NP) & !is.na(T2Death) & is.na(T2LFU) ~ as.character(NA)")) # Yes:NA:No:T2NP:noT2D:T2LFU
+dat3 <- dat3 %>% 
+  mutate(NPDeath.HER2 = case_when(c1, c2, c3, c4, c5, c6, c7, # Conditions for patients not at risk
+                                New.Breast.Primary == "Yes" & HER2.NP == "Positive" & Death %in% c("Yes", "No") ~ "NPYesHER2Pos",
+                                New.Breast.Primary == "Yes" & HER2.NP == "Negative" & Death %in% c("Yes", "No") ~ "NPYesHER2Neg",
+                                Death == "Yes" & New.Breast.Primary == "No" ~ "Dead",
+                                New.Breast.Primary == "No" & Death == "No" & !is.na(T2LFU) ~ "Censored") %>%
+           factor(levels = c("Censored", "NPYesHER2Pos", "NPYesHER2Neg", "Dead")))
+
+table(dat3$NPDeath.HER2, useNA = "ifany")
+  # Censored NPYesHER2Pos NPYesHER2Neg         Dead         <NA> 
+  #      404            1           15           14          170 
+
+with(dat3, table(paste(NPDeath.HER2, 
+                       ifelse(is.na(T2NP), "noT2NP", "T2NP"),
+                       ifelse(is.na(T2Death), "noT2D", "T2D"),
+                       ifelse(is.na(T2LFU), "noT2LFU", "T2LFU"),
+                       sep = ":")))
+#   Censored:noT2NP:noT2D:T2LFU         Dead:noT2NP:T2D:T2LFU       NA:noT2NP:noT2D:noT2LFU 
+#                           404                            14                            18 
+#         NA:noT2NP:noT2D:T2LFU           NA:noT2NP:T2D:T2LFU           NA:T2NP:noT2D:T2LFU 
+#                           136                            13                             3 
+# NPYesHER2Neg:T2NP:noT2D:T2LFU   NPYesHER2Neg:T2NP:T2D:T2LFU NPYesHER2Pos:T2NP:noT2D:T2LFU 
+#                            13                             2                             1 
+
+#################################################################
+##       Recode T2LRDeath.ER/T2LRDeath.PR/T2LRDeath.HER2       ##
+#################################################################
+dat3 <- dat3 %>% 
+  mutate(T2LRDeath.ER = case_when(LRDeath.ER %in% c("LRYesERPos", "LRYesERNeg") ~ T2LR,
+                                  LRDeath.ER == "Dead" ~ T2Death,
+                                  LRDeath.ER == "Censored" ~ T2LFU))
+dat3 <- dat3 %>% 
+  mutate(T2LRDeath.PR = case_when(LRDeath.PR %in% c("LRYesPRPos", "LRYesPRNeg") ~ T2LR,
+                                  LRDeath.PR == "Dead" ~ T2Death,
+                                  LRDeath.PR == "Censored" ~ T2LFU))
+dat3 <- dat3 %>% 
+  mutate(T2LRDeath.HER2 = case_when(LRDeath.HER2 %in% c("LRYesHER2Pos", "LRYesHER2Neg") ~ T2LR,
+                                  LRDeath.HER2 == "Dead" ~ T2Death,
+                                  LRDeath.HER2 == "Censored" ~ T2LFU))
+
+var <- c("T2LRDeath.ER", "T2LRDeath.PR", "T2LRDeath.HER2")
+sapply(var, function(x) sum.na(dat3[x]) )
+  # T2LRDeath.ER   T2LRDeath.PR T2LRDeath.HER2 
+  #          113            113            118 
+
+
+#################################################################
+##       Recode T2NPDeath.ER/T2NPDeath.PR/T2NPDeath.HER2       ##
+#################################################################
+dat3 <- dat3 %>% 
+  mutate(T2NPDeath.ER = case_when(NPDeath.ER %in% c("NPYesERPos", "NPYesERNeg") ~ T2NP,
+                                  NPDeath.ER == "Dead" ~ T2Death,
+                                  NPDeath.ER == "Censored" ~ T2LFU))
+dat3 <- dat3 %>% 
+  mutate(T2NPDeath.PR = case_when(NPDeath.PR %in% c("NPYesPRPos", "NPYesPRNeg") ~ T2NP,
+                                  NPDeath.PR == "Dead" ~ T2Death,
+                                  NPDeath.PR == "Censored" ~ T2LFU))
+dat3 <- dat3 %>% 
+  mutate(T2NPDeath.HER2 = case_when(NPDeath.HER2 %in% c("NPYesHER2Pos", "NPYesHER2Neg") ~ T2NP,
+                                    NPDeath.HER2 == "Dead" ~ T2Death,
+                                    NPDeath.HER2 == "Censored" ~ T2LFU))
+var <- c("T2NPDeath.ER", "T2NPDeath.PR", "T2NPDeath.HER2")
+sapply(var, function(x) sum.na(dat3[x]) )
+  # T2NPDeath.ER   T2NPDeath.PR T2NPDeath.HER2 
+  #          169            169            170 
+
+######################################################################
+##  Recode LRDeath2/DRDeath2/NPDeath2 - combine death and censored  ##
+######################################################################
+# The function Surv() {survival} tries to distinguish between the use of 0/1 and 1/2 coding for censored data via the condition if (max(status)==2). If 1/2 coding is used and all the subjects are censored, it will guess wrong. In any questionable case it is safer to use logical coding, e.g., Surv(time, status==3) would indicate that '3' is the code for an event. For multi-state survival the status variable will be a factor, whose first level is assumed to correspond to censoring (https://stat.ethz.ch/R-manual/R-devel/library/survival/html/Surv.html).
+
+# Formula with Surv() {tidycmprsk} on LHS and covariates on RHS. The event status variable must be a factor, with the first level indicating 'censor' and subsequent levels the competing risks. The Surv(time2=) argument cannot be used.
+
+dat3$LRDeath2 <- case_when(dat3$LRDeath %in% c("Dead", "Censored") ~ "censor",
+                           TRUE ~ as.character(dat3$LRDeath)) %>% 
+  factor(levels = c("censor", "LocRecur"))
+
+dat3$DRDeath2 <- case_when(dat3$DRDeath == c("Dead", "Censored") ~ "censor",
+                           TRUE ~ as.character(dat3$DRDeath)) %>% 
+  factor(levels = c("censor", "DisRecur"))
+
+dat3$NPDeath2 <- case_when(dat3$NPDeath == c("Dead", "Censored") ~ "censor",
+                           TRUE ~ as.character(dat3$NPDeath)) %>% 
+  factor(levels = c("censor", "NBP"))
+
+#################################################################################
+##  Recode LRDeath2.ER/LRDeath2.PR/LRDeath2.HER2 - combine death and censored  ##
+#################################################################################
+dat3$LRDeath2.ER <- case_when(dat3$LRDeath.ER %in% c("Dead", "Censored") ~ "censor",
+                              TRUE ~ as.character(dat3$LRDeath.ER)) %>% 
+  factor(levels = c("censor", "LRYesERPos", "LRYesERNeg"))
+
+dat3$LRDeath2.PR <- case_when(dat3$LRDeath.PR %in% c("Dead", "Censored") ~ "censor",
+                              TRUE ~ as.character(dat3$LRDeath.PR)) %>% 
+  factor(levels = c("censor", "LRYesPRPos", "LRYesPRNeg"))
+
+dat3$LRDeath2.HER2 <- case_when(dat3$LRDeath.HER2 %in% c("Dead", "Censored") ~ "censor",
+                                TRUE ~ as.character(dat3$LRDeath.HER2)) %>% 
+  factor(levels = c("censor", "LRYesHER2Pos", "LRYesHER2Neg"))
+
+
+#################################################################################
+##  Recode NPDeath2.ER/NPDeath2.PR/NPDeath2.HER2 - combine death and censored  ##
+#################################################################################
+dat3$NPDeath2.ER <- case_when(dat3$NPDeath.ER %in% c("Dead", "Censored") ~ "censor",
+                              TRUE ~ as.character(dat3$NPDeath.ER)) %>% 
+  factor(levels = c("censor", "NPYesERPos", "NPYesERNeg"))
+
+dat3$NPDeath2.PR <- case_when(dat3$NPDeath.PR %in% c("Dead", "Censored") ~ "censor",
+                              TRUE ~ as.character(dat3$NPDeath.PR)) %>% 
+  factor(levels = c("censor", "NPYesPRPos", "NPYesPRNeg"))
+
+dat3$NPDeath2.HER2 <- case_when(dat3$NPDeath.HER2 %in% c("Dead", "Censored") ~ "censor",
+                                TRUE ~ as.character(dat3$NPDeath.HER2)) %>% 
+  factor(levels = c("censor", "NPYesHER2Pos", "NPYesHER2Neg"))
+```
+
+
+```{r order_variable, eval=FALSE}
+#################################################################
+##                        Order columns                        ##
 #################################################################
 dat3 <- dat3 %>%
-  select("Age.at.Diagnosis", 
-         "Race.Ethnicity2", 
-         "Race.Ethnicity3", 
-         "Local.Recurrence", 
-         "Distant.Recurrence", 
-         "New.Breast.Primary", 
-         "ER.LR", 
-         "PR.LR", 
-         "HER2.LR", 
-         "ER.NP", 
-         "PR.NP", 
-         "HER2.NP", 
-         "Clinical.T.Stage", 
-         "Clinical.T.Stage2", 
-         "Clinical.N.Stage", 
-         "Clinical.N.Stage2", 
-         "Mammo.Screen.Detected", 
-         "Mammo.Occult", 
-         "MRI.Screen.Detected", 
-         everything())
+  select("Subject.ID",
+         
+         #################################################################
+         ##                   Demographical variables                   ##
+         #################################################################
+         "Age.at.Diagnosis", "Race.Ethnicity2", "Race.Ethnicity3", "Race.Ethnicity",    
+         "Race.Ethnicity",
+         
+         ##################################################################
+         ##                   Disease history variables                  ##
+         ##################################################################
+         "Clinical.T.Stage", "Clinical.T.Stage2", 
+         "Clinical.N.Stage", "Clinical.N.Stage2", 
+         "Date.of.Diagnosis", "Index.Tumor.Status", 
+         "Past.Ipsilateral.Br.CA", "Past.Contralateral.Br.CA", ## Past Ipsilateral Breast Cancer 
+         "Tumor.Size.best.estimate.By.Path.Primary.surg.case",
+         "Tumor.Size.best.estimate.By.Breast.Imaging.NACT.case",
+         "Needle.biopsy.proven.nodal.metastases.at.Dx",
+         "Histology", "Any.high.grade.Disease", "Any.LVI", "Ki67",
+         ## LVI: lymphovascular invasion
+         
+         #################################################################
+         ##           Screening/diagnosis/treatment variables           ##
+         #################################################################
+         "Mammo.Screen.Detected", "Mammo.Occult", "MRI.Screen.Detected",
+         "Date.of.Diagnosis",
+         "First.Treatment.Modality", "Date.First.Treatment.Delivered",               
+         "Any.Attempt.at.Lumpectomy", "Mastectomy.Surgery", "CPM", ## Contralateral Prophylactic Mastectomy
+         "Any.SLN.Biopsy", "ALND", "If.Primary.Surgery.Date.of.First.Surgery", ## Sentinel Lymph Node; Axillary Lymph Node Dissection
+         "If.primary.surgery.Date.of.Last.Surgery", 
+         "If.Primary.Surgery.pT.Stage", "If.Primary.Surgery.pN.Stage",                   "Neoadjuvant.Chemotherapy",
+         "In.NACT.did.pt.complete.all.planned.preop.CTX",                
+         "If.NACT.date.CTX.initiated",                                   
+         "If.NACT.CTX.components.check.all.delivered.choice.A",       
+         "If.NACT.CTX.components.check.all.delivered.choice.T",          
+         "If.NACT.CTX.components.check.all.delivered.choice.C",       
+         "If.NACT.preop.Herceptin", "If.NACT.preop.Perjeta",
+         "If.NACT.ypT.Stage", "If.NACT.ypN.Stage", 
+         "if.NACT.pCR", "If.NACT.postop.Capecitabine",
+         "If.NACT.postop.Kadcyla.TDM.1", "Postop.Adjuvant.CTX",
+         "If.Postop.Adjuvant.CTX.did.pt.complete.all.planned.postop.CTX",
+         "If.Postop.Adjuvant.CTX.date.CTX.initiated",                    
+         "Postop.Adjuvant.XRT", 
+         "If.postop.XRT.date.XRT.initiated", "If.postop.XRT.date.XRT.initiated",
+         "Genetic.Testing.Done", "Genetic.Testing.Result.s",
+         
+          #################################################################
+          ##                      Outcome variables                      ##
+          #################################################################
+         "Local.Recurrence", "Distant.Recurrence", "New.Breast.Primary", 
+         "ER.LR", "PR.LR", "HER2.LR", "ER.NP", "PR.NP", "HER2.NP", 
+         "T2LR", "T2DR", "T2NP", "T2Death", "T2LFU",
+         "LRFS.event", "DRFS.event", "NPFS.event",
+         "LRFS.time", "DRFS.time", "NPFS.time",
+         "NP5y", "DR5y", "LR5y", 
+         "Death", "LRDeath", "DRDeath", "NPDeath",
+         "T2LRDeath", "T2DRDeath", "T2NPDeath",                                          
+         "LRDeath.ER", "LRDeath.PR", "LRDeath.HER2", 
+         "T2LRDeath.ER", "T2LRDeath.PR", "T2LRDeath.HER2",
+         "NPDeath.ER", "NPDeath.PR", "NPDeath.HER2",
+         "T2NPDeath.ER", "T2NPDeath.PR", "T2NPDeath.HER2",
+         "Any.Local.Recurrence", "Date.Local.Recurrence", 
+         "Any.Distant.Recurrence", "Site.First.Distant.Recurrence",
+         "Date.First.Distant.Recurrence", "Any.New.subsequent.Br.1",
+         "Date.New.Breast.primary", "Date.Death", "Date.Last.Follow.up",
+         "Status.Last.Follow.up", everything()
+         )
+```
 
 
+```{r save_data, eval=FALSE}
 #################################################################
 ##                          Save data                          ##
 #################################################################
-dput(dat0, "../data/derived/2022Nov23_dat0.Rdata")
-dput(dat1, "../data/derived/2022Nov23_dat1.Rdata")
-dput(dat2, "../data/derived/2022Nov23_dat2.Rdata")
-dput(dat3, "../data/derived/2022Nov23_dat3.Rdata")
-dput(dat3, "../data/derived/2022Nov23_dat_TNBC.Rdata")
-write.csv(dat3, "../data/derived/2022Nov23_dat_TNBC.csv", row.names = F)
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+dput(dat0, paste0("../data/derived/", date.analysis, "_dat0.Rdata"))
+dput(dat1, paste0("../data/derived/", date.analysis, "_dat1.Rdata"))
+dput(dat2, paste0("../data/derived/", date.analysis, "_dat2.Rdata"))
+dput(dat3, paste0("../data/derived/", date.analysis, "_dat3.Rdata"))
+dput(dat3, paste0("../data/derived/", date.analysis, "_dat_TNBC.Rdata"))
+write.csv(dat3, paste0("../data/derived/", date.analysis, "_dat_TNBC.csv"), row.names = F)
 ```
 
 
-```{r}
+```{r load_cleaned_data}
 ##################################################################
 ##                  Load cleaned data in Rdata                  ##
 ##################################################################
-dat.work <- dget("../data/derived/2022Nov23_dat_TNBC.Rdata")
+dat.work <- dget("../data/derived/2022Dec21_dat_TNBC.Rdata")
 ```
 
-
-Among patients with local recurrence 72 (11.92%, n = 604),  2 patients do not have the date of local recurrence. Among patients with distant recurrence 70 (11.59%, n = 604), 13 patients do not have the date of distant recurrence. Among patients with new breast primary recurrence 18 (2.98%, n = 604), no patient does not have the date of new breast primary recurrence.
-
-Patients who were never disease free (n=2) were counted as N/A's in terms of recurrence and new primary endpoints.
-
-Race and ethnicity variable need careful re-examination of the categories. It seems that the two sheets contained race data based on different ways of categorization. Regarding Hisp/Latina category, it is unclear if some of the whites would have been in the Hisp/Latina category. In the current analysis, the patient with race=Arabic/Mideastern (n=1) was included in WA category.
-
-Local recurrence free survival, distant recurrence free survival, and new primary free survival were calculated from date of diagnosis to date of event of interest and censored at date of death or date of last follow up which ever is earlier for patients not experiencing the event of interest. Local recurrence, distant recurrence, and new primary at 5 years were evaluated among patients developed the event of interest within 5 years of disease diagnosis and patients were at risk at 5 years. 
 
 ```{r, eval=FALSE, include=FALSE}
 #################################################################
@@ -817,93 +1381,63 @@ mis.cal(var1 = "New.Breast.Primary", var2 = "Date.New.Breast.primary")
 ##                     Set study variables                     ##
 #################################################################
 vars.all <- c(
-  "Race.Ethnicity2",
-  "Race.Ethnicity3",
-  "Age.at.Diagnosis",
-  "Local.Recurrence",
-  "Distant.Recurrence",
-  "New.Breast.Primary",
-  "ER.LR",
-  "PR.LR",
-  "HER2.LR",
-  "ER.NP",
-  "PR.NP",
-  "HER2.NP",
-  "Clinical.T.Stage",
-  "Clinical.T.Stage2",
-  "Clinical.N.Stage",
-  "Clinical.N.Stage2",
-  "Mammo.Screen.Detected",
-  "Mammo.Occult",
-  "MRI.Screen.Detected",
+  
+  ###  Demographical variables   
+  "Age.at.Diagnosis", 
+  "Race.Ethnicity2", "Race.Ethnicity3", 
+  
+  ###  Disease history variables  
+  "Clinical.T.Stage", "Clinical.T.Stage2", "Clinical.N.Stage", "Clinical.N.Stage2", 
   "Index.Tumor.Status",
-  "Past.Ipsilateral.Br.CA",
-  "Past.Contralateral.Br.CA",
+  "Past.Ipsilateral.Br.CA", "Past.Contralateral.Br.CA",
   # "Tumor.Size.best.estimate.By.Path.Primary.surg.case",
   # "Tumor.Size.best.estimate.By.Breast.Imaging.NACT.case",
   "Needle.biopsy.proven.nodal.metastases.at.Dx",
-  "Histology",
-  "Any.high.grade.Disease",
-  "Any.LVI",
-  "Ki67",
-  #"ER.expression2",
-  #"PR.expression2",
-  #"HER2.neu.IHC",
-  #"HER2.neu.FISH",
-  "First.Treatment.Modality",
-  "Any.Attempt.at.Lumpectomy",
-  "Mastectomy.Surgery",
-  "CPM",
-  "Any.SLN.Biopsy",
-  "ALND" ,
-  "If.Primary.Surgery.pT.Stage",
-  "If.Primary.Surgery.pN.Stage",
+  "Histology", "Any.high.grade.Disease", "Any.LVI", "Ki67",
+  # "ER.expression2",
+  # "PR.expression2",
+  # "HER2.neu.IHC",
+  # "HER2.neu.FISH",
+  
+  ###  Screening/diagnosis/treatment variables
+  "Mammo.Screen.Detected", "Mammo.Occult", "MRI.Screen.Detected", # Screen
+  "First.Treatment.Modality", "Any.Attempt.at.Lumpectomy", "Mastectomy.Surgery",
+  "CPM", "Any.SLN.Biopsy", "ALND",
+  "If.Primary.Surgery.pT.Stage", "If.Primary.Surgery.pN.Stage",
   "Neoadjuvant.Chemotherapy",
   "In.NACT.did.pt.complete.all.planned.preop.CTX",
   "If.NACT.CTX.components.check.all.delivered.choice.A",
   "If.NACT.CTX.components.check.all.delivered.choice.T",
   "If.NACT.CTX.components.check.all.delivered.choice.C",
-  "If.NACT.preop.Herceptin",
-  "If.NACT.preop.Perjeta",
-  "If.NACT.ypT.Stage",
-  "If.NACT.ypN.Stage",
-  "if.NACT.pCR",
-  "If.NACT.postop.Capecitabine",
-  "If.NACT.postop.Kadcyla.TDM.1",
+  "If.NACT.preop.Herceptin", "If.NACT.preop.Perjeta",
+  "If.NACT.ypT.Stage", "If.NACT.ypN.Stage", "if.NACT.pCR",
+  "If.NACT.postop.Capecitabine", "If.NACT.postop.Kadcyla.TDM.1",
   "Postop.Adjuvant.CTX",
   "If.Postop.Adjuvant.CTX.did.pt.complete.all.planned.postop.CTX",
   "Postop.Adjuvant.XRT",
-  "Genetic.Testing.Done",
-  "Genetic.Testing.Result.s",
-  "Status.Last.Follow.up",
-  "T2LR",
-  "T2DR", 
-  "T2NP",
-  "T2Death",
-  "T2LFU",
-  "LRFS.event",
-  "LRFS.time",
-  "DRFS.event",
-  "DRFS.time", 
-  "NPFS.event",
-  "NPFS.time",
-  "NP5y",
-  "DR5y",
-  "LR5y"
+  "Genetic.Testing.Done", "Genetic.Testing.Result.s",
+  
+  ###  Outcome variables
+  "Local.Recurrence", "Distant.Recurrence", "New.Breast.Primary", # Outcome variables
+  "ER.LR", "PR.LR", "HER2.LR", "ER.NP", "PR.NP", "HER2.NP", # ER/PR/HER2
+  "T2LR", "T2DR", "T2NP", "T2Death", "T2LFU", # Survival time
+  "LRFS.event", "DRFS.event", "NPFS.event", 
+  "LRFS.time", "DRFS.time", "NPFS.time", 
+  "NP5y", "DR5y", "LR5y", # Survival event
+  "LRDeath.ER", "LRDeath.PR", "LRDeath.HER2", # Survival event
+  "T2LRDeath.ER", "T2LRDeath.PR", "T2LRDeath.HER2", # Survival time
+  "Status.Last.Follow.up"
 )
 
 # Create an indicator [0, 1] for all categorical variables 
 vars.cat <- rep(1, length(vars.all))
 vars.cat[vars.all %in% c("Age.at.Diagnosis", "T2LR", "T2DR", "T2NP", "T2Death", 
-                         "T2LFU", "LRFS.time", "DRFS.time", "NPFS.time")] <- 0
+                         "T2LFU", "LRFS.time", "DRFS.time", "NPFS.time",
+                         "T2LRDeath.ER", "T2LRDeath.PR", "T2LRDeath.HER2")] <- 0
 
 # Create an index for the particular categorical variable to drop
 vars.cat.rm <- which(vars.all %in% c("Race.Ethnicity2"))
 ```
-
-## Methodology of summary tables
-
-The association between a categorical variable and a grouping variable (i.e., Race.Ethnicity) was examined using the Fisher’s exact test. Difference in the value of a continuous variable among patients of different groups was examined using the Wilcoxon rank sum test (p-value is aligned with the median (IQR) summmaries in the following table). For variable with missing values, the difference in the proportion of missingness across different groups was also examined.
 
 ## Summary of patients characteristics by Race.Ethnicity2
 
@@ -915,7 +1449,7 @@ vars.cat.rm <- which(vars.all %in% c("Race.Ethnicity2"))
 out <- fsmry.dmgrph(dat = dat.work,
                     vars = vars.all[-vars.cat.rm],
                     vars.cat = vars.cat[-vars.cat.rm],
-                    by = vars.all[vars.cat.rm])
+                    by = "Race.Ethnicity2")
 ```
 
 ```{r, results="asis"}
@@ -923,6 +1457,7 @@ knitr::kable(out[[1]], row.names = F)
 ```
 
 ## Summary of patients characteristics by Race/Ethnicity (exclude Race.Ethnicity2 = Other)
+
 ```{r, results="hide"}
 # Exclude observations with the other race/ethnicity
 dat.work2 <- dat.work[dat.work$Race.Ethnicity2 != "Other", ]
@@ -935,13 +1470,12 @@ vars.cat.rm <- which(vars.all %in% c("Race.Ethnicity2",
 out <- fsmry.dmgrph(dat = dat.work2,
                     vars = vars.all[-vars.cat.rm],
                     vars.cat = vars.cat[-vars.cat.rm],
-                    by = vars.all[vars.cat.rm][1])
+                    by = "Race.Ethnicity2")
 ```
 
 ```{r, results="asis"}
 knitr::kable(out[[1]], row.names = F)
 ```
-
 
 ## Summary of patients characteristics by Race.Ethnicity3 (WA vs all other races combined)
 
@@ -953,7 +1487,7 @@ vars.cat.rm <- which(vars.all %in% c("Race.Ethnicity3",
 out <- fsmry.dmgrph(dat = dat.work,
                     vars = vars.all[-vars.cat.rm],
                     vars.cat = vars.cat[-vars.cat.rm],
-                    by = vars.all[vars.cat.rm][1])
+                    by = "Race.Ethnicity3")
 ```
 
 ```{r, results="asis"}
@@ -961,6 +1495,7 @@ knitr::kable(out[[1]], row.names = F)
 ```
 
 ## Summary of patients characteristics by Local.Recurrence
+
 Note that the p-values in the following table should not be used for assessing association between each of the variables and recurrence as the analysis did not take into account different follow-up times.
 
 ```{r, results="hide"}
@@ -974,7 +1509,7 @@ vars.cat.rm <- which(vars.all %in% c("Local.Recurrence",
 out <- fsmry.dmgrph(dat = dat.work,
                     vars = vars.all[-vars.cat.rm],
                     vars.cat = vars.cat[-vars.cat.rm],
-                    by = vars.all[vars.cat.rm][1])
+                    by = "Local.Recurrence")
 ```
 
 ```{r, results="asis"}
@@ -982,6 +1517,7 @@ knitr::kable(out[[1]], row.names = F)
 ```
 
 ## Summary of patients characteristics by Distant.Recurrence
+
 Note that the p-values in the following table should not be used for assessing association between each of the variables and recurrence as the analysis did not take into account different follow-up times.
 
 ```{r, results="hide"}
@@ -999,7 +1535,7 @@ vars.cat.rm <- which(vars.all %in% c("Distant.Recurrence",
 out <- fsmry.dmgrph(dat = dat.work,
                     vars = vars.all[-vars.cat.rm],
                     vars.cat = vars.cat[-vars.cat.rm],
-                    by = vars.all[vars.cat.rm][1])
+                    by = "Distant.Recurrence")
 ```
 
 ```{r, results="asis"}
@@ -1007,6 +1543,7 @@ knitr::kable(out[[1]], row.names = F)
 ```
 
 ## Summary of patients characteristics by New.Breast.Primary
+
 Note that the p-values in the following table should not be used for assessing association between each of the variables and recurrence as the analysis did not take into account different follow-up times.
 
 ```{r, results="hide"}
@@ -1020,14 +1557,15 @@ vars.cat.rm <- which(vars.all %in% c("New.Breast.Primary",
 out <- fsmry.dmgrph(dat = dat.work,
                     vars = vars.all[-vars.cat.rm],
                     vars.cat = vars.cat[-vars.cat.rm],
-                    by = vars.all[vars.cat.rm][1])
+                    by = "New.Breast.Primary")
 ```
 
 ```{r, results="asis"}
 knitr::kable(out[[1]], row.names = F)
 ```
 
-## Summary of patients characteristics by 5-year local recurrence
+## Summary of patients characteristics by 5-year local recurrence (column proportion)
+
 ```{r, results="hide"}
 # Create a summary table by 5-year local recurrence
 id.keep <- which(!is.na(dat.work$LR5y))
@@ -1037,14 +1575,13 @@ vars.cat.rm <- which(vars.all %in% c("LR5y",
                                      "Genetic.Testing.Result.s",
                                      "If.NACT.preop.Perjeta", 
                                      "If.NACT.postop.Kadcyla.TDM.1",
-                                     "ER.NP",
-                                     "PR.NP",
-                                     "HER2.NP"))
+                                     "HER2.NP" # 'x' must have at least 2 rows and columns
+))
 
 out <- fsmry.dmgrph(dat = dat.work[id.keep, ],
                     vars = vars.all[-vars.cat.rm],
                     vars.cat = vars.cat[-vars.cat.rm],
-                    by = vars.all[vars.cat.rm][1])
+                    by = "LR5y")
 
 ##################################################################
 ##                  Problem: only one category                  ##
@@ -1063,37 +1600,41 @@ out <- fsmry.dmgrph(dat = dat.work[id.keep, ],
 knitr::kable(out[[1]], row.names = F)
 ```
 
+## Summary of patients characteristics by 5-year local recurrence (row proportion)
+```{r, results="hide"}
+source("../BTKR_function/fsmry.dmgrph.rowprop.R")
+out <- fsmry.dmgrph.rowprop(dat = dat.work[id.keep, ],
+                            vars = vars.all[-vars.cat.rm],
+                            vars.cat = vars.cat[-vars.cat.rm],
+                            by = "LR5y")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
 ### Additional results for each categorical variable
+
 ```{r, results="asis"}
 #################################################################
 ##                   Set possible predictors                   ##
 #################################################################
 vars.ana.rm <- c("Age.at.Diagnosis", 
-                 "Local.Recurrence", 
-                 "Distant.Recurrence",
-                 "New.Breast.Primary",
+                 "Local.Recurrence", "Distant.Recurrence", "New.Breast.Primary",
                  "Ki67",
                  "If.NACT.postop.Kadcyla.TDM.1", # Only one category
                  "Genetic.Testing.Done",
                  "Genetic.Testing.Result.s",
                  "Status.Last.Follow.up",
-                 "ER.NP",
-                 "PR.NP",
-                 "HER2.NP",
-                 "T2LR",
-                 "T2DR",
-                 "T2NP",
-                 "T2Death",
-                 "T2LFU",
-                 "LRFS.event",
-                 "LRFS.time",
-                 "DRFS.event",
-                 "DRFS.time",
-                 "NPFS.event",
-                 "NPFS.time",
-                 "NP5y",
-                 "DR5y",
-                 "LR5y")
+                 "ER.NP", "PR.NP", "HER2.NP", # ER/PR/HER2 for new breast primary
+                 "T2LR", "T2DR", "T2NP", "T2Death", "T2LFU",
+                 "LRFS.event", "DRFS.event", "NPFS.event",
+                 "LRFS.time", "DRFS.time", "NPFS.time",
+                 "NP5y", "DR5y", "LR5y",
+                 "LRDeath.ER", "LRDeath.PR", "LRDeath.HER2",
+                 "T2LRDeath.ER", "T2LRDeath.PR", "T2LRDeath.HER2"
+                 )
+  
 vars.ana <- vars.all[vars.all %in% vars.ana.rm == FALSE]
 
 id.keep <- which(!is.na(dat.work$LR5y))
@@ -1123,7 +1664,8 @@ for (i in 1:length(vars.ana)) {
 }
 ```
 
-## Summary of patients characteristics by 5-year distant recurrence
+## Summary of patients characteristics by 5-year distant recurrence (column proportion)
+
 ```{r, results="hide"}
 # Create a summary table by 5-year distant recurrence
 id.keep <- which(!is.na(dat.work$DR5y))
@@ -1132,50 +1674,50 @@ vars.cat.rm <- which(vars.all %in% c("DR5y",
                                      "Ki67", 
                                      "Genetic.Testing.Result.s",
                                      "If.NACT.postop.Kadcyla.TDM.1",
-                                     "ER.LR",
-                                     "PR.LR",
-                                     "HER2.LR",
-                                     "ER.NP",
-                                     "PR.NP",
-                                     "HER2.NP"))
+                                     "HER2.NP" # 'x' must have at least 2 rows and columns
+))
 
 out <- fsmry.dmgrph(dat = dat.work[id.keep, ],
                     vars = vars.all[-vars.cat.rm],
                     vars.cat = vars.cat[-vars.cat.rm],
-                    by = vars.all[vars.cat.rm][1])
+                    by = "DR5y")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Summary of patients characteristics by 5-year distant recurrence (row proportion)
+```{r, results="hide"}
+out <- fsmry.dmgrph.rowprop(dat = dat.work[id.keep, ],
+                            vars = vars.all[-vars.cat.rm],
+                            vars.cat = vars.cat[-vars.cat.rm],
+                            by = "DR5y")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
 ```
 
 ### Additional results for each categorical variable
+
 ```{r, results="asis"}
 vars.ana.rm <- c("Age.at.Diagnosis", 
-                 "Local.Recurrence", 
-                 "Distant.Recurrence",
-                 "New.Breast.Primary",
+                 "Local.Recurrence", "Distant.Recurrence", "New.Breast.Primary",
                  "Ki67",
                  "If.NACT.postop.Kadcyla.TDM.1", # Only one category
                  "Genetic.Testing.Done",
                  "Genetic.Testing.Result.s",
                  "Status.Last.Follow.up",
-                 "ER.LR",
-                 "PR.LR",
-                 "HER2.LR",
-                 "ER.NP",
-                 "PR.NP",
-                 "HER2.NP",
-                 "T2LR",
-                 "T2DR",
-                 "T2NP",
-                 "T2Death",
-                 "T2LFU",
-                 "LRFS.event",
-                 "LRFS.time",
-                 "DRFS.event",
-                 "DRFS.time",
-                 "NPFS.event",
-                 "NPFS.time",
-                 "NP5y",
-                 "DR5y",
-                 "LR5y")
+                 "ER.LR", "PR.LR", "HER2.LR",
+                 "ER.NP", "PR.NP", "HER2.NP",
+                 "T2LR", "T2DR", "T2NP", "T2Death", "T2LFU",
+                 "LRFS.event", "DRFS.event", "NPFS.event",
+                 "LRFS.time", "DRFS.time", "NPFS.time",
+                 "NP5y", "DR5y", "LR5y",
+                 "LRDeath.ER", "LRDeath.PR", "LRDeath.HER2",
+                 "T2LRDeath.ER", "T2LRDeath.PR", "T2LRDeath.HER2"
+                 )
 vars.ana <- vars.all[vars.all %in% vars.ana.rm == FALSE]
 
 id.keep <- which(!is.na(dat.work$DR5y))
@@ -1205,7 +1747,8 @@ for (i in 1:length(vars.ana)) {
 }
 ```
 
-## Summary of patients characteristics by 5-year new breast primary recurrence
+## Summary of patients characteristics by 5-year new primary breast cancer (column proportion)
+
 ```{r, results="hide"}
 # Create a summary table by 5-year new breast primary recurrence.
 id.keep <- which(!is.na(dat.work$NP5y))
@@ -1213,42 +1756,49 @@ vars.cat.rm <- which(vars.all %in% c("NP5y",
                                      "New.Breast.Primary",
                                      "Ki67", 
                                      "Genetic.Testing.Result.s",
-                                     "If.NACT.postop.Kadcyla.TDM.1"))
+                                     "If.NACT.postop.Kadcyla.TDM.1")) 
 
 out <- fsmry.dmgrph(dat = dat.work[id.keep, ],
                     vars = vars.all[-vars.cat.rm],
                     vars.cat = vars.cat[-vars.cat.rm],
-                    by = vars.all[vars.cat.rm][1])
+                    by = "NP5y")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Summary of patients characteristics by 5-year new primary breast cancer (row proportion)
+
+```{r, results="hide"}
+out <- fsmry.dmgrph.rowprop(dat = dat.work[id.keep, ],
+                            vars = vars.all[-vars.cat.rm],
+                            vars.cat = vars.cat[-vars.cat.rm],
+                            by = "NP5y")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
 ```
 
 ### Additional results for each categorical variable
+
 ```{r, results="asis"}
 vars.ana.rm <- c("Age.at.Diagnosis", 
-                 "Local.Recurrence", 
-                 "Distant.Recurrence",
-                 "New.Breast.Primary",
+                 "Local.Recurrence", "Distant.Recurrence", "New.Breast.Primary",
                  "Ki67",
                  "If.NACT.postop.Kadcyla.TDM.1", # Only one category
                  "Genetic.Testing.Done",
                  "Genetic.Testing.Result.s",
                  "Status.Last.Follow.up",
-                 "ER.LR",
-                 "PR.LR",
-                 "HER2.LR",
-                 "T2LR",
-                 "T2DR",
-                 "T2NP",
-                 "T2Death",
-                 "T2LFU",
-                 "LRFS.event",
-                 "LRFS.time",
-                 "DRFS.event",
-                 "DRFS.time",
-                 "NPFS.event",
-                 "NPFS.time",
-                 "NP5y",
-                 "DR5y",
-                 "LR5y")
+                 "ER.LR", "PR.LR", "HER2.LR", # ER/PR/HER2 for local recurrence
+                 "T2LR", "T2DR", "T2NP", "T2Death", "T2LFU",
+                 "LRFS.event", "DRFS.event", "NPFS.event",
+                 "LRFS.time", "DRFS.time", "NPFS.time",
+                 "NP5y", "DR5y", "LR5y",
+                 "LRDeath.ER", "LRDeath.PR", "LRDeath.HER2",
+                 "T2LRDeath.ER", "T2LRDeath.PR", "T2LRDeath.HER2")
+
 vars.ana <- vars.all[vars.all %in% vars.ana.rm == FALSE]
 
 id.keep <- which(!is.na(dat.work$NP5y))
@@ -1278,191 +1828,281 @@ for (i in 1:length(vars.ana)) {
 }
 ```
 
-## Incidence rate of recurrence
-```{r results='hide'}
-#################################################################
-##              Set up variables for the for loop              ##
-#################################################################
+## Incidence rate of breast cancer recurrence and new breast cancer
+
+```{r km_analysis_nomarker, results='hide'}
+##################################################################
+##             Estimate the incidence rate of LR/NP             ##
+##################################################################
 var.time <- c("T2LRDeath", "T2DRDeath", "T2NPDeath")
-var.event <- c("LRDeath", "DRDeath", "NPDeath")
-covar.LR <- c("ER.LR", "PR.LR", "HER2.LR")
-covar.NP <- c("ER.NP", "PR.NP", "HER2.NP")
+var.event <- c("LRDeath2", "DRDeath2", "NPDeath2")
 
-# Check the distributions of each survival time (T2LRDeath, T2DRDeath,  T2NPDeath)
-# mclapply(1:3, 
-#          function(i){summary(dat.work[var.time[i]])},
-#          mc.cores = 4)
-
-
-#################################################################
-##  Run a for loop to estimate the incidence rate of LR/DR/NP  ##
-#################################################################
-# Note: use the min, 25%, 50%, 75%, and max of the survival time to obtain risk estimates at these time points
-out.i <- vector("list", length = 3)
-for (i in 1:3) {
-  out.i[[i]] <-
-    tidycmprsk::cuminc(formula(paste0("Surv(", var.time[i], ", ", var.event[i], ") ~ 1")), data = dat.work, conf.level = 0.95) %>%
-  tidy(time = c(min(dat.work[var.time[i]], na.rm = T), 
-                quantile(dat.work[var.time[i]], probs = 0.25, na.rm = T) %>% round(),
-                quantile(dat.work[var.time[i]], probs = 0.50, na.rm = T) %>% round(), 
-                quantile(dat.work[var.time[i]], probs = 0.75, na.rm = T) %>% round(), 
-                max(dat.work[var.time[i]], na.rm = T)))
-}
+out.i <- mclapply(1:3,
+  function(i){ 
+    fit.i <- survfit(formula(paste0("Surv(", var.time[i], ", ", var.event[i], ") ~ 1")), data = dat.work) # Combine death and censored
+    res.i <- summary(fit.i, times = c(365.25, 365.25*2, 365.25*3, 365.25*5, 365.25*10)) 
+    out.i <- data.frame(time = res.i$time, 
+                        n.risk = res.i$n.risk[, 1], 
+                        estimate = 1 - res.i$pstate[, 1], 
+                        std.error = res.i$std.err[, 1], 
+                        conf.low = 1 - res.i$upper[, 1], 
+                        conf.high = 1 - res.i$lower[, 1]) %>% 
+      mutate(across(.cols = c(estimate, std.error, conf.low, conf.high), num, digits = 4))
+    return(list(fit = fit.i, res = res.i, out = out.i))},
+  mc.cores = 4L)
+```
 
 
-############################################################################
-##  Run a for loop to estimate the incidence rate of LR/NP by ER/PR/HER2  ##
-############################################################################
-out.i.LR <- vector("list", length = 3)
-for (i in 1:3) {
-  out.i.LR[[i]] <-
-    tidycmprsk::cuminc(formula(paste0("Surv(", var.time[1], ", ", var.event[1], ") ~ ", covar.LR[i])), data = dat.work, conf.level = 0.95) %>%
-  tidy(time = c(min(dat.work[var.time[1]], na.rm = T), 
-                quantile(dat.work[var.time[1]], probs = 0.25, na.rm = T) %>% round(),
-                quantile(dat.work[var.time[1]], probs = 0.50, na.rm = T) %>% round(), 
-                quantile(dat.work[var.time[1]], probs = 0.75, na.rm = T) %>% round(), 
-                max(dat.work[var.time[1]], na.rm = T)))
-}
+```{r competing_risk_analysis_marker, results='hide'}
+###################################################################
+##  Estimate and plot the incidence rate of LR/NP by ER/PR/HER2  ##
+###################################################################
+var.time.LR <- c("T2LRDeath.ER", "T2LRDeath.PR", "T2LRDeath.HER2")
+var.event.LR <- c("LRDeath2.ER", "LRDeath2.PR", "LRDeath2.HER2")
+var.time.NP <- c("T2NPDeath.ER", "T2NPDeath.PR", "T2NPDeath.HER2")
+var.event.NP <- c("NPDeath2.ER", "NPDeath2.PR", "NPDeath2.HER2")
+var.time2 <- c(var.time.LR, var.time.NP)
 
-out.i.NP <- vector("list", length = 3)
-for (i in 1:3) {
-  out.i.NP[[i]] <-
-    tidycmprsk::cuminc(formula(paste0("Surv(", var.time[3], ", ", var.event[3], ") ~ ", covar.NP[i])), data = dat.work, conf.level = 0.95) %>%
-  tidy(time = c(min(dat.work[var.time[3]], na.rm = T), 
-                quantile(dat.work[var.time[3]], probs = 0.25, na.rm = T) %>% round(),
-                quantile(dat.work[var.time[3]], probs = 0.50, na.rm = T) %>% round(), 
-                quantile(dat.work[var.time[3]], probs = 0.75, na.rm = T) %>% round(), 
-                max(dat.work[var.time[3]], na.rm = T)))
-}
+## Check the distributions of each survival time (T2LRDeath.ER, T2LRDeath.PR, T2LRDeath.HER2, T2NPDeath.ER, T2NPDeath.PR, T2NPDeath.HER2)
+# mclapply(1:6, 
+#          function(i){summary(dat.work[var.time2[i]])},
+#          mc.cores = 4L)
 
+# Create a new outcome showing that the recurrence with positive marker value and recurrence with negative marker values are competing outcomes as well. 
 
-##################################################################
-##          Run a for loop to plot the CIF of LR/DR/NP          ##
-##################################################################
-out.i.plot <- vector("list", length = 3)
-for (i in 1:3) {
-out.i.plot[[i]] <- cmprsk::cuminc(
-  ftime = dat.work[var.time[i]] %>% pull(), 
-  fstatus = dat.work[var.event[i]] %>% pull(),
-  cencode = "Censored")
-}
+out.i.LR <- mclapply(1:3,
+  function(i){ 
+    est.i.LR <- cuminc(
+      formula(paste0("Surv(", var.time.LR[i], ", ", var.event.LR[i], ") ~ 1")), 
+      data = dat.work, conf.level = 0.95)
+    est.i.LR.timepoint <- est.i.LR %>% 
+      tidy(time = c(365.25, 365.25*2, 365.25*3, 365.25*5, 365.25*10)) %>% 
+      mutate(across(.cols = c(estimate, std.error, conf.low, conf.high), num, digits = 4))
+    plot.i.LR <- ggcuminc(x = est.i.LR, 
+                          outcome = names(table(dat.work[[var.event.LR[i]]]))[-1],
+                          color = c("#A73030FF"),
+                          theme = list(ggplot2::theme_classic(), 
+                                       ggplot2::theme(legend.position = "bottom"),
+                                       ggplot2::theme(strip.background = ggplot2::element_blank()),
+                                       ggplot2::theme(axis.text = ggplot2::element_text(size = 10)),
+                                       ggplot2::theme(axis.title = ggplot2::element_text(size = 12)),
+                                       ggplot2::theme(legend.text = ggplot2::element_text(size = 10))
+                                       )
+                          ) +
+                   add_confidence_interval() +
+                   add_risktable() 
+    return(list(est = est.i.LR, est.timepoint = est.i.LR.timepoint, curve = plot.i.LR)) 
+    },
+  mc.cores = 4L)
 
-
-#################################################################
-##    Run a for loop to plot the CIF of LR/NP by ER/PR/HER2    ##
-#################################################################
-out.i.plot.LR <- vector("list", length = 3)
-for (i in 1:3) {
-out.i.plot.LR[[i]] <- cmprsk::cuminc(
-  ftime = dat.work[var.time[1]] %>% pull(), 
-  fstatus = dat.work[var.event[1]] %>% pull(),
-  cencode = "Censored",
-  group = dat.work[covar.LR[i]] %>% pull())
-}
-
-out.i.plot.NP <- vector("list", length = 3)
-for (i in 1:3) {
-out.i.plot.NP[[i]] <- cmprsk::cuminc(
-  ftime = dat.work[var.time[3]] %>% pull(), 
-  fstatus = dat.work[var.event[3]] %>% pull(),
-  cencode = "Censored",
-  group = dat.work[covar.NP[i]] %>% pull())
-}
+out.i.NP <- mclapply(1:3,
+  function(i){ 
+    est.i.NP <- cuminc(
+      formula(paste0("Surv(", var.time.NP[i], ", ", var.event.NP[i], ") ~ 1")), 
+      data = dat.work, conf.level = 0.95)
+    est.i.NP.timepoint <- est.i.NP %>% 
+      tidy(time = c(365.25, 365.25*2, 365.25*3, 365.25*5, 365.25*10)) %>% 
+      mutate(across(.cols = c(estimate, std.error, conf.low, conf.high), num, digits = 4))
+    plot.i.NP <- ggcuminc(x = est.i.NP, 
+                          outcome = names(table(dat.work[[var.event.NP[i]]]))[-1],
+                          color = c("#A73030FF"),
+                          theme = list(ggplot2::theme_classic(), 
+                                       ggplot2::theme(legend.position = "bottom"),
+                                       ggplot2::theme(strip.background = ggplot2::element_blank()),
+                                       ggplot2::theme(axis.text = ggplot2::element_text(size = 10)),
+                                       ggplot2::theme(axis.title = ggplot2::element_text(size = 12)),
+                                       ggplot2::theme(legend.text = ggplot2::element_text(size = 10))
+                                       )
+                          ) +
+                   add_confidence_interval() +
+                   add_risktable() 
+    return(list(est = est.i.NP, est.timepoint = est.i.NP.timepoint, curve = plot.i.NP)) 
+    },
+  mc.cores = 4L)
 ```
 
 ### Local recurrence
+
 ```{r}
-knitr::kable(out.i[[1]])
+knitr::kable(out.i[[1]][["out"]])
 cat("\n")
-plot(out.i.plot[[1]], 
-     color = 1:2, 
-     xlab = "Days", 
-     main = "Cumulative incidence curve of LR")
+plot(
+  out.i[[1]][["fit"]], 
+  fun = "event",
+  xlab = "Days", 
+  ylab = "1 - survival probability",
+  main = "Event rate curve of LR")
 ```
 
-### Local recurrence by ER
+### Local recurrence with ER marker values
+
 ```{r}
-knitr::kable(out.i.LR[[1]])
-plot(out.i.plot.LR[[1]], 
-     color = 1:4, 
-     xlab = "Days", 
-     main = "Cumulative incidence curve of LR by ER",
-     cex.main = 0.8)
+knitr::kable(out.i.LR[[1]][["est.timepoint"]])
+# Return same results of the following codes
+# i = 1
+# cmprsk::cuminc(
+#     ftime = dat.work[var.time.LR[i]] %>% pull(), 
+#     fstatus = dat.work[var.event.LR[i]] %>% pull(),
+#     cencode = "censor") %>% cmprsk::timepoints(times = c(365.25, 365.25*2, 365.25*3, 365.25*5, 365.25*10))
+cat("\n")
+out.i.LR[[1]][["curve"]]
 ```
 
-### Local recurrence by PR
+### Local recurrence with PR marker values
+
 ```{r}
-knitr::kable(out.i.LR[[2]])
-plot(out.i.plot.LR[[2]], 
-     color = 1:4, 
-     xlab = "Days",
-     main = "Cumulative incidence curve of LR by PR",
-     cex.main = 0.8)
+knitr::kable(out.i.LR[[2]][["est.timepoint"]])
+cat("\n")
+out.i.LR[[2]][["curve"]]
 ```
 
-### Local recurrence by HER2
+### Local recurrence with HER2 marker values
+
 ```{r}
-knitr::kable(out.i.LR[[3]])
-plot(out.i.plot.LR[[3]], 
-     color = 1:4, 
-     xlab = "Days",
-     main = "Cumulative incidence curve of LR by HER2",
-     cex.main = 0.8)
+knitr::kable(out.i.LR[[3]][["est.timepoint"]])
+cat("\n")
+out.i.LR[[3]][["curve"]]
 ```
 
 ### Distant recurrence
+
 ```{r}
-knitr::kable(out.i[[2]])
+knitr::kable(out.i[[2]][["out"]])
 cat("\n")
-plot(out.i.plot[[2]], 
-     color = 1:2, 
-     xlab = "Days",
-     main = "Cumulative incidence curve of DR")
+plot(
+  out.i[[2]][["fit"]], 
+  fun = "event",
+  xlab = "Days", 
+  ylab = "1 - survival probability",
+  main = "Event rate curve of DR")
 ```
 
-### New breast primary
+### New primary breast cancer
+
 ```{r}
-knitr::kable(out.i[[3]])
+knitr::kable(out.i[[3]][["out"]])
 cat("\n")
-plot(out.i.plot[[3]], 
-     color = 1:2, 
-     xlab = "Days",
-     main = "Cumulative incidence curve of NP")
+plot(
+  out.i[[3]][["fit"]], 
+  fun = "event",
+  xlab = "Days", 
+  ylab = "1 - survival probability",
+  main = "Event rate curve of DR")
 ```
 
-### New breast primary by ER
+### New primary breast cancer with ER marker values
+
 ```{r}
-knitr::kable(out.i.NP[[1]])
-plot(out.i.plot.NP[[1]], 
-     color = 1:4, 
-     xlab = "Days",
-     main = "Cumulative incidence curve of NP by ER",
-     cex.main = 0.8)
+knitr::kable(out.i.NP[[1]][["est.timepoint"]])
+cat("\n")
+out.i.NP[[1]][["curve"]]
 ```
 
-### New breast primary by PR
+### New primary breast cancer with PR marker values
+
 ```{r}
-knitr::kable(out.i.NP[[2]])
-plot(out.i.plot.NP[[2]], 
-     color = 1:4, 
-     xlab = "Days",
-     main = "Cumulative incidence curve of NP by PR",
-     cex.main = 0.8)
+knitr::kable(out.i.NP[[2]][["est.timepoint"]])
+cat("\n")
+out.i.NP[[2]][["curve"]]
 ```
 
-### New breast primary by HER2
+### New primary breast cancer with HER2 marker values
+
 ```{r}
-knitr::kable(out.i.NP[[3]])
-plot(out.i.plot.NP[[3]], 
-     color = 1:4, 
-     xlab = "Days",
-     main = "Cumulative incidence curve of NP by HER2",
-     cex.main = 0.8)
+knitr::kable(out.i.NP[[3]][["est.timepoint"]])
+cat("\n")
+out.i.NP[[3]][["curve"]]
 ```
 
-## Session info
+# Session info
+
 ```{r}
 sessionInfo()
 ```
 
 
+```{r analysis_plan_future, include=FALSE}
+##################################################################
+##                     Future analysis plan                     ##
+##################################################################
+## Design the R- and Python-based machine learning pipeline that predicts the 5-year recurrence and new cancer in TNBC patients using the 604 observations of this TNBC project
+```
+
+
+```{r data_preprocess}
+library(tidyverse)
+dat_py <- dget("../data/derived/2022Dec21_dat3.Rdata")
+vars_all <- c(
+  ###  Demographical variables   
+  "Age.at.Diagnosis",  "Race.Ethnicity2",
+  
+  ###  Disease history variables  
+  "Clinical.T.Stage2", "Clinical.N.Stage2", 
+  "Past.Ipsilateral.Br.CA", "Past.Contralateral.Br.CA",
+  "Needle.biopsy.proven.nodal.metastases.at.Dx",
+  "Histology", "Any.high.grade.Disease", "Any.LVI", "Ki67",
+
+  ###  Screening/diagnosis/treatment variables
+  "Mammo.Screen.Detected", "Mammo.Occult", "MRI.Screen.Detected", 
+  "First.Treatment.Modality", "Any.Attempt.at.Lumpectomy", "Mastectomy.Surgery",
+  "CPM", "Any.SLN.Biopsy", "ALND", "Neoadjuvant.Chemotherapy",
+  
+  ###  Outcome variables
+  "NP5y", "DR5y", "LR5y" # Survival event
+)
+dat_py <- dat_py[names(dat_py) %in% vars_all]
+
+# Convert all character columns into factor columns
+dat_py <- dat_py %>% 
+  mutate_if(is.character, as.factor)
+
+# str(dat_py)
+```
+
+
+```{r attach_reticulate}
+library(reticulate)
+# py_config() 
+use_python("/Users/anniliu/mambaforge/bin/python")
+# use_condaenv(condaenv = "base", conda = "auto", required = NULL)
+# quit # quit the Python interface in RMarkdown
+```
+
+
+```{r open_iTerm2}
+# conda activate base
+# conda list
+# conda install scikit-learn
+```
+
+
+```{python}
+# Import necessary libraries
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+import pandas as pd
+```
+
+
+```{python}
+# Load the data
+dat = pd.DataFrame(r.dat_py)
+
+# Split the data into features and target
+X = dat.drop(['LR5y', 'DR5y', 'NP5y'], axis=1)
+y = dat['LR5y']
+
+# Split the data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=999)
+
+# Train the model
+model = RandomForestClassifier()
+model.fit(X_train, y_train)
+
+# Make predictions on the test set
+predictions = model.predict(X_test)
+
+# Evaluate the model's performance
+accuracy = model.score(X_test, y_test)
+print('Accuracy:', accuracy)
+```
