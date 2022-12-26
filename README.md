@@ -17,5 +17,5 @@ This is a list of my coding work affiliated with multiple collaborative and indi
 
 - **Statistical analysis for breast cancer surgery clinical data (use R and Python)**
   - [MDCAsian.Rmd](MDCAsian.Rmd)
-  - [TNBC.Rmd](TNBC.Rmd)
+  - [TNBC.Rmd](TNBC.Rmd): The goal of this project is to 
   - [Micromets.Rmd](Micromets.Rmd)
