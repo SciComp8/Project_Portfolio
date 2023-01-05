@@ -18,7 +18,8 @@ Here is a summary of my coding work affiliated with multiple collaborative and i
   - [LipidomicTranscriptomic.Rmd](LipidomicTranscriptomic.Rmd)
 
 ## **Statistical analysis for breast cancer surgery clinical data (use R and Python)**
-  - The TNBC project aims to evaluate the incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. 
+  - The TNBC project aims to evaluate the incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. The association between a categorical variable and a grouping variable (e.g., Race.Ethnicity) is examined using the Fisher’s exact test. Difference in the value of a continuous variable among patients of different groups is examined using the Wilcoxon rank sum test. The difference in the proportion of missingness across different groups is also examined. The incidence rates of local recurrence and new primary breast cancer are estimated in 1, 2, 3, 5, 10 years, separately, using the Kaplan-Meier approach. The cumulative incidence rates of local recurrence and new primary breast cancer with ER, PR, HER2 marker values are estimated in 1, 2, 3, 5, 10 years, separately, using the cumulative incidence function which considers the competing risk between the positive marker and the negative marker (e.g., ER positive vs ER negative).
+
     - [TNBC.Rmd](TNBC.Rmd)
   - [MDCAsian.Rmd](MDCAsian.Rmd)
   - [Micromets.Rmd](Micromets.Rmd)
