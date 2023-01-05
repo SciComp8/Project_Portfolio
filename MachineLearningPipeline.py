@@ -13,12 +13,13 @@ df.select = df[['Age.at.Diagnosis',
 df.select = df.select.dropna()
 dat = pd.DataFrame(df.select)
 
+### Local recurrence
 # Split the data into features and target
-X = dat.drop(['LR5y', 'DR5y', 'NP5y'], axis=1)
-y = dat['LR5y']
+X.LR = dat.drop(['LR5y', 'DR5y', 'NP5y'], axis=1)
+y.LR = dat['LR5y']
 
 # Split the data into training and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=999)
+X_train, X_test, y_train, y_test = train_test_split(X.LR, y.LR, test_size=0.2, random_state=999)
 
 # Train the model
 model = RandomForestClassifier()
@@ -31,4 +32,21 @@ predictions = model.predict(X_test)
 accuracy = model.score(X_test, y_test)
 print('Accuracy:', accuracy)
 
-# Accuracy: 0.9032258064516129
+### New primary breast cancer
+# Split the data into features and target
+X.NP = dat.drop(['LR5y', 'DR5y', 'NP5y'], axis=1)
+y.NP = dat['NP5y']
+
+# Split the data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X.NP, y.NP, test_size=0.2, random_state=999)
+
+# Train the model
+model = RandomForestClassifier()
+model.fit(X_train, y_train)
+
+# Make predictions on the test set
+predictions = model.predict(X_test)
+
+# Evaluate the model's performance
+accuracy = model.score(X_test, y_test)
+print('Accuracy:', accuracy)
