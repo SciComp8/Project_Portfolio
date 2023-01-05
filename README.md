@@ -1,6 +1,6 @@
 # Research project-oriented analytical programming
 
-Here lists my coding work affiliated with multifaceted collaborative and individual research projects spanning from statistical genomics to clinical research.
+Here lists my coding work affiliated with multifaceted collaborative and individual research projects spanning from statistical omics to clinical research.
 
 
 ## **Bayesian model averaging for bulk RNA-Seq data (use R)**
