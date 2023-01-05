@@ -18,6 +18,7 @@ Here is a summary of my coding work affiliated with multiple collaborative and i
   - [LipidomicTranscriptomic.Rmd](LipidomicTranscriptomic.Rmd)
 
 ## **Statistical analysis for breast cancer surgery clinical data (use R and Python)**
-  - [TNBC.Rmd](TNBC.Rmd): This project aims to evaluate the cumulative incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. 
+  - The TNBC project aims to evaluate the cumulative incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. 
+    - [TNBC.Rmd](TNBC.Rmd)
   - [MDCAsian.Rmd](MDCAsian.Rmd)
   - [Micromets.Rmd](Micromets.Rmd)
