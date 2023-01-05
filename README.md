@@ -21,6 +21,6 @@ Here is a summary of my coding work affiliated with multiple collaborative and i
   - The TNBC project aims to evaluate the incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. The incidence rates of local recurrence and new primary breast cancer are estimated in 1, 2, 3, 5, 10 years, separately, using the Kaplan-Meier approach. The cumulative incidence rates of local recurrence and new primary breast cancer with ER, PR, HER2 marker values are estimated in 1, 2, 3, 5, 10 years, separately, using the cumulative incidence function which considers the competing risk between the positive marker and the negative marker (e.g., ER positive vs ER negative).
 
     - [TNBC.Rmd](TNBC.Rmd)
-    - [MachineLearningPipeline.Rmd](MachineLearningPipeline.Rmd)
+    - [MachineLearningPipeline.py](MachineLearningPipeline.py)
   - [MDCAsian.Rmd](MDCAsian.Rmd)
   - [Micromets.Rmd](Micromets.Rmd)
