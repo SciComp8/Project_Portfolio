@@ -8,6 +8,7 @@ Here lists my coding work affiliated with multifaceted collaborative and individ
 
     - [UniBMA_voom_limma_edgeR_DESeq2.Rmd](UniBMA_voom_limma_edgeR_DESeq2.Rmd)
     - [MultiBMA_voom_limma_edgeR_DESeq2.Rmd](MultiBMA_voom_limma_edgeR_DESeq2.Rmd)
+    - [Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd](Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd)
   
 ## **Differential expression analysis pipeline for single cell data (use Python-based snakefile and R)**
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
