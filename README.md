@@ -24,5 +24,6 @@ The goal of this project is to evaluate the performance  of our novel BMAseq and
 
     - [TNBC.Rmd](TNBC.Rmd)
     - [MachineLearningPipeline.py](MachineLearningPipeline.py)
-  - [MDCAsian.Rmd](MDCAsian.Rmd)
+  - In the MDC Asian project, the breast cancer patterns such as frequency of screen-detected disease and clinical T and N stages are evaluated using the aggregated and disaggregated racial/ethnic and community demographic data at two hospitals.
+    - [MDCAsian.Rmd](MDCAsian.Rmd)
   - [Micromets.Rmd](Micromets.Rmd)
