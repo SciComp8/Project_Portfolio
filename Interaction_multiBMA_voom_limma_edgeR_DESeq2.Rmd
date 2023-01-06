@@ -1,0 +1,840 @@
+---
+title: "Evaluate performance of multivariate BMAseq, voom, limma, edgeR, and DESeq2 with interaction terms on inferring differentially expressed genes"
+author: "Anni Liu"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+
+### Save and load images
+```{r saveimage, eval=FALSE}
+image.date <- format(Sys.Date(), "%Y%b%d")
+save.image(file = paste0("../ApplicationData/derived/", image.date, "_image_RData"))
+```
+
+```{r loadimage}
+load("../ApplicationData/derived/2023Jan05_image_RData")
+```
+
+
+## Load original data
+```{r}
+# Attach the package
+suppressPackageStartupMessages(easypackages::libraries("BMAseq", "limma", "qvalue", "parallel", "ggVennDiagram", "gridExtra", "tidyverse", "edgeR", "DESeq2", "microbenchmark"))
+
+dat.expr <- dget("../ApplicationData/derived/dat.expr.Subcutaneous") 
+dat.pheno <- dget("../ApplicationData/derived/dat.pheno.Subcutaneous") 
+
+dim(dat.expr) # 24660 genes and 404 subjects
+dim(dat.pheno) # 404 subjects and 13 phenotypes
+
+dat.pheno[1:5, ]
+dat.expr[1:5, 1:5]
+```
+
+```{r filter}
+# Pre-filter the genes
+# Here we perform the median absolute deviation with the threshold of 0.8 to select genes that are most likely to distinguish the samples
+dat.expr.new <- dat.expr[apply(dat.expr, 1, function(x) mad(x) > 0.8), ] # We have 24455 genes
+```
+
+
+## Random data segmentation
+```{r random.divide}
+# Randomly divide the datasets into 50% training and 50% test sets
+# Check the distribution of binary phenotypes
+sapply(names(dat.pheno), function(x) with(dat.pheno, table(get(x))) )  
+
+set.seed(190987)
+test.ind <- sample(1:nrow(dat.pheno), ceiling(0.5*nrow(dat.pheno)))
+dat.pheno.train <- dat.pheno[-test.ind, ]
+dat.pheno.test <- dat.pheno[test.ind, ]
+sapply(names(dat.pheno.train), function(x) with(dat.pheno.train, table(get(x))) )
+sapply(names(dat.pheno.test), function(x) with(dat.pheno.test, table(get(x))) )  
+
+dat.expr.train <- dat.expr.new[, rownames(dat.pheno.train)]
+dat.expr.test <- dat.expr.new[, rownames(dat.pheno.test)]
+```
+
+
+### multiBMAseq + interaction
+```{r recap}
+### indicator.eFDR.Main
+cat("Training set\n")
+dim(output.multi.int2.train$indicator.eFDR.Main)
+output.multi.int2.train$indicator.eFDR.Main[1:5, ] 
+cat("\nTest set\n")
+dim(output.multi.int2.test$indicator.eFDR.Main)
+output.multi.int2.test$indicator.eFDR.Main[1:5, ]
+
+### indicator.eFDR.Interaction
+cat("Training set\n")
+dim(output.multi.int2.train$indicator.eFDR.Interaction)
+output.multi.int2.train$indicator.eFDR.Interaction[1:5, ]
+cat("\nTest set\n")
+dim(output.multi.int2.test$indicator.eFDR.Interaction)
+output.multi.int2.test$indicator.eFDR.Interaction[1:5, ]
+
+### model space
+# output.multi.int1.train <- BMAseq.multi.postprob(dat.expr.counts = dat.expr.train, 
+#                                                  dat.pheno = dat.pheno.train, 
+#                                                  var.pool = vars.pool, 
+#                                                  max.nvar = 5, 
+#                                                  interaction = "BMI&SEX", 
+#                                                  cut.BF = 1)
+output.multi.int1.train[["model.space"]]
+#  [1] "~1"                                                   
+#  [2] "~1+BMI"                                               
+#  [3] "~1+AGE"                                               
+#  [4] "~1+SEX"                                               
+#  [5] "~1+MHABNWBC"                                          
+#  [6] "~1+BMI+AGE"                                           
+#  [7] "~1+BMI+SEX"                                           
+#  [8] "~1+BMI+MHABNWBC"                                      
+#  [9] "~1+AGE+SEX"                                           
+# [10] "~1+AGE+MHABNWBC"                                      
+# [11] "~1+SEX+MHABNWBC"                                      
+# [12] "~1+BMI+AGE+SEX"                                       
+# [13] "~1+BMI+AGE+MHABNWBC"                                  
+# [14] "~1+BMI+SEX+MHABNWBC"                                  
+# [15] "~1+AGE+SEX+MHABNWBC"                                  
+# [16] "~1+BMI+AGE+SEX+MHABNWBC"                              
+# [17] "~1+BMIlow.SEXfemale"                                  
+# [18] "~1+BMIlow.SEXmale"                                    
+# [19] "~1+BMIhigh.SEXfemale"                                 
+# [20] "~1+BMIhigh.SEXmale"                                   
+# [21] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale"                  
+# [22] "~1+BMI+BMIlow.SEXmale"                                
+# [23] "~1+SEX+BMIhigh.SEXfemale"                             
+# [24] "~1+BMI+BMIhigh.SEXmale"                               
+# [25] "~1+SEX+BMIhigh.SEXmale"                               
+# [26] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXfemale"
+# [27] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXmale"  
+# [28] "~1+BMI+SEX+BMIhigh.SEXmale"    
+```
+
+
+```{r DEG.compare.within.MultiIntBMAseq.noTMM}
+### Main
+multiIntBMAseq.DEG.ENSG.train.Main <- mclapply(
+  1:4,
+  function(i) names(which(output.multi.int2.train$indicator.eFDR.Main[, i] == 1)),
+  mc.cores = 4L)
+# which(output.multi.int2.train$indicator.eFDR.Main[, i] == 1) returns the target vector of indices named with the ENSG IDs
+
+multiIntBMAseq.DEG.ENSG.test.Main <- mclapply(
+  1:4,
+  function(i) names(which(output.multi.int2.test$indicator.eFDR.Main[, i] == 1)),
+  mc.cores = 4L)
+
+# Display the common DEGs associated with the main effect of each variable between the training set and testing set identified by multivariate BMAseq with interaction
+plot.array <- mclapply(1:4,
+                       function(x) {ggVennDiagram(list(Train = multiIntBMAseq.DEG.ENSG.train.Main[[x]], 
+                                                       Test = multiIntBMAseq.DEG.ENSG.test.Main[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool[x])},
+              mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 4)))
+
+multiIntBMAseq.DEG.ENSG.train.Main <- mclapply(
+  1:4,
+  function(i) names(which(output.multi.int2.train$indicator.eFDR.Main[, i] == 1)),
+  mc.cores = 4L)
+
+
+### Interaction
+multiIntBMAseq.DEG.ENSG.train.Interaction <- mclapply(
+  1:4,
+  function(i) names(which(output.multi.int2.train$indicator.eFDR.Interaction[, i] == 1)),
+  mc.cores = 4L)
+
+multiIntBMAseq.DEG.ENSG.test.Interaction <- mclapply(
+  1:4,
+  function(i) names(which(output.multi.int2.test$indicator.eFDR.Interaction[, i] == 1)),
+  mc.cores = 4L)
+
+# Display the common DEGs associated with the interaction effect of each variable between the training set and testing set identified by multivariate BMAseq with interaction
+plot.array <- mclapply(1:4,
+                       function(x) {ggVennDiagram(list(Train = multiIntBMAseq.DEG.ENSG.train.Interaction[[x]], 
+                                                       Test = multiIntBMAseq.DEG.ENSG.test.Interaction[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool[x])},
+              mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 4)))
+```
+
+
+### First step
+```{r interaction.BMAseq}
+interaction <- "BMI&SEX" 
+
+t0 <- Sys.time()
+output.multi.int1.train <- BMAseq.multi.postprob(dat.expr.counts = dat.expr.train, 
+                                                 dat.pheno = dat.pheno.train, 
+                                                 var.pool = vars.pool, 
+                                                 max.nvar = 5, 
+                                                 interaction = "BMI&SEX", 
+                                                 cut.BF = 1)
+t1 <- Sys.time()
+t1 - t0
+# Time difference of 9.51796 mins
+
+# [1] "1. ~1"
+# [1] "2. ~1+BMI"
+# [1] "3. ~1+AGE"
+# [1] "4. ~1+SEX"
+# [1] "5. ~1+MHABNWBC"
+# [1] "6. ~1+BMI+AGE"
+# [1] "7. ~1+BMI+SEX"
+# [1] "8. ~1+BMI+MHABNWBC"
+# [1] "9. ~1+AGE+SEX"
+# [1] "10. ~1+AGE+MHABNWBC"
+# [1] "11. ~1+SEX+MHABNWBC"
+# [1] "12. ~1+BMI+AGE+SEX"
+# [1] "13. ~1+BMI+AGE+MHABNWBC"
+# [1] "14. ~1+BMI+SEX+MHABNWBC"
+# [1] "15. ~1+AGE+SEX+MHABNWBC"
+# [1] "16. ~1+BMI+AGE+SEX+MHABNWBC"
+# [1] "17. ~1+BMIlow.SEXfemale"
+# [1] "18. ~1+BMIlow.SEXmale"
+# [1] "19. ~1+BMIhigh.SEXfemale"
+# [1] "20. ~1+BMIhigh.SEXmale"
+# [1] "21. ~1+BMIlow.SEXfemale.BMIhigh.SEXmale"
+# [1] "22. ~1+BMI+BMIlow.SEXmale"
+# [1] "23. ~1+SEX+BMIhigh.SEXfemale"
+# [1] "24. ~1+BMI+BMIhigh.SEXmale"
+# [1] "25. ~1+SEX+BMIhigh.SEXmale"
+# [1] "26. ~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXfemale"
+# [1] "27. ~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXmale"
+# [1] "28. ~1+BMI+SEX+BMIhigh.SEXmale"
+
+output.multi.int1.test <- BMAseq.multi.postprob(dat.expr.counts = dat.expr.test, 
+                                                dat.pheno = dat.pheno.test, 
+                                                var.pool = vars.pool, 
+                                                max.nvar = 5, 
+                                                interaction = "BMI&SEX", 
+                                                cut.BF = 1)
+```
+
+
+### Second step
+```{r second.step}
+output.multi.int2.train <- BMAseq.multi.DEG(
+  dat.pheno = output.multi.int1.train$dat.pheno.new,
+  model.space = output.multi.int1.train$model.space, 
+  post.modelprob = output.multi.int1.train$post.modelprob, 
+  var.pool = var.pool,
+  interact = T, 
+  cut.FDR = 0.05)
+
+output.multi.int2.test <- BMAseq.multi.DEG(
+  dat.pheno = output.multi.int1.test$dat.pheno.new,
+  model.space = output.multi.int1.test$model.space, 
+  post.modelprob = output.multi.int1.test$post.modelprob, 
+  var.pool = var.pool,
+  interact = T, 
+  cut.FDR = 0.05)
+```
+
+```{r post.incl.modelprob.Main}
+dim(output.multi.int2.train$post.incl.modelprob.Main)
+output.multi.int2.train$post.incl.modelprob.Main[1:5, ]
+
+dim(output.multi.int2.test$post.incl.modelprob.Main)
+output.multi.int2.test$post.incl.modelprob.Main[1:5, ] 
+```
+
+```{r post.incl.modelprob.Interaction}
+dim(output.multi.int2.train$post.incl.modelprob.Interaction)
+output.multi.int2.train$post.incl.modelprob.Interaction[1:5, ] # ALiu: do not quite understand the column name meaning
+
+dim(output.multi.int2.test$post.incl.modelprob.Interaction)
+output.multi.int2.test$post.incl.modelprob.Interaction[1:5, ]
+```
+
+```{r post.incl.modelprob.MainInteraction}
+dim(output.multi.int2.train$post.incl.modelprob.MainInteraction)
+output.multi.int2.train$post.incl.modelprob.MainInteraction[1:5, ]
+
+dim(output.multi.int2.test$post.incl.modelprob.MainInteraction)
+output.multi.int2.test$post.incl.modelprob.MainInteraction[1:5, ]
+```
+
+```{r eFDR.Main}
+dim(output.multi.int2.train$eFDR.Main)
+output.multi.int2.train$eFDR.Main[1:5, ]
+
+dim(output.multi.int2.test$eFDR.Main)
+output.multi.int2.test$eFDR.Main[1:5, ]
+```
+
+```{r eFDR.Interaction}
+dim(output.multi.int2.train$eFDR.Interaction)
+output.multi.int2.train$eFDR.Interaction[1:5, ] # ALiu: do not quite understand the column name meaning
+
+dim(output.multi.int2.test$eFDR.Interaction)
+output.multi.int2.test$eFDR.Interaction[1:5, ]
+```
+
+```{r eFDR.MainInteraction}
+dim(output.multi.int2.train$eFDR.MainInteraction)
+output.multi.int2.train$eFDR.MainInteraction[1:5, ]
+
+dim(output.multi.int2.test$eFDR.MainInteraction)
+output.multi.int2.test$eFDR.MainInteraction[1:5, ]
+```
+
+```{r indicator.eFDR.Main}
+dim(output.multi.int2.train$indicator.eFDR.Main)
+output.multi.int2.train$indicator.eFDR.Main[1:5, ] # Map to output.multi.int2.train$eFDR.Main[1:5, ]; eFDR.Main < 0.05 -> indicator: 1
+
+dim(output.multi.int2.test$indicator.eFDR.Main)
+output.multi.int2.test$indicator.eFDR.Main[1:5, ]
+
+# Number of DE genes associated with the main effect of BMI in the training set
+# sum(output.multi.int2.train$indicator.eFDR.Main[, 1] == 1)
+# [1] 1491
+# Number of DE genes associated with the main effect of BMI in the test set
+# sum(output.multi.int2.test$indicator.eFDR.Main[, 1] == 1)
+# [1] 40
+```
+
+```{r indicator.eFDR.Interaction}
+dim(output.multi.int2.train$indicator.eFDR.Interaction)
+output.multi.int2.train$indicator.eFDR.Interaction[1:5, ]
+
+dim(output.multi.int2.test$indicator.eFDR.Interaction)
+output.multi.int2.test$indicator.eFDR.Interaction[1:5, ]
+
+# Number of DE genes associated with the interaction effect of BMI in the training set
+# sum(output.multi.int2.train$indicator.eFDR.Interaction[, 1] == 1)
+# [1] 36
+# Number of DE genes associated with the main effect of BMI in the test set
+# sum(output.multi.int2.test$indicator.eFDR.Interaction[, 1] == 1)
+# [1] 296
+```
+
+```{r summary.nDEG.multi.interaction}
+cat("Training set")
+cat("\n")
+output.multi.int2.train$summary.nDEG
+cat("\n")
+cat("Test set")
+cat("\n")
+output.multi.int2.test$summary.nDEG
+```
+
+```{r DEG.bestmodel.Main}
+# Output the first five DE genes associated with the main effect of BMI and the best model used to identify each DE gene
+cat("Training set")
+cat("\n")
+output.multi.int2.train$DEG.bestmodel.Main$BMI[1:5, ]
+cat("\n")
+cat("Test set")
+cat("\n")
+output.multi.int2.test$DEG.bestmodel.Main$BMI[1:5, ]
+```
+
+```{r DEG.bestmodel.Interaction}
+# Output the first five DE genes associated with the interaction effect of BMI and the best model used to identify each DE gene
+cat("Training set")
+cat("\n")
+output.multi.int2.train$DEG.bestmodel.Interaction$BMI[1:5, ]
+cat("\n")
+cat("Test set")
+cat("\n")
+output.multi.int2.test$DEG.bestmodel.Interaction$BMI[1:5, ]
+```
+
+```{r DEG.bestmodel.MainInteraction}
+# Output the first five DE genes associated with the main or interaction effect of BMI and the best model used to identify each DE gene
+cat("Training set")
+cat("\n")
+output.multi.int2.train$DEG.bestmodel.MainInteraction$BMI[1:5, ]
+cat("\n")
+cat("Test set")
+cat("\n")
+output.multi.int2.test$DEG.bestmodel.MainInteraction$BMI[1:5, ]
+```
+
+```{r bestmodel.DEG.Main}
+cat("Training set")
+cat("\n")
+lapply(output.multi.int2.train$bestmodel.DEG.Main$BMI, head) # Scan the first six DE genes of each best model associated with BMI
+cat("\n")
+cat("Test set")
+cat("\n")
+lapply(output.multi.int2.test$bestmodel.DEG.Main$BMI, head)
+```
+
+```{r bestmodel.DEG.Interaction}
+cat("Training set")
+cat("\n")
+lapply(output.multi.int2.train$bestmodel.DEG.Interaction$BMI, head) # Scan the first six DE genes of each best model associated with BMI
+cat("\n")
+cat("Test set")
+cat("\n")
+lapply(output.multi.int2.test$bestmodel.DEG.Interaction$BMI, head)
+```
+
+```{r bestmodel.DEG.MainInteraction}
+cat("Training set")
+cat("\n")
+lapply(output.multi.int2.train$bestmodel.DEG.MainInteraction$BMI, head) # Scan the first six DE genes of each best model associated with BMI
+cat("\n")
+cat("Test set")
+cat("\n")
+lapply(output.multi.int2.test$bestmodel.DEG.MainInteraction$BMI, head)
+```
+
+
+### Comparison
+#### multiBMAseq + interaction + TMM
+```{r DEG.compare.within.MultiIntBMAseq.TMM}
+# Which functions derive the following two results?
+# 1. output.multi.int2.train$indicator.eFDR.Main[1:5, ] 
+# 2. output.multi.int2.train$indicator.eFDR.Interaction[1:5, ]
+
+# The functions BMAseq.multi.postprob() and BMAseq.multi.DEG()
+
+# output.multi.int1.train <- BMAseq.multi.postprob(dat.expr.counts = dat.expr.train, 
+#                                                  dat.pheno = dat.pheno.train, 
+#                                                  var.pool = vars.pool, 
+#                                                  max.nvar = 5, 
+#                                                  interaction = "BMI&SEX", 
+#                                                  cut.BF = 1)
+# output.multi.int2.train <- BMAseq.multi.DEG(
+#   dat.pheno = output.multi.int1.train$dat.pheno.new,
+#   model.space = output.multi.int1.train$model.space, 
+#   post.modelprob = output.multi.int1.train$post.modelprob, 
+#   var.pool = var.pool,
+#   interact = T, 
+#   cut.FDR = 0.05)
+
+source("./2022Dec8Version_ALiu/R/BMAseq.multi.postprob.norm.R")
+source("./2022Dec8Version_ALiu/R/Bayesfactor.R")
+t0 <- get_nanotime()
+output.multi.int1.train <- BMAseq.multi.postprob.norm(
+  dat.expr.counts = dat.expr.train,  
+  dat.pheno = dat.pheno.train, 
+  var.pool = vars.pool, 
+  max.nvar = 5, 
+  interaction = "BMI&SEX", 
+  cut.BF = 1)
+output.multi.int2.train <- BMAseq.multi.DEG(
+  dat.pheno = output.multi.int1.train$dat.pheno.new, 
+  model.space = output.multi.int1.train$model.space, 
+  post.modelprob = output.multi.int1.train$post.modelprob, 
+  var.pool = var.pool, 
+  interact = T, 
+  cut.FDR = 0.05)
+t1 <- get_nanotime()
+t1 - t0
+```
+
+
+#### voom + limma + interaction
+```{r DEG.compare.within.MultiIntvoom_limma.noTMM}
+# Set the model design matrix for the training and testing sets, respectively
+design.train <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.train)
+design.test <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.test)
+
+# Estimate the voom weights
+voom.train <- voom(dat.expr.train,
+                   design = design.train,
+                   lib.size = colSums(dat.expr.train))
+
+# Fit the linear model with the voom weights
+voom.fit.train <- lmFit(voom.train[["E"]],
+                        design = design.train,
+                        weights = voom.train[["weights"]])
+
+# Estimate the FDR for each variable of interest
+eFDR.train <- mclapply(1:5L, # BMIhigh; AGEold; SEXmale; MHABNWBCyes; BMIhigh:SEXmale
+                       function(i) {
+                         t <- voom.fit.train[["coefficients"]][, i+1]/voom.fit.train[["stdev.unscaled"]][, i+1]/voom.fit.train[["sigma"]] # 1: intercept
+                         p <- 2*pt(-abs(t), df = voom.fit.train[["df.residual"]])
+                         return(qvalue(p)) },
+                       mc.cores = 4L)
+
+# Output the Ensembl gene IDs of DEGs for each variable of interest
+voom.DEG.train <- mclapply(1:5L,
+                           function(i) rownames(dat.expr.train)[ eFDR.train[[i]][["qvalues"]] < 0.05 ],
+                           mc.cores = 4L)
+
+# Name elements using the corresponding variable of interest for all list objects of model design, voom weight, model fit, eFDR, and DEG ID
+vars.pool.new <- c(vars.pool, "BMIxSEX")
+names(eFDR.train) = names(voom.DEG.train) = vars.pool.new
+
+# Repeat the above steps for the testing data
+voom.test <- voom(dat.expr.test,
+                  design = design.test,
+                  lib.size = colSums(dat.expr.test))
+
+voom.fit.test <- lmFit(voom.test[["E"]],
+                       design = design.test,
+                       weights = voom.test[["weights"]])
+
+eFDR.test <- mclapply(1:5L,
+                      function(i) {
+                        t <- voom.fit.test[["coefficients"]][, i+1]/voom.fit.test[["stdev.unscaled"]][, i+1]/voom.fit.test[["sigma"]] # 1: intercept
+                        p <- 2*pt(-abs(t), df = voom.fit.test[["df.residual"]])
+                        return(qvalue(p)) },
+                      mc.cores = 4L)
+
+voom.DEG.test <- mclapply(1:5L,
+                          function(i) rownames(dat.expr.test)[ eFDR.test[[i]][["qvalues"]] < 0.05 ],
+                          mc.cores = 4L)
+
+names(eFDR.test) = names(voom.DEG.test) = vars.pool.new
+
+# Display the common DEGs between the training set and testing set identified by multivariate limma with interaction using voom weights
+plot.array <- mclapply(1:5L,
+                       function(x) {ggVennDiagram(list(Train = voom.DEG.train[[x]], Test = voom.DEG.test[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool.new[x]) },
+                       mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+```
+
+
+#### voom + limma + interaction + TMM
+```{r DEG.compare.within.MultiIntvoom_limma.TMM}
+# Set the model design matrix for the training and testing sets, respectively
+design.train <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.train)
+design.test <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.test)
+
+# Estimate the voom weights
+voom.train <- voom(counts = dat.expr.train,
+                   design = design.train,
+                   lib.size = colSums(dat.expr.train)*calcNormFactors(dat.expr.train, lib.size = colSums(dat.expr.train))) # Use TMM normalization factor to transform the original library size into the effective library size
+
+# Fit the linear model with the voom weights
+voom.fit.train <- lmFit(voom.train[["E"]],
+                        design = design.train,
+                        weights = voom.train[["weights"]])
+
+# Estimate the FDR for each variable of interest
+eFDR.train <- mclapply(1:5L, # BMIhigh; AGEold; SEXmale; MHABNWBCyes; BMIhigh:SEXmale
+                       function(i) {
+                         t <- voom.fit.train[["coefficients"]][, i+1]/voom.fit.train[["stdev.unscaled"]][, i+1]/voom.fit.train[["sigma"]] # 1: intercept
+                         p <- 2*pt(-abs(t), df = voom.fit.train[["df.residual"]])
+                         return(qvalue(p)) },
+                       mc.cores = 4L)
+
+# Output the Ensembl gene IDs of DEGs for each variable of interest
+voom.DEG.train <- mclapply(1:5L,
+                           function(i) rownames(dat.expr.train)[ eFDR.train[[i]][["qvalues"]] < 0.05 ],
+                           mc.cores = 4L)
+
+# Name elements using the corresponding variable of interest for all list objects of model design, voom weight, model fit, eFDR, and DEG ID
+vars.pool.new <- c(vars.pool, "BMIxSEX")
+names(eFDR.train) = names(voom.DEG.train) = vars.pool.new
+
+# Repeat the above steps for the testing data
+voom.test <- voom(counts = dat.expr.test,
+                  design = design.test,
+                  lib.size = colSums(dat.expr.test)*calcNormFactors(dat.expr.test, lib.size = colSums(dat.expr.test))) 
+
+voom.fit.test <- lmFit(voom.test[["E"]],
+                       design = design.test,
+                       weights = voom.test[["weights"]])
+
+eFDR.test <- mclapply(1:5L,
+                      function(i) {
+                        t <- voom.fit.test[["coefficients"]][, i+1]/voom.fit.test[["stdev.unscaled"]][, i+1]/voom.fit.test[["sigma"]] # 1: intercept
+                        p <- 2*pt(-abs(t), df = voom.fit.test[["df.residual"]])
+                        return(qvalue(p)) },
+                      mc.cores = 4L)
+
+voom.DEG.test <- mclapply(1:5L,
+                          function(i) rownames(dat.expr.test)[ eFDR.test[[i]][["qvalues"]] < 0.05 ],
+                          mc.cores = 4L)
+
+names(eFDR.test) = names(voom.DEG.test) = vars.pool.new
+
+# Display the common DEGs between the training set and testing set identified by multivariate limma with interaction using voom weights
+plot.array <- mclapply(1:5,
+                       function(x) {ggVennDiagram(list(Train = voom.DEG.train[[x]], Test = voom.DEG.test[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool.new[x]) },
+                       mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+```
+
+
+#### edgeR + interaction
+```{r DEG.compare.within.MultiIntedgeR.noTMM}
+# Create the DGEList data class and then estimate the trended dispersions
+t0 <- Sys.time()
+y.train <- DGEList(counts = dat.expr.train, 
+                   lib.size = colSums(dat.expr.train)) %>% 
+             estimateGLMTrendedDisp(design.train)
+
+# Estimate the quasi-likelihood (QL) dispersion
+fit.train <- glmQLFit(y.train, design.train)
+
+# Perform the hypothesis testing of QL dispersion
+qlf.train <- mclapply(1:5L,
+                      function(i) glmQLFTest(fit.train, coef = i + 1), # coef: integer or character index vector indicating which coefficients of the linear model are to be tested equal to zero.
+                      mc.cores = 4L)
+t1 <- Sys.time()
+t1 - t0
+
+# Estimate the FDR for each variable of interest
+eFDR.train <- mclapply(1:5L,
+                       function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
+                         qvalue(),
+                       mc.cores = 4L)
+
+# Output the Ensembl gene IDs of DEGs for each variable of interest
+edgeR.DEG.train <- mclapply(1:5L,
+                            function(i) rownames(dat.expr.train)[ eFDR.train[[i]][["qvalues"]] < 0.05 ],
+                            mc.cores = 4L)
+
+names(qlf.train) = names(eFDR.train) = names(edgeR.DEG.train) = vars.pool.new
+
+# Repeat the above steps for the testing data
+y.test <- DGEList(counts = dat.expr.test, 
+                  lib.size = colSums(dat.expr.test)) %>% 
+            estimateGLMTrendedDisp(design.test)
+
+fit.test <- glmQLFit(y.test, design.test)
+
+qlf.test <- mclapply(1:5L,
+                     function(i) glmQLFTest(fit.test, coef = i + 1),
+                     mc.cores = 4L)
+
+eFDR.test <- mclapply(1:5L,
+                      function(i) qlf.test[[i]][["table"]][["PValue"]] %>% qvalue(),
+                      mc.cores = 4L)
+
+edgeR.DEG.test <- mclapply(1:5L,
+                           function(i) rownames(dat.expr.test)[ eFDR.test[[i]][["qvalues"]] < 0.05 ],
+                           mc.cores = 4L)
+
+names(qlf.test) = names(eFDR.test) = names(edgeR.DEG.test) = vars.pool.new
+
+# Display the common DEGs between the training set and testing set identified by univariate edgeR
+plot.array <- mclapply(1:5L,
+                       function(x) {ggVennDiagram(list(Train = edgeR.DEG.train[[x]], Test = edgeR.DEG.test[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool.new[x]) },
+                       mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+```
+
+
+#### edgeR + interaction + TMM
+```{r DEG.compare.within.MultiIntedgeR.TMM}
+# Create the DGEList data class and then estimate the trended dispersions
+t0 <- Sys.time()
+y.train <- DGEList(counts = dat.expr.train, 
+                   lib.size = colSums(dat.expr.train)) %>% 
+             calcNormFactors() %>% 
+             estimateGLMTrendedDisp(design.train)
+
+# Estimate the quasi-likelihood (QL) dispersion
+fit.train <- glmQLFit(y.train, design.train)
+
+# Perform the hypothesis testing of QL dispersion
+qlf.train <- mclapply(1:5L,
+                      function(i) glmQLFTest(fit.train, coef = i + 1), # coef: integer or character index vector indicating which coefficients of the linear model are to be tested equal to zero.
+                      mc.cores = 4L)
+t1 <- Sys.time()
+t1 - t0
+
+# Estimate the FDR for each variable of interest
+eFDR.train <- mclapply(1:5L,
+                       function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
+                         qvalue(),
+                       mc.cores = 4L)
+
+# Output the Ensembl gene IDs of DEGs for each variable of interest
+edgeR.DEG.train <- mclapply(1:5L,
+                            function(i) rownames(dat.expr.train)[ eFDR.train[[i]][["qvalues"]] < 0.05 ],
+                            mc.cores = 4L)
+
+names(qlf.train) = names(eFDR.train) = names(edgeR.DEG.train) = vars.pool.new
+
+# Repeat the above steps for the testing data
+y.test <- DGEList(counts = dat.expr.test, 
+                  lib.size = colSums(dat.expr.test)) %>% 
+            calcNormFactors() %>% 
+            estimateGLMTrendedDisp(design.test)
+
+fit.test <- glmQLFit(y.test, design.test)
+
+qlf.test <- mclapply(1:5L,
+                     function(i) glmQLFTest(fit.test, coef = i + 1),
+                     mc.cores = 4L)
+
+eFDR.test <- mclapply(1:5L,
+                      function(i) qlf.test[[i]][["table"]][["PValue"]] %>% qvalue(),
+                      mc.cores = 4L)
+
+edgeR.DEG.test <- mclapply(1:5L,
+                           function(i) rownames(dat.expr.test)[ eFDR.test[[i]][["qvalues"]] < 0.05 ],
+                           mc.cores = 4L)
+
+names(qlf.test) = names(eFDR.test) = names(edgeR.DEG.test) = vars.pool.new
+
+# Display the common DEGs between the training set and testing set identified by univariate edgeR
+plot.array <- mclapply(1:5L,
+                       function(x) {ggVennDiagram(list(Train = edgeR.DEG.train[[x]], Test = edgeR.DEG.test[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool.new[x]) },
+                       mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+```
+
+
+#### DESeq2 + interaction
+```{r DEG.compare.within.MultiIntDESeq2.noTMM}
+# Read: https://support.bioconductor.org/p/67600/#67612
+# Build the DESeqDataSet and then DESeq2 model for the training set
+t0 <- Sys.time()
+name.formula <- c("BMI_high_vs_low", 
+                  "AGE_old_vs_young", 
+                  "SEX_male_vs_female", 
+                  "MHABNWBC_yes_vs_no",
+                  "BMIhigh.SEXmale") 
+# The above names can be obtained by running resultsNames(DESeq(dds))
+
+dds <- DESeqDataSetFromMatrix(countData = cts.train, 
+                              colData = coldata.train, 
+                              design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+
+res.train <- mclapply(1:5L, 
+                      function(i) return(results(DESeq(dds), name = name.formula[i])), # name: extract individual effects
+                      mc.cores = 4L)
+t1 <- Sys.time()
+t1 - t0
+
+
+# Estimate the FDR for each variable of interest
+eFDR.train <- mclapply(1:5L,
+                       function(i) qvalue(res.train[[i]][["pvalue"]])$qvalues,
+                       mc.cores = 4L)
+
+# Output the Ensembl gene IDs of DEGs for each variable of interest
+DESeq2.DEG.train <- mclapply(1:5L,
+                             function(i) rownames(cts.train)[eFDR.train[[i]] < 0.05],
+                             mc.cores = 4L)
+
+names(res.train) = names(eFDR.train) = names(DESeq2.DEG.train) = vars.pool.new
+
+# Repeat the above steps for the testing set
+dds <- DESeqDataSetFromMatrix(countData = cts.test, 
+                              colData = coldata.test, 
+                              design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+
+res.test <- mclapply(1:5L, 
+                     function(i) return(results(DESeq(dds), name = name.formula[i])),
+                     mc.cores = 4L)
+
+eFDR.test <- mclapply(1:5L,
+                      function(i) qvalue(res.test[[i]][["pvalue"]])$qvalues,
+                      mc.cores = 4L)
+
+DESeq2.DEG.test <- mclapply(1:5L,
+                            function(i) rownames(cts.test)[eFDR.test[[i]] < 0.05],
+                            mc.cores = 4L)
+
+names(res.test) = names(eFDR.test) = names(DESeq2.DEG.test) = vars.pool.new
+
+# Display the common DEGs between the training set and testing set identified by univariate DESeq2
+plot.array <- mclapply(1:5L,
+                       function(x) {ggVennDiagram(list(Train = DESeq2.DEG.train[[x]], Test = DESeq2.DEG.test[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool.new[x]) },
+                       mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+```
+
+
+#### DESeq2 + interaction + TMM
+```{r DEG.compare.within.MultiIntDESeq2.TMM}
+# Read: https://support.bioconductor.org/p/67600/#67612
+# Build the DESeqDataSet and then DESeq2 model for the training set
+t0 <- Sys.time()
+name.formula <- c("BMI_high_vs_low", 
+                  "AGE_old_vs_young", 
+                  "SEX_male_vs_female", 
+                  "MHABNWBC_yes_vs_no",
+                  "BMIhigh.SEXmale") 
+# The above names can be obtained by running resultsNames(DESeq(dds))
+
+# Transform the TMM normalization factors to be used in DESeq2
+lib.size <- colSums(cts.train)
+norm.factor <- calcNormFactors(cts.train, method = "TMM")
+size.factor <- lib.size*norm.factor/exp(mean(log(lib.size*norm.factor)))
+dds <- DESeqDataSetFromMatrix(countData = cts.train, 
+                              colData = coldata.train, 
+                              design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+sizeFactors(dds) <- size.factor
+res.train <- mclapply(1:5L, 
+                      function(i) return(results(DESeq(dds), name = name.formula[i])), # name: extract individual effects
+                      mc.cores = 4L)
+t1 <- Sys.time()
+t1 - t0
+
+
+# Estimate the FDR for each variable of interest
+eFDR.train <- mclapply(1:5L,
+                       function(i) qvalue(res.train[[i]][["pvalue"]])$qvalues,
+                       mc.cores = 4L)
+
+# Output the Ensembl gene IDs of DEGs for each variable of interest
+DESeq2.DEG.train <- mclapply(1:5L,
+                             function(i) rownames(cts.train)[eFDR.train[[i]] < 0.05],
+                             mc.cores = 4L)
+
+names(res.train) = names(eFDR.train) = names(DESeq2.DEG.train) = vars.pool.new
+
+# Repeat the above steps for the testing set
+lib.size <- colSums(cts.test)
+norm.factor <- calcNormFactors(cts.test, method = "TMM")
+size.factor <- lib.size*norm.factor/exp(mean(log(lib.size*norm.factor)))
+dds <- DESeqDataSetFromMatrix(countData = cts.test, 
+                              colData = coldata.test, 
+                              design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+sizeFactors(dds) <- size.factor
+res.test <- mclapply(1:5L, 
+                     function(i) return(results(DESeq(dds), name = name.formula[i])),
+                     mc.cores = 4L)
+
+eFDR.test <- mclapply(1:5L,
+                      function(i) qvalue(res.test[[i]][["pvalue"]])$qvalues,
+                      mc.cores = 4L)
+
+DESeq2.DEG.test <- mclapply(1:5L,
+                            function(i) rownames(cts.test)[eFDR.test[[i]] < 0.05],
+                            mc.cores = 4L)
+
+names(res.test) = names(eFDR.test) = names(DESeq2.DEG.test) = vars.pool.new
+
+# Display the common DEGs between the training set and testing set identified by univariate DESeq2
+plot.array <- mclapply(1:5L,
+                       function(x) {ggVennDiagram(list(Train = DESeq2.DEG.train[[x]], Test = DESeq2.DEG.test[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool.new[x]) },
+                       mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+```
