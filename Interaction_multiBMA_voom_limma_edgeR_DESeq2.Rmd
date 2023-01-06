@@ -440,6 +440,53 @@ output.multi.int2.train <- BMAseq.multi.DEG(
   cut.FDR = 0.05)
 t1 <- get_nanotime()
 t1 - t0
+
+### Main effect
+multiIntBMAseq.DEG.ENSG.train.Main <- mclapply(
+  1:4L,
+  function(i) names(which(output.multi.int2.train$indicator.eFDR.Main[, i] == 1)),
+  mc.cores = 4L)
+
+multiIntBMAseq.DEG.ENSG.test.Main <- mclapply(
+  1:4L,
+  function(i) names(which(output.multi.int2.test$indicator.eFDR.Main[, i] == 1)),
+  mc.cores = 4L)
+
+# Display the common DEGs associated with the main effect of each variable between the training set and testing set identified by multivariate BMAseq with interaction
+plot.array <- mclapply(1:4L,
+                       function(x) {ggVennDiagram(list(Train = multiIntBMAseq.DEG.ENSG.train.Main[[x]], 
+                                                       Test = multiIntBMAseq.DEG.ENSG.test.Main[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool[x])},
+              mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 4)))
+
+multiIntBMAseq.DEG.ENSG.train.Main <- mclapply(
+  1:4L,
+  function(i) names(which(output.multi.int2.train$indicator.eFDR.Main[, i] == 1)),
+  mc.cores = 4L)
+
+### Interaction effect
+multiIntBMAseq.DEG.ENSG.train.Interaction <- mclapply(
+  1:4L,
+  function(i) names(which(output.multi.int2.train$indicator.eFDR.Interaction[, i] == 1)),
+  mc.cores = 4L)
+
+multiIntBMAseq.DEG.ENSG.test.Interaction <- mclapply(
+  1:4L,
+  function(i) names(which(output.multi.int2.test$indicator.eFDR.Interaction[, i] == 1)),
+  mc.cores = 4L)
+
+# Display the common DEGs associated with the interaction effect of each variable between the training set and testing set identified by multivariate BMAseq with interaction
+plot.array <- mclapply(1:4L,
+                       function(x) {ggVennDiagram(list(Train = multiIntBMAseq.DEG.ENSG.train.Interaction[[x]], 
+                                                       Test = multiIntBMAseq.DEG.ENSG.test.Interaction[[x]]), 
+                                                  label_alpha = 0, label_color = "white") + 
+                                      theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                                      ggtitle(vars.pool[x])},
+              mc.cores = 4L)
+grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 4)))
 ```
 
 
