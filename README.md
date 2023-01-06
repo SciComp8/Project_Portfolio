@@ -25,9 +25,9 @@ The TNBC project aims to evaluate the incidence and phenotypic distribution of s
 - [TNBC.Rmd](TNBC.Rmd)
 - [MachineLearningPipeline.py](MachineLearningPipeline.py)
 
-In the MDC Asian project, the breast cancer patterns such as frequency of screen-detected disease, clinical T and N stages, and tumor subtype are evaluated using the aggregated and disaggregated racial/ethnic and community demographic data at two hospitals.
-- [MDCAsian.Rmd](MDCAsian.Rmd)
-
 In the micrometastatic axillary nodal disease project, most analytical work centers on the descriptive analysis, for example, estimate the number of patients undergoing completion axillary lymph node dissection (ALND), number of cases with additional positive nodes if completion ALND, and frequency of axillary recurrence stratified by whether ALND was performed and by whether radiation was delivered. The univariate survival analysis using the Cox-proportional hazards model is performed to interrogate the factors associated with the recurrence-free survival. Specially, recurrence-free survival time is defined as a composite endpoint which combines the time to recurrence, time to death, and time to last follow-up into a univariate time to the first event or censoring. 
 
 - [Micromets.Rmd](Micromets.Rmd)
+
+In the MDC Asian project, the breast cancer patterns such as frequency of screen-detected disease, clinical T and N stages, and tumor subtype are evaluated using the aggregated and disaggregated racial/ethnic and community demographic data at two hospitals.
+- [MDCAsian.Rmd](MDCAsian.Rmd)
