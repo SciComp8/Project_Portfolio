@@ -414,9 +414,9 @@ grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
 
 
 # Wrap above separate codes into one function
-```{r BMAseq_uni_ana}
-uni_ana <- function(seed.num = 999) {
-  
+```{r uni_ana_one_func}
+uni_ana_noTMM <- function(seed.num = 999) {
+  ##------data preprocessing------  
   #################################################################
   ##                      Data segmentation                      ##
   #################################################################
@@ -428,8 +428,20 @@ uni_ana <- function(seed.num = 999) {
   dat.expr.train <- dat.expr.new[, rownames(dat.pheno.train)]
   dat.expr.test <- dat.expr.new[, rownames(dat.pheno.test)]
   
+  #################################################################
+  ##         Output patient characteristics distribution         ##
+  #################################################################
+  dat.pheno.train$group = "Training"
+  dat.pheno.test$group = "Test"
+  dat.pheno.all <- rbind(dat.pheno.train, dat.pheno.test)
+  tab1 <- tbl_summary(data = dat.pheno.all,
+                    by = "group") %>% 
+    add_p()
+  tab1
+  
   vars <- c("BMI", "AGE", "SEX", "MHABNWBC", "MHARTHTS", "MHCVD") 
-
+  
+  ##------BMAseq------
   ##################################################################
   ##                  BMAseq univariate analysis                  ##
   ##################################################################
@@ -438,7 +450,6 @@ uni_ana <- function(seed.num = 999) {
                                  var.pool = vars, 
                                  cut.BF = 1, 
                                  cut.FDR = 0.25) 
-
   output.uni.test <- BMAseq.uni(dat.expr.counts = dat.expr.test, 
                                 dat.pheno = dat.pheno.test, 
                                 var.pool = vars, 
@@ -448,49 +459,53 @@ uni_ana <- function(seed.num = 999) {
   #################################################################
   ##                   Venn diagram for BMAseq                   ##
   #################################################################
-  BMI <- list(Train = output.uni.train$DEG$BMI[, 2], Test = output.uni.test$DEG$BMI[, 2])
-  ggVennDiagram(BMI, label_alpha = 0)
-  plot.array <- lapply(vars, function(x) ggVennDiagram(list(Train = output.uni.train[["DEG"]][[x]][, 2], 
-                                                            Test = output.uni.test[["DEG"]][[x]][, 2]), 
-                                                       label_alpha = 0, label_color = "white") + 
-                                           theme(legend.position = "none", 
-                                                 plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                                         ggtitle(x) 
+  # ggVennDiagram: https://cran.r-project.org/web/packages/ggVennDiagram/readme/README.html
+  plot.array <- mclapply(1:length(vars), 
+                         function(x) ggVennDiagram(list(Train = output.uni.train[["DEG"]][[x]][, 2], # 1: index.DEG, 2: name.DEG (ENSG IDs)
+                                                        Test = output.uni.test[["DEG"]][[x]][, 2]), 
+                                                   label_alpha = 0, label_color = "white") +
+                           theme(legend.position = "none", 
+                                 plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                           ggtitle(x),
+                         mc.cores = 4L
                        )
   grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
   
+  
+  ##------voom + limma------
   ##################################################################
   ##               voom + limma univariate analysis               ##
   ##################################################################
   design.train <- mclapply(1:length(vars),
                            function(i) model.matrix(~dat.pheno.train[vars][[i]]), 
-                           mc.cores = 10L)
+                           mc.cores = 4L)
   
   design.test <- mclapply(1:length(vars),
                           function(i) model.matrix(~dat.pheno.test[vars][[i]]),
-                          mc.cores = 10L)
+                          mc.cores = 4L)
   
   voom.train <- mclapply(1:length(vars),
                          function(i) voom(dat.expr.train,
                                           design = design.train[[i]],
                                           lib.size = colSums(dat.expr.train)),
-                         mc.cores = 10L)
+                         mc.cores = 4L)
   
   voom.fit.train <- mclapply(1:length(vars),
                              function(i) lmFit(voom.train[[i]][["E"]],
                                                design = design.train[[i]],
-                                               weights = voom.train[[i]][["weights"]]) %>% 
-                                eBayes(), 
-                             mc.cores = 10L)
+                                               weights = voom.train[[i]][["weights"]]),
+                             mc.cores = 4L)
   
   eFDR.train <- mclapply(1:length(vars),
-                         function(i) voom.fit.train[[i]][["p.value"]][, 2] %>% 
-                           qvalue(),
-                         mc.cores = 10L)
+                         function(i) {
+                           t <- voom.fit.train[[i]][["coefficients"]][, 2]/voom.fit.train[[i]][["stdev.unscaled"]][, 2]/voom.fit.train[[i]][["sigma"]]
+                           p <- 2*pt(-abs(t), df = voom.fit.train[[i]][["df.residual"]])
+                           return(qvalue(p)) },
+                         mc.cores = 4L)
   
   voom.DEG.train <- mclapply(1:length(vars),
-                             function(i) rownames(cts.train)[ eFDR.train[[i]][["qvalues"]] < 0.25 ],
-                             mc.cores = 10L)
+                             function(i) rownames(dat.expr.train)[ eFDR.train[[i]][["qvalues"]] < 0.25 ],
+                             mc.cores = 4L)
   
   names(design.train) = names(voom.train) = names(voom.fit.train) = names(eFDR.train) = names(voom.DEG.train) = vars 
   
@@ -498,197 +513,227 @@ uni_ana <- function(seed.num = 999) {
                         function(i) voom(dat.expr.test,
                                          design = design.test[[i]],
                                          lib.size = colSums(dat.expr.test)),
-                        mc.cores = 10L)
+                        mc.cores = 4L)
   
   voom.fit.test <- mclapply(1:length(vars),
                             function(i) lmFit(voom.test[[i]][["E"]],
                                               design = design.test[[i]],
-                                              weights = voom.test[[i]][["weights"]]) %>% 
-                              eBayes(), 
-                            mc.cores = 10L)
+                                              weights = voom.test[[i]][["weights"]]), 
+                            mc.cores = 4L)
   
   eFDR.test <- mclapply(1:length(vars),
-                        function(i) voom.fit.test[[i]][["p.value"]][, 2] %>%
-                          qvalue(),
-                        mc.cores = 10L)
+                        function(i) {
+                          t <- voom.fit.test[[i]][["coefficients"]][, 2]/voom.fit.test[[i]][["stdev.unscaled"]][, 2]/voom.fit.test[[i]][["sigma"]]
+                          p <- 2*pt(-abs(t), df = voom.fit.test[[i]][["df.residual"]])
+                          return(qvalue(p)) },
+                        mc.cores = 4L)
   
   voom.DEG.test <- mclapply(1:length(vars),
-                            function(i) rownames(cts.test)[ eFDR.test[[i]][["qvalues"]] < 0.25 ],
-                            mc.cores = 10L)
+                            function(i) rownames(dat.expr.test)[ eFDR.test[[i]][["qvalues"]] < 0.25 ],
+                            mc.cores = 4L)
   
   names(design.test) = names(voom.test) = names(voom.fit.test) = names(eFDR.test) = names(voom.DEG.test) = vars 
   
   #################################################################
   ##                Venn diagram for voom + limma                ##
   #################################################################
-  plot.array <- lapply(vars, function(x) ggVennDiagram(list(Train = voom.DEG.train[[x]], Test = voom.DEG.test[[x]]), 
-                                                            label_alpha = 0, label_color = "white") + 
-                                           theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                                           ggtitle(x) 
+  plot.array <- mclapply(1:length(vars), 
+                         function(x) ggVennDiagram(list(Train = voom.DEG.train[[x]], 
+                                                        Test = voom.DEG.test[[x]]), 
+                                                   label_alpha = 0, label_color = "white") +
+                           theme(legend.position = "none", 
+                                 plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                           ggtitle(x),
+                         mc.cores = 4L
                        )
   grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
   
+  
+  ##------voom + limma + eBayes------
   #################################################################
-  ##                  limma univariate analysis                  ##
+  ##          voom + limma + eBayes univariate analysis          ##
   #################################################################
-  fit.train <- mclapply(1:length(vars),
-                      function(i) cpm(dat.expr.train, 
-                                      lib.size = colSums(dat.expr.train), 
-                                      log = T, 
-                                      prior.count = 1) %>% 
-                        lmFit(design.train[[i]]) %>% 
-                        eBayes(), 
-                      mc.cores = 10L)
-
+  design.train <- mclapply(1:length(vars),
+                           function(i) model.matrix(~dat.pheno.train[vars][[i]]), 
+                           mc.cores = 4L)
+  
+  design.test <- mclapply(1:length(vars),
+                          function(i) model.matrix(~dat.pheno.test[vars][[i]]),
+                          mc.cores = 4L)
+  
+  voom.train <- mclapply(1:length(vars),
+                         function(i) voom(dat.expr.train,
+                                          design = design.train[[i]],
+                                          lib.size = colSums(dat.expr.train)),
+                         mc.cores = 4L)
+  
+  voom.fit.train <- mclapply(1:length(vars),
+                             function(i) lmFit(voom.train[[i]][["E"]],
+                                               design = design.train[[i]],
+                                               weights = voom.train[[i]][["weights"]]) %>% 
+                                eBayes(), 
+                             mc.cores = 4L)
+  
   eFDR.train <- mclapply(1:length(vars),
-                         function(i) fit.train[[i]][["p.value"]][, 2] %>% 
+                         function(i) voom.fit.train[[i]][["p.value"]][, 2] %>% 
                            qvalue(),
-                         mc.cores = 10L)
+                         mc.cores = 4L)
   
-  limma.DEG.train <- mclapply(1:length(vars),
-                              function(i) rownames(cts.train)[ eFDR.train[[i]][["qvalues"]] < 0.25 ],
-                              mc.cores = 10L)
+  voom.DEG.train <- mclapply(1:length(vars),
+                             function(i) rownames(dat.expr.train)[ eFDR.train[[i]][["qvalues"]] < 0.25 ],
+                             mc.cores = 4L)
   
-  names(design.train) = names(fit.train) = names(eFDR.train) = names(limma.DEG.train) = vars 
+  names(design.train) = names(voom.train) = names(voom.fit.train) = names(eFDR.train) = names(voom.DEG.train) = vars 
   
-  fit.test <- mclapply(1:length(vars),
-                       function(i) cpm(dat.expr.test, 
-                                       lib.size = colSums(dat.expr.test), 
-                                       log = T, 
-                                       prior.count = 1) %>% 
-                         lmFit(design.test[[i]]) %>% 
-                         eBayes(), 
-                       mc.cores = 10L)
+  voom.test <- mclapply(1:length(vars),
+                        function(i) voom(dat.expr.test,
+                                         design = design.test[[i]],
+                                         lib.size = colSums(dat.expr.test)),
+                        mc.cores = 4L)
+  
+  voom.fit.test <- mclapply(1:length(vars),
+                            function(i) lmFit(voom.test[[i]][["E"]],
+                                              design = design.test[[i]],
+                                              weights = voom.test[[i]][["weights"]]) %>% 
+                              eBayes(), 
+                            mc.cores = 4L)
   
   eFDR.test <- mclapply(1:length(vars),
-                        function(i) fit.test[[i]][["p.value"]][, 2] %>%
+                        function(i) voom.fit.test[[i]][["p.value"]][, 2] %>%
                           qvalue(),
-                        mc.cores = 10L)
+                        mc.cores = 4L)
   
-  limma.DEG.test <- mclapply(1:length(vars),
-                             function(i) rownames(cts.test)[ eFDR.test[[i]][["qvalues"]] < 0.25 ],
-                             mc.cores = 10L)
+  voom.DEG.test <- mclapply(1:length(vars),
+                            function(i) rownames(dat.expr.test)[ eFDR.test[[i]][["qvalues"]] < 0.25 ],
+                            mc.cores = 4L)
   
-  names(design.test) = names(fit.test) = names(eFDR.test) = names(limma.DEG.test) = vars 
+  names(design.test) = names(voom.test) = names(voom.fit.test) = names(eFDR.test) = names(voom.DEG.test) = vars 
   
   ##################################################################
-  ##                    Venn diagram for limma                    ##
+  ##            Venn diagram for voom + limma + eBayes            ##
   ##################################################################
-  plot.array <- lapply(vars, function(x) ggVennDiagram(list(Train = limma.DEG.train[[x]], Test = limma.DEG.test[[x]]), 
-                                                            label_alpha = 0, label_color = "white") + 
-                                           theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) +  
-                                           ggtitle(x) 
+  plot.array <- mclapply(1:length(vars), 
+                         function(x) ggVennDiagram(list(Train = voom.DEG.train[[x]], 
+                                                        Test = voom.DEG.test[[x]]), 
+                                                   label_alpha = 0, label_color = "white") +
+                           theme(legend.position = "none", 
+                                 plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                           ggtitle(x),
+                         mc.cores = 4L
                        )
   grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
   
+  
+  ##------edgeR------
   #################################################################
   ##                  edgeR univariate analysis                  ##
   #################################################################
   y.train <- mclapply(1:length(vars),
-                    function(i) DGEList(counts = dat.expr.train, 
-                                        lib.size = colSums(dat.expr.train)) %>% 
-                      estimateGLMTrendedDisp(design.train[[i]]),
-                    mc.cores = 10L) 
-
+                      function(i) DGEList(counts = dat.expr.train, 
+                                          lib.size = colSums(dat.expr.train)) %>% 
+                        estimateGLMTrendedDisp(design.train[[i]]),
+                      mc.cores = 4L) 
   fit.train <- mclapply(1:length(vars),
                         function(i) glmQLFit(y.train[[i]], design.train[[i]]),
-                        mc.cores = 10L)
+                        mc.cores = 4L)
   
   qlf.train <- mclapply(1:length(vars),
                         function(i) glmQLFTest(fit.train[[i]], coef = 2),
-                        mc.cores = 10L)
+                        mc.cores = 4L)
   
   eFDR.train <- mclapply(1:length(vars),
                         function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
                           qvalue(),
-                        mc.cores = 10L)
+                        mc.cores = 4L)
   
   edgeR.DEG.train <- mclapply(1:length(vars),
-                              function(i) rownames(cts.train)[ eFDR.train[[i]][["qvalues"]] < 0.25 ],
-                              mc.cores = 10L)
+                              function(i) rownames(dat.expr.train)[ eFDR.train[[i]][["qvalues"]] < 0.25 ],
+                              mc.cores = 4L)
   
   names(fit.train) = names(qlf.train) = names(eFDR.train) = names(edgeR.DEG.train) = vars 
   
   y.test <- mclapply(1:length(vars),
                      function(i) DGEList(counts = dat.expr.test, 
                                          lib.size = colSums(dat.expr.test)) %>% 
-                      estimateGLMTrendedDisp(design.test[[i]]),
-                      mc.cores = 10L) 
+                       estimateGLMTrendedDisp(design.test[[i]]),
+                     mc.cores = 4L) 
   
   fit.test <- mclapply(1:length(vars),
                        function(i) glmQLFit(y.test[[i]], design.test[[i]]),
-                       mc.cores = 10L)
+                       mc.cores = 4L)
   
   qlf.test <- mclapply(1:length(vars),
-                        function(i) glmQLFTest(fit.test[[i]], coef = 2),
-                        mc.cores = 10L)
+                       function(i) glmQLFTest(fit.test[[i]], coef = 2),
+                       mc.cores = 4L)
   
   eFDR.test <- mclapply(1:length(vars),
                         function(i) qlf.test[[i]][["table"]][["PValue"]] %>%
                           qvalue(),
-                        mc.cores = 10L)
+                        mc.cores = 4L)
   
   edgeR.DEG.test <- mclapply(1:length(vars),
-                             function(i) rownames(cts.test)[ eFDR.test[[i]][["qvalues"]] < 0.25 ],
-                             mc.cores = 10L)
+                             function(i) rownames(dat.expr.test)[ eFDR.test[[i]][["qvalues"]] < 0.25 ],
+                             mc.cores = 4L)
   
   names(fit.test) = names(qlf.test) = names(eFDR.test) = names(edgeR.DEG.test) = vars 
   
   ##################################################################
   ##                    Venn diagram for edgeR                    ##
   ##################################################################
-  plot.array <- lapply(vars, function(x) ggVennDiagram(list(Train = edgeR.DEG.train[[x]], Test = edgeR.DEG.test[[x]]), 
-                                                            label_alpha = 0, label_color = "white") + 
-                                           theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                                           ggtitle(x) 
+  plot.array <- mclapply(1:length(vars), 
+                         function(x) ggVennDiagram(list(Train = edgeR.DEG.train[[x]], 
+                                                        Test = edgeR.DEG.test[[x]]), 
+                                                   label_alpha = 0, label_color = "white") +
+                           theme(legend.position = "none", 
+                                 plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                           ggtitle(x),
+                         mc.cores = 4L
                        )
   grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
   
+  
+  ##------DESeq2------
   ##################################################################
   ##                  DESeq2 univariate analysis                  ##
   ##################################################################
   cts.train <- as.matrix(dat.expr.train)
+  cts.test <- as.matrix(dat.expr.test)
   coldata.train <- dat.pheno.train
-  head(cts.train[1:5, 1:5])
-  head(coldata.train[1:5, 1:5])
+  coldata.test <- dat.pheno.test
   
+  # Check the sample order of the count matrix and column data in the training and test sets 
+  all(rownames(coldata.test) == colnames(cts.test))
   all(rownames(coldata.train) == colnames(cts.train))
   
   res.train <- mclapply(1:length(vars),
-                        function(i) DESeqDataSetFromMatrix(countData = cts.train, 
-                                                           colData = coldata.train, 
-                                                           design = formula(paste0("~", vars[i]))) %>% 
-                          DESeq() %>% 
-                          results(),
-                        mc.cores = 10L)
+                        function(i) {
+                          dds <- DESeqDataSetFromMatrix(countData = cts.train, 
+                                                        colData = coldata.train, 
+                                                        design = formula(paste0("~", vars[i])))
+                          return(results(DESeq(dds)))},
+                      mc.cores = 4L) 
   
   eFDR.train <- mclapply(1:length(vars),
                          function(i) qvalue(res.train[[i]][["pvalue"]])$qvalues,
-                         mc.cores = 10L)
+                         mc.cores = 4L)
   
   DESeq2.DEG.train <- mclapply(1:length(vars),
                                function(i) rownames(cts.train)[eFDR.train[[i]] < 0.25],
-                               mc.cores = 10L)
+                               mc.cores = 4L)
   
   names(res.train) = names(eFDR.train) = names(DESeq2.DEG.train) = vars 
   
-  cts.test <- as.matrix(dat.expr.test)
-  coldata.test <- dat.pheno.test
-  head(cts.test[1:5, 1:5])
-  head(coldata.test[1:5, 1:5])
-  all(rownames(coldata.test) == colnames(cts.test))
-  
   res.test <- mclapply(1:length(vars),
-                       function(i) DESeqDataSetFromMatrix(countData = cts.test, 
-                                                          colData = coldata.test, 
-                                                          design = formula(paste0("~", vars[i]))) %>% 
-                          DESeq() %>% 
-                          results(),
-                        mc.cores = 10L)
+                       function(i) {
+                         dds <- DESeqDataSetFromMatrix(countData = cts.test, 
+                                                       colData = coldata.test, 
+                                                       design = formula(paste0("~", vars[i])))
+                         return(results(DESeq(dds)))},
+                       mc.cores = 4L) 
   
   eFDR.test <- mclapply(1:length(vars),
-                   function(i) qvalue(res.test[[i]][["pvalue"]])$qvalues, 
-                   mc.cores = 10L) 
+                        function(i) qvalue(res.test[[i]][["pvalue"]])$qvalues, 
+                        mc.cores = 4L) 
   
   DESeq2.DEG.test <- mclapply(1:length(vars),
                               function(i) rownames(cts.test)[eFDR.test[[i]] < 0.25],
@@ -699,13 +744,35 @@ uni_ana <- function(seed.num = 999) {
   #################################################################
   ##                   Venn diagram for DESeq2                   ##
   #################################################################
-  plot.array <- lapply(vars, function(x) ggVennDiagram(list(Train = DESeq2.DEG.train[[x]], Test = DESeq2.DEG.test[[x]]), 
-                                                       label_alpha = 0, label_color = "white") + 
-                                           theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                                           ggtitle(x) )
+  plot.array <- mclapply(1:length(vars), 
+                         function(x) ggVennDiagram(list(Train = DESeq2.DEG.train[[x]], 
+                                                        Test = DESeq2.DEG.test[[x]]), 
+                                                   label_alpha = 0, label_color = "white") +
+                           theme(legend.position = "none", 
+                                 plot.title = element_text(hjust = 0.5, colour = "red")) + 
+                           ggtitle(x),
+                         mc.cores = 4L
+                       )
   grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
 }
 ```
 
+
+# Trial 2
+```{r trial2}
+t0 <- get_nanotime()
+uni_ana_noTMM(seed.num = 66666)
+t1 <- get_nanotime()
+t1-t0
+```
+
+
+# Trial 3
+```{r trial3}
+t0 <- get_nanotime()
+uni_ana_noTMM(seed.num = 39089)
+t1 <- get_nanotime()
+t1-t0
+```
   
 
