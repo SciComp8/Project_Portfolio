@@ -385,6 +385,7 @@ uni_ana_noTMM <- function(seed.num = 999) {
   print(paste0("The column names of training gene expression data", ifelse(all(colnames(dat.expr.train) == rownames(dat.pheno.train)), " MATCH ", "NOT MATCH"), "the row names of training phenotype data."))
   print(paste0("The column names of test gene expression data", ifelse(all(colnames(dat.expr.test) == rownames(dat.pheno.test)), " MATCH ", "NOT MATCH"), "the row names of test phenotype data."))
   
+  
   ##------make a table one------
   #################################################################
   ##         Output patient characteristics distribution         ##
@@ -399,6 +400,7 @@ uni_ana_noTMM <- function(seed.num = 999) {
     gt::gtsave(filename = paste0("../ApplicationResult/RandomSeed/Uni/", date.analysis, "_", "Table1", "_", seed.num, ".rtf"))
   
   vars <- c("BMI", "AGE", "SEX", "MHABNWBC", "MHARTHTS", "MHCVD") 
+  
   
   ##------BMAseq------
   ##################################################################
@@ -435,7 +437,6 @@ uni_ana_noTMM <- function(seed.num = 999) {
          width = 8,
          height = 4,
          units = "in")
-  
   
   
   ##------voom + limma------
