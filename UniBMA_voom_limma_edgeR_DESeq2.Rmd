@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
 ```
 
 
-### Save and load images
+## Save and load images
 ```{r saveimage, eval=FALSE}
 image.date <- format(Sys.Date(), "%Y%b%d")
 save.image(file = paste0("../ApplicationData/derived/", image.date, "_image_unione_ALiu.RData"))
@@ -749,3 +749,10 @@ uni_ana_noTMM <- function(seed.num = 999) {
 ```
   
 
+## Ten trials to assess the reproducibility of BMAseq, voom + limma, edgeR, and DESeq2 
+```{r}
+# Set 10 different random seeds
+seed.num.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+
+for (i in 1:10L) {uni_ana_noTMM(seed.num = seed.num.vec[i])}
+```
