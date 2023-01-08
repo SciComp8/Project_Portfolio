@@ -14,23 +14,22 @@ knitr::opts_chunk$set(
 ```
 
 
-## Save and load images
-
-```{r eval=FALSE}
+### Save and load images
+```{r saveimage, eval=FALSE}
 image.date <- format(Sys.Date(), "%Y%b%d")
-save.image(file = paste0("../ApplicationData/derived/", image.date, "_image_ALiu.RData"))
+save.image(file = paste0("../ApplicationData/derived/", image.date, "_image_unione_ALiu.RData"))
 ```
 
-```{r}
-load("../ApplicationData/derived/2022Dec11_image_ALiu.RData")
+```{r loadimage}
+load("../ApplicationData/derived/2023Jan07_image_unione_ALiu.RData")
 ```
 
 
 ## Load original data
 ```{r}
-# Attach the package 
+# Install and attach the package 
 # devtools::install("/Library/Frameworks/R.framework/Versions/4.2/Resources/library/BMAseq")
-library(BMAseq)
+suppressPackageStartupMessages(easypackages::libraries("BMAseq", "limma", "qvalue", "parallel", "ggVennDiagram", "gridExtra", "tidyverse", "edgeR", "DESeq2", "microbenchmark", "gtsummary"))
 ```
 
 ```{r read.data}
@@ -44,7 +43,7 @@ dat.pheno[1:5,]
 dat.expr[1:5,1:5]
 ```
 
-```{r filter}
+```{r filter.gene}
 # Pre-filter the genes
 # Here we perform the median absolute deviation with the threshold of 0.8 to select genes that are most likely to distinguish the samples
 dat.expr.new <- dat.expr[apply(dat.expr, 1, function(x) mad(x) > 0.8), ] # We have 24455 genes
@@ -67,7 +66,7 @@ dat.expr.train <- dat.expr.new[, rownames(dat.pheno.train)]
 dat.expr.test <- dat.expr.new[, rownames(dat.pheno.test)]
 ```
 
-### Univariate analysis
+### Univariate analysis specific to BMAseq
 ```{r uni.train}
 vars <- c("BMI", "AGE", "SEX", "MHABNWBC", "MHARTHTS", "MHCVD") 
 
@@ -159,6 +158,8 @@ plot.array <- lapply(vars, function(x) ggVennDiagram(list(Train = output.uni.tra
 grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
 ```
 
+
+### Univariate analysis specific to voom + limma
 ```{r DEG.compare.withinvoom_limma}
 suppressPackageStartupMessages(easypackages::libraries("limma", "qvalue", "parallel"))
 # Set the model design matrix for each variable of interest for the training and testing sets, respectively
@@ -230,63 +231,9 @@ plot.array <- lapply(vars, function(x) ggVennDiagram(list(Train = voom.DEG.train
 grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
 ```
 
-```{r DEG.compare.withinlimma}
-suppressPackageStartupMessages(library(limma))
 
-# Fit the linear model
-fit.train <- mclapply(1:length(vars),
-                      function(i) cpm(dat.expr.train, 
-                                      lib.size = colSums(dat.expr.train), 
-                                      log = T, 
-                                      prior.count = 1) %>% 
-                        lmFit(design.train[[i]]) %>% 
-                        eBayes(), 
-                      mc.cores = 10L)
-
-# Estimate the FDR for each variable of interest
-eFDR.train <- mclapply(1:length(vars),
-                       function(i) fit.train[[i]][["p.value"]][, 2] %>% 
-                         qvalue(),
-                       mc.cores = 10L)
-
-# Output the Ensembl gene IDs of DEGs for each variable of interest
-limma.DEG.train <- mclapply(1:length(vars),
-                            function(i) rownames(cts.train)[ eFDR.train[[i]][["qvalues"]] < 0.25 ],
-                            mc.cores = 10L)
-
-# Name elements using the corresponding variable of interest for all list objects of model design, model fit, eFDR, and DEG ID
-names(design.train) = names(fit.train) = names(eFDR.train) = names(limma.DEG.train) = vars 
-
-# Repeat the above steps for the testing data
-fit.test <- mclapply(1:length(vars),
-                     function(i) cpm(dat.expr.test, 
-                                     lib.size = colSums(dat.expr.test), 
-                                     log = T, 
-                                     prior.count = 1) %>% 
-                       lmFit(design.test[[i]]) %>% 
-                       eBayes(), 
-                     mc.cores = 10L)
-
-eFDR.test <- mclapply(1:length(vars),
-                      function(i) fit.test[[i]][["p.value"]][, 2] %>%
-                        qvalue(),
-                      mc.cores = 10L)
-
-limma.DEG.test <- mclapply(1:length(vars),
-                           function(i) rownames(cts.test)[ eFDR.test[[i]][["qvalues"]] < 0.25 ],
-                           mc.cores = 10L)
-
-names(design.test) = names(fit.test) = names(eFDR.test) = names(limma.DEG.test) = vars 
-
-# Display the common DEGs between the training set and testing set identified by univariate limma
-plot.array <- lapply(vars, function(x) ggVennDiagram(list(Train = limma.DEG.train[[x]], Test = limma.DEG.test[[x]]), 
-                                                          label_alpha = 0, label_color = "white") + theme(legend.position = "none", plot.title = element_text(hjust = 0.5, colour = "red")) + ggtitle(x) )
-grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
-```
-
+### Univariate analysis specific to edgeR
 ```{r DEG.compare.withinedgeR}
-suppressPackageStartupMessages(library(edgeR))
-
 # Create the DGEList data class and then estimate the trended dispersions
 y.train <- mclapply(1:length(vars),
                     function(i) DGEList(counts = dat.expr.train, 
@@ -349,8 +296,9 @@ plot.array <- lapply(vars, function(x) ggVennDiagram(list(Train = edgeR.DEG.trai
 grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
 ```
 
+
+### Univariate analysis specific to DESeq2
 ```{r DEG.compare.withinDESeq2}
-suppressPackageStartupMessages(library(DESeq2))
 cts.train <- as.matrix(dat.expr.train)
 coldata.train <- dat.pheno.train
 head(cts.train[1:5, 1:5])
@@ -413,14 +361,15 @@ grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
 ```
 
 
-# Wrap above separate codes into one function
-```{r uni_ana_one_func}
+## Wrap above separate codes into one function
+```
 uni_ana_noTMM <- function(seed.num = 999) {
   ##------data preprocessing------  
   #################################################################
   ##                      Data segmentation                      ##
   #################################################################
   set.seed(seed.num)
+  date.analysis <- format(Sys.Date(), "%Y%b%d")
   test.ind <- sample(1:nrow(dat.pheno), ceiling(0.5*nrow(dat.pheno)))
   dat.pheno.train <- dat.pheno[-test.ind, ]
   dat.pheno.test <- dat.pheno[test.ind, ]
@@ -428,6 +377,15 @@ uni_ana_noTMM <- function(seed.num = 999) {
   dat.expr.train <- dat.expr.new[, rownames(dat.pheno.train)]
   dat.expr.test <- dat.expr.new[, rownames(dat.pheno.test)]
   
+  
+  ##------check data------
+  ##################################################################
+  ##     Check if gene expression data matches phenotype data     ##
+  ##################################################################
+  print(paste0("The column names of training gene expression data", ifelse(all(colnames(dat.expr.train) == rownames(dat.pheno.train)), " MATCH ", "NOT MATCH"), "the row names of training phenotype data."))
+  print(paste0("The column names of test gene expression data", ifelse(all(colnames(dat.expr.test) == rownames(dat.pheno.test)), " MATCH ", "NOT MATCH"), "the row names of test phenotype data."))
+  
+  ##------make a table one------
   #################################################################
   ##         Output patient characteristics distribution         ##
   #################################################################
@@ -436,8 +394,9 @@ uni_ana_noTMM <- function(seed.num = 999) {
   dat.pheno.all <- rbind(dat.pheno.train, dat.pheno.test)
   tab1 <- tbl_summary(data = dat.pheno.all,
                     by = "group") %>% 
-    add_p()
-  tab1
+    add_p() %>% 
+    as_gt() %>%
+    gt::gtsave(filename = paste0("../ApplicationResult/RandomSeed/Uni/", date.analysis, "_", "Table1", "_", seed.num, ".rtf"))
   
   vars <- c("BMI", "AGE", "SEX", "MHABNWBC", "MHARTHTS", "MHCVD") 
   
@@ -466,10 +425,17 @@ uni_ana_noTMM <- function(seed.num = 999) {
                                                    label_alpha = 0, label_color = "white") +
                            theme(legend.position = "none", 
                                  plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                           ggtitle(x),
+                           ggtitle(vars[x]),
                          mc.cores = 4L
                        )
-  grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  g <- grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  ggsave(filename = paste0("../ApplicationResult/RandomSeed/Uni/", date.analysis, "_", "BMAseq", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+  
   
   
   ##------voom + limma------
@@ -543,10 +509,16 @@ uni_ana_noTMM <- function(seed.num = 999) {
                                                    label_alpha = 0, label_color = "white") +
                            theme(legend.position = "none", 
                                  plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                           ggtitle(x),
+                           ggtitle(vars[x]),
                          mc.cores = 4L
                        )
-  grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  g <- grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  ggsave(filename = paste0("../ApplicationResult/RandomSeed/Uni/", date.analysis, "_", "voom_limma", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
   
   
   ##------voom + limma + eBayes------
@@ -618,10 +590,16 @@ uni_ana_noTMM <- function(seed.num = 999) {
                                                    label_alpha = 0, label_color = "white") +
                            theme(legend.position = "none", 
                                  plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                           ggtitle(x),
+                           ggtitle(vars[x]),
                          mc.cores = 4L
                        )
-  grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  g <- grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  ggsave(filename = paste0("../ApplicationResult/RandomSeed/Uni/", date.analysis, "_", "voom_limma_eBayes", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
   
   
   ##------edgeR------
@@ -686,10 +664,16 @@ uni_ana_noTMM <- function(seed.num = 999) {
                                                    label_alpha = 0, label_color = "white") +
                            theme(legend.position = "none", 
                                  plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                           ggtitle(x),
+                           ggtitle(vars[x]),
                          mc.cores = 4L
                        )
-  grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  g <- grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  ggsave(filename = paste0("../ApplicationResult/RandomSeed/Uni/", date.analysis, "_", "edgeR", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
   
   
   ##------DESeq2------
@@ -737,7 +721,7 @@ uni_ana_noTMM <- function(seed.num = 999) {
   
   DESeq2.DEG.test <- mclapply(1:length(vars),
                               function(i) rownames(cts.test)[eFDR.test[[i]] < 0.25],
-                              mc.cores = 10L)
+                              mc.cores = 4L)
   
   names(res.test) = names(eFDR.test) = names(DESeq2.DEG.test) = vars 
   
@@ -750,29 +734,17 @@ uni_ana_noTMM <- function(seed.num = 999) {
                                                    label_alpha = 0, label_color = "white") +
                            theme(legend.position = "none", 
                                  plot.title = element_text(hjust = 0.5, colour = "red")) + 
-                           ggtitle(x),
+                           ggtitle(vars[x]),
                          mc.cores = 4L
                        )
-  grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  g <- grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
+  ggsave(filename = paste0("../ApplicationResult/RandomSeed/Uni/", date.analysis, "_", "DESeq2", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
 }
-```
-
-
-# Trial 2
-```{r trial2}
-t0 <- get_nanotime()
-uni_ana_noTMM(seed.num = 66666)
-t1 <- get_nanotime()
-t1-t0
-```
-
-
-# Trial 3
-```{r trial3}
-t0 <- get_nanotime()
-uni_ana_noTMM(seed.num = 39089)
-t1 <- get_nanotime()
-t1-t0
 ```
   
 
