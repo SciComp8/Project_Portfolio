@@ -362,7 +362,7 @@ grid.arrange(do.call("arrangeGrob", c(plot.array, ncol = 3)))
 
 
 ## Wrap above separate codes into one function
-```
+```{r uni_ana_noTMM_func}
 uni_ana_noTMM <- function(seed.num = 999) {
   ##------data preprocessing------  
   #################################################################
