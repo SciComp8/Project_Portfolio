@@ -39,7 +39,7 @@ knitr::opts_chunk$set(
   * Pairwise comparison for differential gene expression between cell types
       + key functions: `DESeq()` and `results()`
 
-# Build the snakemake rule of taking FASTQ files from the seqencing facility, assess the quality of reads, and quantify expression on count data
+# Build the snakemake rule of taking FASTQ files from the seqencing facility, assessing the quality of reads, and quantifying abundances of transcripts from RNA-Seq data
 ```{python eval=FALSE}
 # configfile: "config.yaml"
 from collections import Counter
