@@ -15,6 +15,7 @@ A bioinformatics pipeline using the next-generation single cell data from the mo
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
 
 ## **Bayesian integrative clustering for multi-omics data (use R programming)**
+In this project, 
   - [BayesClustering.Rmd](BayesClustering.Rmd)
  
 ## **Lipidomics and transcriptomics analysis (use R programming)**
