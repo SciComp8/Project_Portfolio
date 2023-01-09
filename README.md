@@ -1,4 +1,4 @@
-# Research project-oriented analytical programming
+# Research project-oriented programming
 
 Here lists my coding work affiliated with multifaceted collaborative and individual research projects spanning from statistical omics to clinical research.
 
