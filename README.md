@@ -11,7 +11,7 @@ The goal of this project is to evaluate the performance  of our novel BMAseq and
 - [Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd](Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd)
   
 ## **Differential expression analysis pipeline for single cell data (use Python-based snakemake workflow and R programming)**
-A bioinformatics pipeline is developed to glue several steps of trimming reads from raw FASTQ files, quantifying abundances of transcripts from RNA-Seq data, and performing downstream DESeq2-based differential gene expression analysis .
+A bioinformatics pipeline using the next-generation single cell data from the mouse B lymphocytes is developed for the purpose of streamlining several steps: trimming reads from raw FASTQ files, quantifying abundances of transcripts from RNA-Seq data, and performing downstream DESeq2-based differential gene expression analysis.
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
 
 ## **Bayesian integrative clustering for multi-omics data (use R programming)**
