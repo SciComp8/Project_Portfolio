@@ -9,6 +9,7 @@ The goal of this project is to evaluate the performance  of our novel BMAseq and
 - [UniBMA_voom_limma_edgeR_DESeq2.Rmd](UniBMA_voom_limma_edgeR_DESeq2.Rmd)
 - [UniBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](UniBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
 - [MultiBMA_voom_limma_edgeR_DESeq2.Rmd](MultiBMA_voom_limma_edgeR_DESeq2.Rmd)
+- [MultiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](MultiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
 - [Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd](Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd)
   
 ## **Differential expression analysis pipeline for single cell data (use Python-based snakemake workflow and R programming)**
