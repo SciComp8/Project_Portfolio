@@ -21,7 +21,7 @@ This project characterizes the shared patterns underlying the transcriptomic and
   - [BayesClustering.Rmd](BayesClustering.Rmd)
  
 ## **Lipidomics and transcriptomics analysis (use R programming)**
-The goal of this lipidomics and transcriptomics analysis is to test the hypothesis where lipid and gene molecules may be co-up- or co-down-regulated in different phenotypes (e.g., body mass index, trunk fat percent, adipocyte diameter states) and these differences may enable useful insights into the pathogenic mechanisms of breast cancer, ultimately for the purpose of developing more targeted prevention and intervention strategies for breast cancer patients. The analysis starts from raw lipidomic and transcriptomic data preprocessing, statistical analysis, and heatmap visualization. 
+The goal of this lipidomics and transcriptomics analysis is to test the hypothesis where lipid and gene molecules may be co-up- or co-down-regulated in different phenotypes (e.g., body mass index, trunk fat percent, adipocyte diameter states) and these differences may enable useful insights into the pathogenic mechanisms of breast cancer, to pave the way for developing more targeted prevention and intervention strategies for breast cancer patients. The main theme of analysis starts from processing lipidomic and transcriptomic expression data, analyzing the co-expression patterns in different phenotypes, to creating heatmap presentations. 
   - [LipidomicTranscriptomic.Rmd](LipidomicTranscriptomic.Rmd)
 
 ## **Statistical analysis for breast cancer surgery clinical data (use R/Python programming)**
