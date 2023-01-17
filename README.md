@@ -17,7 +17,7 @@ A bioinformatics pipeline using the next-generation single cell data from the mo
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
 
 ## **Bayesian integrative clustering for multi-omics data (use R programming)**
-This project explores the shared patterns between transcriptomic and lipidomic profiles and their biomedical relevance in women at high risk or diagnosed with breast cancers. The Bayesian latent variable approach which jointly models the non-tumorous breast tissue transcriptomic expression levels and plasma lipidomic expression levels is used to identify clinically and biologically relevant clusters co-driven by transcriptomic and lipidomic features.
+This project explores the shared patterns between transcriptomic and lipidomic profiles and their biomedical relevance in women at high risk or diagnosed with breast cancers. A novel Bayesian latent variable approach which jointly models the non-tumorous breast tissue transcriptomic expression levels and plasma lipidomic expression levels is used to identify clinically and biologically relevant clusters co-driven by transcriptomic and lipidomic features.
   - [BayesClustering.Rmd](BayesClustering.Rmd)
  
 ## **Lipidomics and transcriptomics analysis (use R programming)**
