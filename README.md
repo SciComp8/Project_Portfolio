@@ -13,11 +13,11 @@ The goal of this project is to evaluate the performance  of our novel BMAseq and
 - [Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd](Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd)
   
 ## **Differential expression analysis pipeline for single cell data (use Python-based snakemake workflow and R programming)**
-A bioinformatics pipeline using the next-generation single cell data from the mouse B lymphocytes is developed for the purpose of streamlining several steps: trimming reads from raw FASTQ files, quantifying abundances of transcripts from RNA-Seq data, and performing downstream DESeq2-based differential gene expression analysis.
+A bioinformatics pipeline using the next-generation single cell data from the mouse B lymphocytes is developed for the purpose of streamlining several steps involving trimming reads from raw FASTQ files, quantifying abundances of transcripts from RNA-Seq data, and performing downstream DESeq2-based differential gene expression analysis. 
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
 
 ## **Bayesian integrative clustering for multi-omics data (use R programming)**
-In this project, 
+This project explores the shared patterns between transcriptomic and lipidomic profiles and their clinical or biological relevance in women at high risk or diagnosed with breast cancers. Here the Bayesian latent variable approach which jointly models the non-tumorous breast tissue transcriptomic data and plasma lipidomic data is used to identify clinically and biologically relevant clusters co-driven by transcriptomic and lipidomic features.
   - [BayesClustering.Rmd](BayesClustering.Rmd)
  
 ## **Lipidomics and transcriptomics analysis (use R programming)**
