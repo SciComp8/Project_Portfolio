@@ -393,6 +393,12 @@ with(dat3, table(paste(New.Breast.Primary, HER2.NP, Death,
 ```
 
 # Data preparation
+Among patients with local recurrence 72 (11.92%, n = 604), 2 patients do not have the date of local recurrence. Among patients with distant recurrence 70 (11.59%, n = 604), 13 patients do not have the date of distant recurrence. Among patients with new breast primary recurrence 18 (2.98%, n = 604), no patient does not have the date of new breast primary recurrence.
+
+Patients who were never disease free (n = 2) were counted as N/A’s in terms of recurrence and new primary endpoints.
+
+The categorical levels of race and ethnicity variables need careful re-examination. Two spreadsheets contained race data, however the race variables were categorized in varied ways. Specially, in terms of Hisp/Latina category, it is unclear if some of the whites would have been in the Hisp/Latina category. At present, one patient with race of Arabic/Mideastern was included in the WA category.
+
 
 ```{r global_options, include=FALSE}
 #################################################################
