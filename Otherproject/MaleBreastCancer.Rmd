@@ -1,0 +1,963 @@
+---
+title: "Male Breast Cancer Data Analysis"
+author: "Anni Liu"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+knit: knitautomator::knit_filename
+output:
+  word_document:
+    fig_caption: no
+    fig_height: 4
+    fig_width: 4
+    highlight: null
+    toc: yes
+    reference_docx: manuscript_style_V0.docx
+  html_document: default
+params:
+  date.analysis: !r format(Sys.Date(), "%Y%B%D")
+  plot.fig: TRUE
+  results.folder: FALSE
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r shorcut, include=FALSE}
+#################################################################
+##                  RStudio keyboard shortcut                  ##
+#################################################################
+# Cursor at the beginning of a command line: Ctrl+A
+# Cursor at the end of a command line: Ctrl+E
+# Clear all the code from your console: Ctrl+L
+# Create a pipe operator %>%: Ctrl+Shift+M (Windows) or Cmd+Shift+M (Mac)
+# Create an assignment operator <-: Alt+- (Windows) or Option+-(Mac) 
+# Knit a document (knitr): Ctrl+Shift+K (Windows) or Cmd+Shift+K (Mac)
+# Comment or uncomment current selection: Ctrl+Shift+C (Windows) or Cmd+Shift+C (Mac)
+```
+
+
+```{r analysis_plan, include=FALSE}
+#################################################################
+##                        Analysis plan                        ##
+#################################################################
+# Create a summary table of patient characteristics
+# Create a summary table of patient characteristics by race
+# Create a summary table of patient characteristics by ever local recurrence 
+# Create a summary table of patient characteristics by ever distant recurrence
+# Create a summary table of patient characteristics by death
+# Create a summary table of patient characteristics by 5-year local recurrence for patients with local recurrence data
+# Create a summary table of patient characteristics by 5-year distant metastasis for patients with distant recurrence data
+# Create a summary table of patient characteristics by 5-year death
+# Create a summary table of univariate analysis of local recurrence free survival
+# Create a summary table of univariate analysis of distant metastasis free survival
+# Create a summary table of univariate analysis of overall survival
+```
+
+
+```{r check_data, include=FALSE}
+##################################################################
+##                           Checking                           ##
+##################################################################
+dat.work <- fst::read_fst(path = "../data/derived/2023Jan19_dat_maleBC.RData")
+
+with(dat.work, table(paste(Local.Recurrence, 
+                           ifelse(is.na(Time.to.Local.Recurrence.in.years), "noT2LR", "T2LR"),
+                           ifelse(is.na(Time.to.Follow.Up.in.years), "noT2LFU", "T2LFU"),
+                           sep = ":")))
+# NA:noT2LR:noT2LFU   NA:noT2LR:T2LFU No:noT2LR:noT2LFU   No:noT2LR:T2LFU 
+#                 1                22                 7               167 
+#     No:T2LR:T2LFU    Yes:T2LR:T2LFU 
+#                 1*                 9 
+# One male patient (ID: 107) without local recurrence shows the date of local recurrence. Need to check and fix this record.
+
+with(dat.work, table(paste(Distant.Metastasis, 
+                           ifelse(is.na(Time.to.Distant.Metastasis.in.years), "noT2DM", "T2DM"),
+                           ifelse(is.na(Time.to.Follow.Up.in.years), "noT2LFU", "T2LFU"),
+                           sep = ":")))
+# NA:noT2DM:noT2LFU   NA:noT2DM:T2LFU No:noT2DM:noT2LFU   No:noT2DM:T2LFU 
+#                 2                 8                 6               178 
+#    Yes:T2DM:T2LFU 
+#                13 
+
+with(dat.work, table(paste(dat.work$Status.at.follow.up, 
+                           ifelse(is.na(Time.to.Follow.Up.in.years), "noT2LFU", "T2LFU"),
+                           sep = ":")))
+# Alive:noT2LFU   Alive:T2LFU    Dead:T2LFU 
+#             8           191             8 
+```
+
+
+```{r attach_lib_func, include=FALSE}
+##################################################################
+##                Attach libraries and functions                ##
+##################################################################
+# devtools::install("/Library/Frameworks/R.framework/Versions/4.2/Resources/library/BTKR")
+easypackages::libraries("BTKR", "multcomp", "readxl", "tidyverse", "bannerCommenter", 
+                        "survival", "parallel", "fst")
+"%_%" <- function(m, n) paste0(m, "_", n)
+"%0%" <- function(m, n) paste0(m, n)
+
+uni.coxph <- function(surv.time, surv.event) {
+  out <- mclapply(1:length(vars.ana),
+                  function(i) {
+                    vars.missing <- ifelse(is.na(dat.work[, vars.ana[i]]), 
+                                         "missing", "non.missing") %>%
+                      factor(levels = c("non.missing", "missing"))
+                    res.i <- coxph(formula("Surv(" %0% surv.time %0% "," %0% surv.event %0% ") ~ " %0% vars.ana[i]), 
+                                   data = dat.work)
+                    if(any(vars.missing == "missing")) {
+                      res.i.miss <- coxph(formula("Surv(" %0% surv.time %0% "," %0% surv.event %0% ") ~ vars.missing"), 
+                                          data = dat.work)
+                      return(list(res.i, res.i.miss))
+                    } else {
+                      return(list(res.i))
+                    }
+                  },
+                mc.cores = 4L)
+  names(out) <- vars.ana
+  return(out)
+}
+
+# Updates on the BTKR package - 1. prop.by.row; 2. tbl input
+# fsmry.dmgrph <-
+#   function (dat = dat.work,
+#             vars = vars,
+#             vars.cat = vars.cat,
+#             vars.chisq = rep(0, length(vars)),
+#             by = "BMI.cat",
+#             all = T,
+#             markdown = T,
+#             IQR = T,
+#             prop.by.row = FALSE) {
+#     if (class(dat)[1] == "tbl_df") 
+#     dat <- data.frame(dat)
+#   }
+```
+
+
+```{r global_options, include=FALSE}
+#################################################################
+##                          Automator                          ##
+#################################################################
+if (params$plot.fig) {
+  dir.fig <- "../report/figs" %_% params$date.analysis %0% "/"
+  # Need "/", otherwise, the images are saved directly under the report folder
+  
+  if (!dir.exists(dir.fig)) { 
+    # If the figure directory does not exist, we create a new directory under the folder report using the name figs + current date passed from the params$date in YAML
+    dir.create(dir.fig) 
+  }
+  
+  knitr::opts_chunk$set( # Setting parameters when figures are plotted
+    fig.width = 4, fig.height = 4, 
+    fig.path = dir.fig, dev = "png", dpi = 300,
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+} else { # Setting parameters when figures are not plotted
+  knitr::opts_chunk$set(
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+}
+
+if (params$results.folder) { # Suitable when the results need to be stored outside the microsoft word report
+  dir.result <- "../report/results" %_% params$date
+  
+  if (!dir.exists(dir.result)) {
+    # If the directory does not exist, we create a new directory under the folder report using the name results + current date passed from the params$date in YAML 
+    
+    dir.create(dir.result)
+  }
+}
+
+loc.perl <- "C:/cygwin64/bin/perl"
+```
+
+
+# Data preparation
+Nine male patients manifest the local recurrence (`r round(sum(dat.work$Local.Recurrence == "Yes", na.rm = T)/nrow(dat.work)*100, 2)`%, n = `r nrow(dat.work)`). All these patients have the dates of local recurrence. Male patients who manifest never-disease-free (n = 12) are recoded as NA in terms of the local recurrence, since their dates of local recurrence are not available. One male patient (ID: 107) without local recurrence shows the date of local recurrence. **Need to check and fix this record**. 
+
+Thirteen patients manifest the distant metastasis (`r round(sum(dat.work$Distant.Metastasis == "Yes", na.rm = T)/nrow(dat.work)*100, 2)`%, n = `r nrow(dat.work)`). All these patients have the dates of distant metastasis.
+
+The minimum, the first quantile, median, mean, the third quantile, and maximum of follow-up time (in years) for male patients are: `r a <- summary(dat.work$Time.to.Follow.Up.in.years) |> round(2); paste(a[1:6], "years")`. The minimum, the first quantile, median, mean, the third quantile, and maximum of time to develop local recurrence (in years) for male patients are: `r a <- summary(dat.work$Time.to.Local.Recurrence.in.years) |> round(2); paste(a[1:6], "years")`. The minimum, the first quantile, median, mean, the third quantile, and maximum of time to develop distant metastasis (in years) for male patients are: `r a <- summary(dat.work$Time.to.Distant.Metastasis.in.years) |> round(2); paste(a[1:6], "years")`. The minimum, the first quantile, median, mean, the third quantile, and maximum of time to die (in years) for male patients are: `r a <- summary(dat.work[dat.work$Status.at.follow.up == "Dead", "Time.to.Follow.Up.in.years"]) |> round(2); paste(a[1:6], "years")`. 
+
+New variables such as `Local.Recurrence.5.Year` (**0** - No local recurrence within 5-year follow-up; **1** - have local recurrence within 5-year follow-up), `Distant.Metastasis.5.Year` (**0** - No distant metastasis within 5-year follow-up; **1** - have distant metastasis within 5-year follow-up), and `Death.5.Year` (**0** - No death within 5-year follow-up; **1** - die within 5-year follow-up) are created. The variable `Ki.67` is categorized into three levels: **<= 5%**, **> 5% and <30%**, **>= 30%** and renamed as `Ki.67.2` based on the *Updated Recommendations From the International Ki67 in Breast Cancer Working Group* (https://academic.oup.com/jnci/article/113/7/808/6053794). 
+
+
+```{r clean_data_start, eval=FALSE}
+# Load original data
+dat0 <- read_xlsx(
+  "../data/raw/Male\ breast\ cancer\ for\ statistician.xlsx", # \ literal space
+  sheet = "Sheet1",
+  range = c("A1:AY208"),
+  col_names = T,
+  na = c("Unknown", "unknown", "N/a", "")
+)
+
+# file.exists("../data/raw/Male\ breast\ cancer\ for\ statistician.xlsx")
+
+# Fix variable names
+names(dat0) <- sapply(strsplit(names(dat0), split = "\\-|\\s|\\(|\\)|\\/|\\%|^the$"), function(x) paste(x[!x %in% c("", "-", "(", ")", "/", "%", "the")], collapse = ".")) # \\s means the literal space 
+
+# Check the categorical levels of character variables
+all <- sapply(names(dat0)[sapply(dat0, is.character)], function(x) with(dat0, table(get(x), useNA = "ifany")))  
+View(all)
+
+# Recode variables
+dat0 <- within(dat0, {
+  
+  ##------Age.at.Diagnosis.10.Year.Groups------
+  Age.at.Diagnosis.10.Year.Groups = case_when(
+    Age.at.Diagnosis.10.Year.Groups == "60-65" ~ "60-69",
+    Age.at.Diagnosis.10.Year.Groups == "70-71" ~ "70-79",
+    TRUE ~ Age.at.Diagnosis.10.Year.Groups) %>% 
+    factor(levels = c("60-69", "30-39", "40-49", "50-59", "70-79", "80-89", ">=90"))
+  
+  ##------Race------
+  Race = ifelse(Race == "Hispanic", "Other", Race) %>% 
+    factor(levels = c("White", "Black", "Asian", "Other"))
+  
+  ##------Presenting.symptom------
+  Presenting.symptom = factor(Presenting.symptom) %>% 
+    relevel(ref = "Palpable mass")
+  
+  ##------Type------
+  Type = factor(Type) %>% 
+    relevel(ref = "Invasive ductal carcinoma")
+  
+  ##------Type.of.ductal.carcinoma------  
+  Type.of.ductal.carcinoma = factor(Type.of.ductal.carcinoma) %>% 
+    relevel(ref = "NOS")
+  
+  ##------Lymphovascular.invasion------
+  Lymphovascular.invasion = Lymphovascular.invasion.yes.no
+  
+  ##------Grade.of.Differentiation------
+  Grade.of.Differentiation = Grade.Of.Differentiation.Pre.8th
+  
+  ##------Grade.of.Differentiation.2------
+  Grade.of.Differentiation.2 = ifelse(
+    Grade.of.Differentiation == "Poorly Differentiated", 
+    "High grade", "Non high grade") %>%
+    factor() %>% 
+    relevel(ref = "Non high grade")
+  
+  ##------Presence.of.DCIS.in.specimen------
+  Presence.of.DCIS.in.specimen = factor(Presence.of.DCIS.in.specimen) %>% 
+    relevel(ref = "Yes")
+  
+  ##------DCIS.architecture------
+  DCIS.architecture = factor(DCIS.architecture) %>% 
+    relevel(ref = "Solid")
+  
+  ##------DCIS.nuclear.grade------
+  DCIS.nuclear.grade = factor(DCIS.nuclear.grade) %>% 
+    relevel(ref = "Intermediate")
+  
+  ##------DCIS.in.specimen------
+  DCIS.in.specimen = factor(DCIS.in.specimen) %>% 
+    relevel(ref = "0.05")
+  
+  ##------ER.Tumor.registry------
+  ER.Tumor.registry = factor(ER.Tumor.registry) %>% 
+    relevel(ref = "Positive")
+  
+  ##------PR.Tumor.registry------
+  PR.Tumor.registry = factor(PR.Tumor.registry) %>% 
+    relevel(ref = "Positive")
+  
+  ##------Ki.67------
+  Ki.67 = factor(Ki.67) %>% 
+    relevel(ref = "0.1")
+  
+  ##------Ki.67.2------
+  # Cut-off point reference: https://academic.oup.com/jnci/article/113/7/808/6053794
+  # 1. <= 5% 2. > 5% and < 30% 3. >= 30%
+  Ki.67.2 = case_when(Ki.67 %in% c("0.01", "0.05") ~ "<= 5%",
+                      Ki.67 %in% c("0.3", "0.31", "0.317", "0.32400000000000001", "0.35", "0.4", "0.5", "0.7", "0.75", "0.8", "40-50%", "50-55%") ~ ">= 30%",
+                      TRUE ~ "> 5% and < 30%") %>% 
+    factor(levels = c("> 5% and < 30%", "<= 5%", ">= 30%"))
+  
+  ##------Genetic.test------
+  Genetic.test = factor(Genetic.test) %>% 
+    relevel(ref = "Negative")  
+  
+  ##------Type.of.personal.cancer------
+  Type.of.personal.cancer = gsub(pattern = " cancer$", replacement = "", Type.of.personal.cancer) %>%
+    factor() %>%
+    relevel(ref = "Prostate")
+  
+  ##------Surgical.Procedure.of.Primary.Site------
+  Surgical.Procedure.of.Primary.Site = factor(Surgical.Procedure.of.Primary.Site) %>% 
+    relevel(ref = "Total mastectomy")
+  
+  ##------Regional.lymph.node.surgery------  
+  Regional.lymph.node.surgery = gsub(pattern = "^sentinel", replacement = "Sentinel", Regional.lymph.node.surgery) %>% 
+    factor() %>%
+    relevel(ref = "Sentinel LN biopsy")
+  
+  ##------T.Class.Pathologic------
+  T.Class.Pathologic = ifelse(T.Class.Pathologic == "T1c", "T1C", T.Class.Pathologic) %>% 
+    factor() %>% 
+    relevel(ref = "T2")
+  
+  ##------T.Class.Pathologic.2------
+  T.Class.Pathologic.2 = gsub(pattern = "T1|T1.|T1..|T2", replacement = "T1|T2",
+                              gsub(pattern = "T3|T4|T4.", replacement = "T3|T4", x = T.Class.Pathologic)) %>% 
+    factor(levels = c("T1|T2", "T3|T4"))
+
+  ##------T.Class.Pathologic.3------
+  T.Class.Pathologic.3 = gsub(pattern = "T1|T1.|T1..", replacement = "T1",
+                              gsub(pattern = "T3|T4|T4.", replacement = "T3|T4", x = T.Class.Pathologic)) %>% 
+  factor(levels = c("T1", "T2", "T3|T4"))
+  
+  ##------N.Class.Pathologic------
+  N.Class.Pathologic = gsub(pattern = "N0..", replacement = "N0", x = N.Class.Pathologic) %>% 
+    factor() %>% 
+    relevel(ref = "N0")
+  
+  ##------N.Class.Pathologic.2------
+  N.Class.Pathologic.2 = gsub(pattern = "N[1-3]", replacement = "N1|N2|N3", x = N.Class.Pathologic) %>% 
+    factor() %>% 
+    relevel(ref = "N0")
+  
+  ##------Pathologic.stage.2------
+  Pathologic.stage.2 = gsub(pattern = "^I[AB]", replacement = "I", x = Pathologic.stage)
+  
+  ##------Pathologic.stage.3------
+  Pathologic.stage.3 = gsub(pattern = "^II[AB]", replacement = "II", 
+                            gsub(pattern = "^III[ABC]", replacement = "III", x = Pathologic.stage.2)) %>% 
+    factor() %>% 
+    relevel(ref = "II")
+  
+  ##------Findings.in.prophylactic.mastectomy------
+  Findings.in.prophylactic.mastectomy = gsub(pattern = "^b", replacement = "B", x = Findings.in.prophylactic.mastectomy)
+  Findings.in.prophylactic.mastectomy = factor(
+    Findings.in.prophylactic.mastectomy,
+    levels = c("Benign", "Negative", "DCIS", "Ductal hyperplasia", "Breast cancer"))
+  
+  ##------Reconstruction------
+  Reconstruction = factor(Reconstruction, levels = c("No", "Yes", "Immediate autologous", "Revision mastectomy incision"))
+  
+  ##------Hormone.Therapy------
+  Hormone.Therapy = factor(Hormone.Therapy) %>% 
+    relevel(ref = "Yes")
+  
+  ##------Local.Recurrence------
+  Local.Recurrence = ifelse(Local.Recurrence %in% c("Never Disease-Free", "Never-Disease-Free"), NA, Local.Recurrence)
+  
+  ##------Distant.Metastasis------
+  Distant.Metastasis = factor(Distant.metastasis.after.diagnosis)
+  
+  ##------Date.of.distant.metastasis------
+  Date.of.distant.metastasis = ifelse(Date.of.distant.metastasis == "No", NA, Date.of.distant.metastasis) %>% as.numeric()
+  
+  ##------Time.to.Follow.Up.in.years------
+  Time.to.Follow.Up.in.years = as.numeric(as.Date(Date.of.Last.Follow.Up.Contact.or.Death) - as.Date(Date.of.diagnosis))/365.25
+  
+  ##------Time.to.Local.Recurrence.in.years------
+  Time.to.Local.Recurrence.in.years = as.numeric(as.Date(Date.of.local.recurrence) - as.Date(Date.of.diagnosis))/365.25
+  
+  ##------Time.to.Local.Recurrence.Follow.Up.in.years------
+  Time.to.Local.Recurrence.Follow.Up.in.years = ifelse(Local.Recurrence == "Yes",
+                                                       Time.to.Local.Recurrence.in.years,
+                                                       Time.to.Follow.Up.in.years)
+  
+  ##------Time.to.Distant.Metastasis.in.years------
+  Date.of.distant.metastasis[178] = NA
+  Date.of.distant.metastasis <- as.numeric(Date.of.distant.metastasis)
+  # Date given as number of days since 1899-12-30 
+  Time.to.Distant.Metastasis.in.years = as.numeric(as.Date(Date.of.distant.metastasis, origin = "1899-12-30") - as.Date(Date.of.diagnosis))/365.25
+  
+  ##------Time.to.Distant.Metastasis.Follow.Up.in.years------
+  Time.to.Distant.Metastasis.Follow.Up.in.years = ifelse(Distant.Metastasis == "Yes",
+                                                         Time.to.Distant.Metastasis.in.years,
+                                                         Time.to.Follow.Up.in.years)
+  
+  ##------Local.Recurrence.5.Year------
+  # Situations: 1. The patient shows the local recurrence before the 5th follow-up year [event]; 2. The patient shows the local recurrence in or after the 5th year [censor]; 3. The patient does not show the local recurrence before the 5th year; we do not exactly know the patient's local recurrence status just before the 5th year [NA]; 4. The patient does not show the local recurrence in or after the 5th year [censor]; 5. The patient does not have the information on local recurrence status [NA]
+  Local.Recurrence.5.Year <- rep(x = 0, times = nrow(dat0))
+  Local.Recurrence.5.Year[Local.Recurrence == "Yes" & !is.na(Time.to.Local.Recurrence.in.years) & Time.to.Local.Recurrence.in.years < 5] <- 1
+  Local.Recurrence.5.Year[Local.Recurrence == "No" & Time.to.Follow.Up.in.years < 5] <- NA # It is likely to have a male patient develop the local recurrence, supposing the follow-up time spans 5 years; we do not know the local recurrence status of this patient just before the 5th year.
+  Local.Recurrence.5.Year[is.na(Local.Recurrence)] <- NA
+  Local.Recurrence.5.Year <- factor(Local.Recurrence.5.Year)
+  
+  ##------Distant.Metastasis.5.Year------
+  # Situations: 1. The patient shows the distant metastasis before the 5th follow-up year [event]; 2. The patient shows the distant metastasis in or after the 5th year [censor]; 3. The patient does not show the distant metastasis before the 5th year; we do not exactly know the patient's distant metastasis status just before the 5th year [NA]; 4. The patient does not show the distant metastasis in or after the 5th year [censor]; 5. The patient does not have the information on distant metastasis status [NA]
+  Distant.Metastasis.5.Year <- rep(x = 0, times = nrow(dat0))
+  Distant.Metastasis.5.Year[Distant.Metastasis == "Yes" & !is.na(Time.to.Distant.Metastasis.in.years) & Time.to.Distant.Metastasis.in.years < 5] <- 1
+  Distant.Metastasis.5.Year[Distant.Metastasis == "No" & Time.to.Follow.Up.in.years < 5] <- NA
+  Distant.Metastasis.5.Year[is.na(Distant.Metastasis)] <- NA
+  Distant.Metastasis.5.Year <- factor(Distant.Metastasis.5.Year)
+  
+  ##------Death.5.Year------
+  # Situations: 1. The patient dies before the 5th follow-up year [event]; 2. The patient dies in or after the 5th year [censor]; 3. The patient is still alive before the 5th year; we do not exactly know the patient's death status just before the 5th year [NA]; 4. The patient does not die in or after the 5th year [censor]
+  Death.5.Year <- rep(x = 0, times = nrow(dat0))
+  Death.5.Year[Status.at.follow.up == "Dead" & !is.na(Time.to.Follow.Up.in.years) & Time.to.Follow.Up.in.years < 5] <- 1
+  Death.5.Year[Status.at.follow.up == "Alive" & Time.to.Follow.Up.in.years < 5] <- NA
+  Death.5.Year <- factor(Death.5.Year)
+})
+```
+
+
+```{r load_save_performance, eval=FALSE}
+library(microbenchmark)
+t0 <- get_nanotime()
+dput(dat0, "../data/derived/2023Jan18_dat_maleBC_v1.RData")
+t1 <- get_nanotime()
+t1 - t0
+# 13675690 nano seconds
+
+t0 <- get_nanotime()
+save(dat0, file = "../data/derived/2023Jan18_dat_maleBC_v2.RData")
+t1 <- get_nanotime()
+t1 - t0
+# 6318559 nano seconds
+
+t0 <- get_nanotime()
+write_fst(dat0, path = "../data/derived/2023Jan18_dat_maleBC_v3.RData", compress = 50, uniform_encoding = TRUE)
+t1 <- get_nanotime()
+t1 - t0
+# 2813464 nano seconds
+
+t0 <- get_nanotime()
+dat.work <- dget("../data/derived/2023Jan18_dat_maleBC_v1.RData")
+t1 <- get_nanotime()
+t1 - t0
+# 8949647 nano seconds
+
+t0 <- get_nanotime()
+dat.work <- get(load("../data/derived/2023Jan18_dat_maleBC_v2.RData"))
+t1 <- get_nanotime()
+t1 - t0
+# 3248012 nano seconds
+
+t0 <- get_nanotime()
+dat.work <- read_fst(path = "../data/derived/2023Jan18_dat_maleBC_v3.RData")
+t1 <- get_nanotime()
+t1 - t0
+# 2271846 nano seconds
+```
+
+
+```{r save_cleaned_data, eval=FALSE}
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+write_fst(dat0, path = paste0("../data/derived/", date.analysis, "_dat_maleBC.RData"), compress = 50, uniform_encoding = TRUE)
+write.csv(dat0, paste0("../data/derived/", date.analysis, "_dat_maleBC.csv"), row.names = F)
+```
+
+
+```{r load_cleaned_data}
+dat.work <- read_fst(path = "../data/derived/2023Jan19_dat_maleBC.RData")
+# class(dat.work) # data.frame
+```
+
+
+
+## Summary of patient characteristics (column proportion)
+```{r, results="hide"}
+#################################################################
+##                     Set study variables                     ##
+#################################################################
+vars.all <- c(
+
+  ##------Demographical variables------
+  "Age.at.diagnosis", "Age.at.Diagnosis.10.Year.Groups",
+  "Race", "Time.to.Follow.Up.in.years",
+  
+  ##------Disease-related variables------
+  "ER.Tumor.registry", "PR.Tumor.registry", "HER.2", "Tumor.size.cm",
+  "T.Class.Pathologic", "T.Class.Pathologic.2", "T.Class.Pathologic.3", 
+  "N.Class.Pathologic", "N.Class.Pathologic.2",
+  "Pathologic.stage", "Pathologic.stage.2", "Pathologic.stage.3",
+  "M.stage.at.diagnosis", 
+  "Site.of.metastasis.at.diagnosis",
+  "Laterality", 
+  # "Duration.of.symptoms.months", 
+  "Presenting.symptom", "Type", "Type.of.ductal.carcinoma",
+  "Lymphovascular.invasion", "Grade.of.Differentiation",
+  "Grade.of.Differentiation.2", "Presence.of.DCIS.in.specimen",
+  "DCIS.architecture", "DCIS.nuclear.grade", 
+  # "DCIS.in.specimen",
+  "Presence.of.Paget.disease",  
+  "Ki.67", 
+  "Ki.67.2",
+  "Proliferation.index", 
+  "Personal.history.of.other.primary.cancer", "Type.of.personal.cancer",
+  "Family.history.of.breast.cancer.in.first.degree.relatives", "Oncotype.score",
+  "Site.of.distant.metastasis.after.diagnosis",
+  
+  ##------Screening/diagnosis/treatment variables------
+  "Genetic.test", "Surgical.Procedure.of.Primary.Site", 
+  "Regional.lymph.node.surgery", "Prophylactic.mastectomy",
+  "Findings.in.prophylactic.mastectomy", "Reconstruction",
+  "Adjuvant.chemotherapy", "Neoadjuvant.chemotherapy", "Hormone.Therapy",
+  "Radiation", 
+
+  ##------Disease outcome variables------
+  "Local.Recurrence", "Local.Recurrence.5.Year", 
+  "Time.to.Local.Recurrence.in.years", "Time.to.Local.Recurrence.Follow.Up.in.years",
+  "Distant.Metastasis", "Distant.Metastasis.5.Year", 
+  "Time.to.Distant.Metastasis.in.years", "Time.to.Distant.Metastasis.Follow.Up.in.years",
+  "Status.at.follow.up", "Death.5.Year"
+)
+
+# Create an indicator [0, 1] for all categorical variables 
+vars.cat <- rep(x = 1, times = length(vars.all))
+vars.cat[vars.all %in% names(dat.work)[sapply(dat.work, is.numeric)]] <- 0
+```
+
+
+```{r, results="hide"}
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all,
+                    vars.cat = vars.cat,
+                    by = NULL)
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+# Patient characteristics summary tables
+The association between a categorical variable and a grouping variable (e.g., race) is examined using the Fisher’s exact test. Difference in the value of a continuous variable among patients of different groups is examined using the Wilcoxon rank sum test and its p-value is shown as the last term in the median (IQR) summary line). For the variable with missing values, the difference in the proportion of missingness across different groups is also examined.
+
+
+## Summary of patient characteristics by race (column proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Race", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Race")
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patient characteristics by race (row proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Race", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Race",
+                    prop.by.row = T)
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patient characteristics by ever local recurrence (column proportion, p-values in this table could not be used for inference)
+The local recurrence as a binary variable may ignore the impact of follow-up time on the recurrence. Manifesting no recurrence may result from the insufficient follow-up time which is used to observe the endpoint of a patient. Therefore, p-values in this table are not reliable for inference.
+
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Local.Recurrence", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Local.Recurrence")
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patient characteristics by ever local recurrence (row proportion, p-values in this table could not be used for inference)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Local.Recurrence", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Local.Recurrence",
+                    prop.by.row = T)
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+
+## Summary of patient characteristics by ever distant metastasis (column proportion, p-values in this table could not be used for inference)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Distant.Metastasis", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Distant.Metastasis")
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patient characteristics by ever distant metastasis (row proportion, p-values in this table could not be used for inference)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Distant.Metastasis", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Distant.Metastasis",
+                    prop.by.row = T)
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patient characteristics by death (column proportion, p-values in this table could not be used for inference)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Status.at.follow.up", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Status.at.follow.up")
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patient characteristics by death (row proportion, p-values in this table could not be used for inference)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Status.at.follow.up", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Status.at.follow.up",
+                    prop.by.row = T)
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+
+## Summary of patient characteristics by 5-year local recurrence (column proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Local.Recurrence.5.Year",
+                                     "Site.of.metastasis.at.diagnosis",
+                                     "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Local.Recurrence.5.Year")
+
+
+# 16. Site.of.metastasis.at.diagnosis
+# Error in fisher.test(y.by.grp, simulate.p.value = T) : 
+#   'x' must have at least 2 rows and columns
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patient characteristics by 5-year local recurrence (row proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Local.Recurrence.5.Year",
+                                     "Site.of.metastasis.at.diagnosis", 
+                                     "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Local.Recurrence.5.Year",
+                    prop.by.row = T)
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+### Single piece of the association between each categorical variable and 5-year local recurrence
+Each table gives the statistical results on the association between each categorical variable and the binary event (e.g., 5-year local recurrence). These results are in accord with the above monolithic summary table showing the row proportion.
+```{r results="asis"}
+##------Set study variables------
+vars.ana.rm <- c(names(dat.work)[sapply(dat.work, is.numeric)],
+                 "Site.of.metastasis.at.diagnosis",
+                 "Local.Recurrence.5.Year",
+                 "Ki.67")
+
+# Why remove the variable Site.of.metastasis.at.diagnosis?
+# Error in fisher.test(y.by.grp, simulate.p.value = T) : 
+#   'x' must have at least 2 rows and columns
+
+vars.ana <- vars.all[!(vars.all %in% vars.ana.rm)]
+
+##------Focus on records with available event statuses------
+id.keep <- which(!is.na(dat.work$Local.Recurrence.5.Year))
+
+for (i in 1:length(vars.ana)) {
+  
+  out.i <-
+    fsmry2.by.grp(y = dat.work$Local.Recurrence.5.Year[id.keep],
+                  grp = dat.work[id.keep, vars.ana[i]],
+                  cmp.method = "fisher")
+  
+  cat("\n#### 5-year Local Recurrence ~ " %0% vars.ana[[i]] %0% "\n")
+  
+  if (class(out.i) == "list") {
+    
+    cat("\nSummary" %0% "\n")
+    print(knitr::kable(out.i[[1]]))
+    cat("\nMissingness" %0% "\n")
+    print(knitr::kable(out.i[[2]]))
+    
+  } else {
+    
+    print(knitr::kable(out.i)) 
+    
+  }
+  
+  cat("\n")
+}
+```
+
+
+## Summary of patient characteristics by 5-year distant metastasis (column proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Distant.Metastasis.5.Year",
+                                     "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Distant.Metastasis.5.Year")
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patient characteristics by 5-year distant metastasis (row proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Distant.Metastasis.5.Year",
+                                     "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Distant.Metastasis.5.Year",
+                    prop.by.row = T)
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+### Single piece of the association between each categorical variable and 5-year distant metastasis
+```{r results="asis"}
+##------Set study variables------
+vars.ana.rm <- c(names(dat.work)[sapply(dat.work, is.numeric)],
+                 "Distant.Metastasis.5.Year", "Ki.67")
+
+vars.ana <- vars.all[!(vars.all %in% vars.ana.rm)]
+
+##------Focus on records with available event statuses------
+id.keep <- which(!is.na(dat.work$Distant.Metastasis.5.Year))
+
+for (i in 1:length(vars.ana)) {
+  
+  out.i <-
+    fsmry2.by.grp(y = dat.work$Distant.Metastasis.5.Year[id.keep],
+                  grp = dat.work[id.keep, vars.ana[i]],
+                  cmp.method = "fisher")
+  
+  cat("\n#### 5-year Distant Metastasis ~ " %0% vars.ana[[i]] %0% "\n")
+  
+  if (class(out.i) == "list") {
+    
+    cat("\nSummary" %0% "\n")
+    print(knitr::kable(out.i[[1]]))
+    cat("\nMissingness" %0% "\n")
+    print(knitr::kable(out.i[[2]]))
+    
+  } else {
+    
+    print(knitr::kable(out.i)) 
+    
+  }
+  
+  cat("\n")
+}
+```
+
+
+## Summary of patient characteristics by 5-year death (column proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Death.5.Year", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Death.5.Year")
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patient characteristics by 5-year death (row proportion)
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("Death.5.Year", "Ki.67"))
+out <- fsmry.dmgrph(dat = dat.work,
+                    vars = vars.all[-vars.cat.rm],
+                    vars.cat = vars.cat[-vars.cat.rm],
+                    by = "Death.5.Year",
+                    prop.by.row = T)
+```
+
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+### Single piece of the association between each categorical variable and 5-year local recurrence
+```{r results="asis"}
+##------Set study variables------
+vars.ana.rm <- c(names(dat.work)[sapply(dat.work, is.numeric)],
+                 "Death.5.Year", "Ki.67")
+
+vars.ana <- vars.all[!(vars.all %in% vars.ana.rm)]
+
+##------Focus on records with available event statuses------
+id.keep <- which(!is.na(dat.work$Death.5.Year))
+
+for (i in 1:length(vars.ana)) {
+  
+  out.i <-
+    fsmry2.by.grp(y = dat.work$Death.5.Year[id.keep],
+                  grp = dat.work[id.keep, vars.ana[i]],
+                  cmp.method = "fisher")
+  
+  cat("\n#### 5-year Death ~ " %0% vars.ana[[i]] %0% "\n")
+  
+  if (class(out.i) == "list") {
+    
+    cat("\nSummary" %0% "\n")
+    print(knitr::kable(out.i[[1]]))
+    cat("\nMissingness" %0% "\n")
+    print(knitr::kable(out.i[[2]]))
+    
+  } else {
+    
+    print(knitr::kable(out.i)) 
+    
+  }
+  
+  cat("\n")
+}
+```
+
+
+# Univariate survival analysis summary tables
+The association between each variable and the survival outcome (e.g. local recurrence and time to local recurrence) is examined using the log rank test. The Cox-proportional hazards model is constructed to estimate the hazard ratio and corresponding 95% confidence interval per unit increase of a continuous variable, or with respect to the reference category for a categorical variable. For each variable, if missing values happen, the association between missingness and the survival outcome will be examined.
+
+## Summary of univariate analysis for local recurrence free survival
+```{r, results="hide"}
+dat.work <- within(dat.work, {
+  LR <- ifelse(Local.Recurrence == "No", 0, 1)
+  DM <- ifelse(Distant.Metastasis == "No", 0, 1)
+  Status <- ifelse(Status.at.follow.up == "Alive", 0, 1)
+})
+vars.ana <- vars.all[!vars.all %in% c("Local.Recurrence", 
+                                      "Local.Recurrence.5.Year",
+                                      "Time.to.Follow.Up.in.years",
+                                      "Time.to.Local.Recurrence.in.years",
+                                      "Time.to.Local.Recurrence.Follow.Up.in.years",
+                                      "Distant.Metastasis",
+                                      "Distant.Metastasis.5.Year",
+                                      "Time.to.Distant.Metastasis.in.years",
+                                      "Time.to.Distant.Metastasis.Follow.Up.in.years",
+                                      "Status.at.follow.up",
+                                      "Death.5.Year",
+                                      "LR", "DM", "Status",
+                                      "Site.of.metastasis.at.diagnosis",
+                                      "Findings.in.prophylactic.mastectomy",
+                                      "Ki.67")]
+
+out <- uni.coxph(surv.time = "Time.to.Local.Recurrence.Follow.Up.in.years", surv.event = "LR")
+
+table(unlist(lapply(out, length)))
+
+out.stat <- lapply(out, function(x) lapply(x, fcphuni.stat))
+out.tbl <- lapply(out.stat, fcphuni.tbl)
+out.tbl <- do.call(rbind, out.tbl)
+row.names(out.tbl) <- NULL
+```
+
+
+```{r}
+knitr::kable(out.tbl)
+```
+
+
+## Summary of univariate analysis for distant metastasis free survival
+```{r, results="hide"}
+out <- uni.coxph(surv.time = "Time.to.Distant.Metastasis.Follow.Up.in.years", surv.event = "DM")
+
+table(unlist(lapply(out, length)))
+
+out.stat <- lapply(out, function(x) lapply(x, fcphuni.stat))
+out.tbl <- lapply(out.stat, fcphuni.tbl)
+out.tbl <- do.call(rbind, out.tbl)
+row.names(out.tbl) <- NULL
+```
+
+
+```{r}
+knitr::kable(out.tbl)
+```
+
+
+## Summary of univariate analysis for overall survival
+```{r, results="hide"}
+out <- uni.coxph(surv.time = "Time.to.Follow.Up.in.years", surv.event = "Status")
+
+table(unlist(lapply(out, length)))
+
+out.stat <- lapply(out, function(x) lapply(x, fcphuni.stat))
+out.tbl <- lapply(out.stat, fcphuni.tbl)
+out.tbl <- do.call(rbind, out.tbl)
+row.names(out.tbl) <- NULL
+```
+
+
+```{r}
+knitr::kable(out.tbl)
+```
+
+
+# Session Info
+```{r}
+sessionInfo()
+```
