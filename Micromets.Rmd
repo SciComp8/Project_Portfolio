@@ -151,6 +151,16 @@ loc.perl <- "C:/cygwin64/bin/perl"
 
 # Data preparation
 
+In our univariate survival analysis, the axillary/local/distant recurrence-free survival time is defined as a composite endpoint which combines the time to axillary/local/distant recurrence, time to death, and time to last follow-up into a univariate time to the first event or censoring. To illustrate how this combination of time works, we enumerate different scenarios for calculating the axillary recurrence-free survival time. The same logic applies to the other two types of recurrence (e.g., local recurrence and distant recurrence).
+
+For axillary recurrence-free survival time:
+•	Given that 1 patient has the axillary recurrence but does not die, the time to axillary recurrence is treated as the survival time.
+•	Given that 5 patients die without the axillary recurrence, the time to death is treated as their survival time.
+•	Given that 1 patient first has the axillary recurrence and then dies, the time to axillary recurrence is treated as the survival time.
+•	Given that 115 patients neither have the axillary recurrence or die, the time to last follow-up is treated as their survival time.
+•	Given that 6 patients die but miss the information on the axillary recurrence, their survival time is treated as not available.
+
+
 ```{r, clean_data_start, eval=FALSE}
 ##################################################################
 ##                          Clean data                          ##
