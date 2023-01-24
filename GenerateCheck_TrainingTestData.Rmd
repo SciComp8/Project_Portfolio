@@ -1,5 +1,5 @@
 ---
-title: "Evaluate performance of univariate BMAseq, voom, limma, edgeR, and DESeq2 on inferring differentially expressed genes"
+title: "Generate and check the training and test datasets of RNA-seq expression levels and phenotypes under each round of random seeds"
 author: "Anni Liu"
 date: "`r Sys.Date()`"
 output: html_document
