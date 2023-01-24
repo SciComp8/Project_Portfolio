@@ -1,0 +1,106 @@
+---
+title: "Evaluate performance of univariate BMAseq, voom, limma, edgeR, and DESeq2 on inferring differentially expressed genes"
+author: "Anni Liu"
+date: "`r Sys.Date()`"
+output: html_document
+
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Save and load images
+```{r saveimage, eval=FALSE}
+image.date <- format(Sys.Date(), "%Y%b%d")
+save.image(file = paste0("../ApplicationData/derived/", image.date, "_checkdata_image_ALiu.RData"))
+```
+
+```{r loadimage}
+load("../ApplicationData/derived/2023Jan23_checkdata_image_ALiu.RData")
+```
+
+
+# Attach libraries and functions
+```{r attach_lib_func}
+suppressPackageStartupMessages(easypackages::libraries("microbenchmark", "fst", "parallel"))
+```
+
+# Load original data
+```{r read.data}
+load("../ApplicationData/derived/rownames.RData")
+dat.expr <- read_fst(path = "../ApplicationData/derived/dat.expr.Subcutaneous.RDS")
+rownames(dat.expr) <- dat.expr.rownames
+dat.pheno <- read_fst(path = "../ApplicationData/derived/dat.pheno.Subcutaneous.RDS")
+rownames(dat.pheno) <- dat.pheno.rownames
+
+sapply(c("dat.expr", "dat.pheno"), function(x) get(x) |> class())
+#     dat.expr    dat.pheno
+# "data.frame" "data.frame"
+
+dim(dat.expr) # 24660 genes and 404 subjects
+dim(dat.pheno) # 404 subjects and 13 phenotypes
+dat.pheno[1:5, ]
+dat.expr[1:5, 1:5]
+cat(paste0("The column names of gene expression data", ifelse(all(colnames(dat.expr) == rownames(dat.pheno)), " MATCH ", " NOT MATCH"), "the row names of phenotype data."))
+```
+
+
+# Preprocess expression data
+```{r filter.gene}
+# Pre-filter the genes
+# Here we perform the median absolute deviation with the threshold of 0.8 to select genes that are most likely to distinguish the samples
+dat.expr.new <- dat.expr[apply(dat.expr, 1, function(x) mad(x) > 0.8), ] # We have 24455 genes
+```
+
+
+# One function of checking the training and test data
+```{r data_func}
+data_func <- function(seed.num = 999) {
+  set.seed(seed.num)
+  date.analysis <- format(Sys.Date(), "%Y%b%d")
+  test.ind <- sample(1:nrow(dat.pheno), ceiling(0.5*nrow(dat.pheno)))
+  dat.pheno.train <- dat.pheno[-test.ind, ]
+  dat.pheno.test <- dat.pheno[test.ind, ]
+  dat.expr.train <- dat.expr.new[, rownames(dat.pheno.train)]
+  dat.expr.test <- dat.expr.new[, rownames(dat.pheno.test)]
+  
+  saveRDS(dat.pheno.train, file = paste0("../ApplicationData/derived/RandomSeed/dat.pheno.train", seed.num, ".RDS"))
+  saveRDS(dat.pheno.test, file = paste0("../ApplicationData/derived/RandomSeed/dat.pheno.test", seed.num, ".RDS"))
+  saveRDS(dat.expr.train, file = paste0("../ApplicationData/derived/RandomSeed/dat.expr.train", seed.num, ".RDS"))
+  saveRDS(dat.expr.test, file = paste0("../ApplicationData/derived/RandomSeed/dat.expr.test", seed.num, ".RDS"))
+  
+  cat("~~~Start for one random seed~~~")
+  cat(paste0("The column names of training gene expression data", ifelse(all(colnames(dat.expr.train) == rownames(dat.pheno.train)), " MATCH ", "NOT MATCH"), "the row names of training phenotype data."))
+  cat("\n")
+  cat(paste0("The column names of test gene expression data", ifelse(all(colnames(dat.expr.test) == rownames(dat.pheno.test)), " MATCH ", "NOT MATCH"), "the row names of test phenotype data."))
+  cat("~~~End for one random seed~~~")
+  cat("\n")
+}
+```  
+
+
+# Ten trials of generating the training and test datasets
+```{r}
+seed.num.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+for (i in 1:10) {data_func(seed.num = seed.num.vec[i])}
+```
+
+
+# Check the first dataset under the seed 120
+```{r}
+dat.expr.train120 <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.train120.RDS")
+```
+
+
+# Check the first dataset under the seed 233
+```{r}
+dat.expr.train233 <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.train233.RDS")
+```
+
+```{r}
+length(intersect(colnames(dat.expr.train120), colnames(dat.expr.train233)))
+```
