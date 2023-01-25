@@ -516,10 +516,6 @@ dat2 <- rbind(dat0, dat1)
 ##################################################################
 ##                       Fix column names                       ##
 ##################################################################
-# Step1: strsplit(names(dat2), split = "\\.")
-# Step2: paste(x[x != ""], collapse = ".")
-# Step3: sapply
-
 names(dat2) <- 
   sapply(strsplit(names(dat2), split = "\\."), function(x)
     paste(x[x != ""], collapse = "."))
