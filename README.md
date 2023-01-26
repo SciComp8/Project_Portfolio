@@ -4,7 +4,7 @@ Here lists my coding work affiliated with multifaceted collaborative and individ
 
 
 ## **Bayesian model averaging for bulk RNA-Seq data (use R programming)**
-The goal of this project is to evaluate the performance  of our novel BMAseq and other three existing biostatistical and bioinformatics approaches: voom + limma, edgeR, and DESeq2 on identifying differentially expressed genes in the setting of univariable, multivaribles, and multivaribles coupled with interaction terms. All subjects are randomly divided into 50% training set and 50% test set. Each method of BMAseq,  voom + limma, edgeR, and DESeq2 is applied to construct the univariate, multivariate, multivariate with interaction models for the six phenotypes: BMI, AGE, SEX, MHABNWBC, MHARTHTS, and MHCVD. The approach-specific Venn diagram panel is plotted to intuitively reveal the absolute number and relative proportion of common differentially expressed genes (cDEGs) associated with each variable between the training and test set. The distribution of cDEGs associated with each variable is compared across four approaches.
+The goal of this project is to evaluate the performance  of our novel `BMAseq` and other three existing biostatistical and bioinformatics approaches: `voom + limma`, `edgeR`, and `DESeq2` on identifying differentially expressed genes in the setting of univariable, multivaribles, and multivaribles coupled with interaction terms. All subjects are randomly divided into 50% training set and 50% test set. Each method of BMAseq,  voom + limma, edgeR, and DESeq2 is applied to construct the univariate, multivariate, multivariate with interaction models for the six phenotypes: BMI, AGE, SEX, MHABNWBC, MHARTHTS, and MHCVD. The approach-specific Venn diagram panel is plotted to intuitively reveal the absolute number and relative proportion of common differentially expressed genes (cDEGs) associated with each variable between the training and test set. The distribution of cDEGs associated with each variable is compared across four approaches.
 
 - [UniBMA_voom_limma_edgeR_DESeq2.Rmd](UniBMA_voom_limma_edgeR_DESeq2.Rmd)
 - [UniBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](UniBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
@@ -15,7 +15,7 @@ The goal of this project is to evaluate the performance  of our novel BMAseq and
 - [GenerateCheck_TrainingTestData.Rmd](GenerateCheck_TrainingTestData.Rmd)
   
 ## **Differential expression analysis pipeline for single cell data (use Python-based snakemake workflow and R programming)**
-A bioinformatics pipeline for the next-generation single cell data from the mouse B lymphocytes is developed to streamline main phases of differential gene expression analysis from `Trim Galore`-based trimming reads from raw FASTQ files, `kallisto`-based quantifying abundances of transcripts from RNA-Seq data, to DESeq2-based differential gene expression analysis. 
+A bioinformatics pipeline for the next-generation single cell data from the mouse B lymphocytes is developed to streamline main phases of differential gene expression analysis from `Trim Galore`-based trimming reads from raw FASTQ files, `kallisto`-based quantifying abundances of transcripts from RNA-Seq data, to `DESeq2`-based differential gene expression analysis. 
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
 
 ## **Bayesian integrative clustering for multi-omics data (use R programming)**
