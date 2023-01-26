@@ -202,19 +202,19 @@ for (i in 1:pair_number) {
     rownames_to_column(var = "ensgene") %>%
     mutate(threshold = padj < 0.5)
 
-plot_array[[i]] <- ggplot(res_new) +
-  geom_point(mapping = aes(x = log2FoldChange,
-                           y = -log10(padj),
-                           color = threshold)) +
-  labs(
-    title = paste0(pair_condition[[i]][1], " vs ", pair_condition[[i]][2]),
-    x = "log2 fold change",
-    y = "-log10 adjusted p-value"
-  ) +
-  xlim(-10, 10) + 
-  scale_color_manual(values = c("black", "#CFB53B")) +
-  theme_bw() +
-  guides(color = "none")
+  plot_array[[i]] <- ggplot(res_new) +
+    geom_point(mapping = aes(x = log2FoldChange,
+                             y = -log10(padj),
+                             color = threshold)) +
+    labs(
+      title = paste0(pair_condition[[i]][1], " vs ", pair_condition[[i]][2]),
+      x = "log2 fold change",
+      y = "-log10 adjusted p-value"
+    ) +
+    xlim(-10, 10) + 
+    scale_color_manual(values = c("black", "#CFB53B")) +
+    theme_bw() +
+    guides(color = "none")
 }
 library(gridExtra)
 do.call("grid.arrange", c(plot_array, ncol = 3))
