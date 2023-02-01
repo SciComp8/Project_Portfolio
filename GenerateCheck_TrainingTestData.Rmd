@@ -102,5 +102,1232 @@ dat.expr.train233 <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.tra
 ```
 
 ```{r}
+# Intersection of samples between two training sets
 length(intersect(colnames(dat.expr.train120), colnames(dat.expr.train233)))
 ```
+
+# Extract eFDR/q-value of the top ranked 2000 genes
+## Seed: 2390
+```{r}
+dat.expr.train <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.train2390.RDS")
+dat.expr.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.test2390.RDS")
+dat.pheno.train <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.train2390.RDS")
+dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test2390.RDS")
+```
+
+```{r}
+  var.pool <- c("BMI", "AGE", "SEX", "MHABNWBC")  
+  var.pool.add <- c(var.pool, "BMIxSEX")
+  
+  ##------BMAseq------
+  ##################################################################
+  ##                 BMAseq multivariate analysis                 ##
+  ##################################################################
+  output.multi.int1.train <- BMAseq.multi.postprob.norm(
+    dat.expr.counts = dat.expr.train,  
+    dat.pheno = dat.pheno.train, 
+    var.pool = var.pool, 
+    max.nvar = 4, 
+    interaction = "BMI&SEX", 
+    cut.BF = 1)
+  
+  output.multi.int2.train <- BMAseq.multi.DEG(
+    dat.pheno = output.multi.int1.train$dat.pheno.new,
+    model.space = output.multi.int1.train$model.space, 
+    post.modelprob = output.multi.int1.train$post.modelprob, 
+    var.pool = var.pool,
+    interact = T, 
+    cut.FDR = 0.05)
+  
+  output.multi.int1.test <- BMAseq.multi.postprob.norm(
+    dat.expr.counts = dat.expr.test, 
+    dat.pheno = dat.pheno.test, 
+    var.pool = var.pool, 
+    max.nvar = 4, 
+    interaction = "BMI&SEX", 
+    cut.BF = 1)
+  
+  output.multi.int2.test <- BMAseq.multi.DEG(
+    dat.pheno = output.multi.int1.test$dat.pheno.new,
+    model.space = output.multi.int1.test$model.space, 
+    post.modelprob = output.multi.int1.test$post.modelprob, 
+    var.pool = var.pool,
+    interact = T, 
+    cut.FDR = 0.05)
+  
+  BMAseq.eFDR.Main.2000.train <- mclapply(1:length(var.pool),
+                                   function(i) output.multi.int2.train$eFDR.Main[, i][order(output.multi.int2.train$eFDR.Main[, i])[1:2000]],
+                                   mc.cores = 4)
+  
+  BMAseq.eFDR.Main.2000.test <- mclapply(1:length(var.pool),
+                                  function(i) output.multi.int2.test$eFDR.Main[, i][order(output.multi.int2.test$eFDR.Main[, i])[1:2000]],
+                                  mc.cores = 4)
+
+  names(BMAseq.eFDR.Main.2000.train) = names(BMAseq.eFDR.Main.2000.test) = var.pool
+  
+  BMAseq.eFDR.Interaction.2000.train <- mclapply(1:length(var.pool),
+                                          function(i) output.multi.int2.train$eFDR.Interaction[, i][order(output.multi.int2.train$eFDR.Interaction[, i])[1:2000]],
+                                          mc.cores = 4)
+  
+  BMAseq.eFDR.Interaction.2000.test <- mclapply(1:length(var.pool),
+                                         function(i) output.multi.int2.test$eFDR.Interaction[, i][order(output.multi.int2.test$eFDR.Interaction[, i])[1:2000]],
+                                         mc.cores = 4)
+  
+  names(BMAseq.eFDR.Interaction.2000.train) = names(BMAseq.eFDR.Interaction.2000.test) = var.pool
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, output.multi.int1.train, output.multi.int2.train, output.multi.int1.test, output.multi.int2.test, BMAseq.eFDR.Main.2000.train, BMAseq.eFDR.Main.2000.test, BMAseq.eFDR.Interaction.2000.train, BMAseq.eFDR.Interaction.2000.test, file = "../ApplicationData/derived/RandomSeed/BMAseqMultiInt2390.RData")
+  
+  
+  ##------voom + limma------
+  ##################################################################
+  ##              voom + limma multivariate analysis              ##
+  ##################################################################
+  design.train <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.train)
+  design.test <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.test)
+    
+  voom.train <- voom(counts = dat.expr.train,
+                     design = design.train,
+                     lib.size = colSums(dat.expr.train)*calcNormFactors(dat.expr.train)) 
+  
+  voom.fit.train <- lmFit(voom.train[["E"]],
+                          design = design.train,
+                          weights = voom.train[["weights"]])
+  
+  voom.eFDR.train <- mclapply(1:length(var.pool.add),
+                         function(i) {
+                           t <- voom.fit.train[["coefficients"]][, i + 1]/voom.fit.train[["stdev.unscaled"]][, i+1]/voom.fit.train[["sigma"]]
+                           p <- 2*pt(-abs(t), df = voom.fit.train[["df.residual"]])
+                           return(qvalue(p)) },
+                         mc.cores = 4L)
+  
+  voom.eFDR.2000.train <- mclapply(1:length(var.pool.add),
+                             function(i) {
+                               q.val <- voom.eFDR.train[[i]][["qvalues"]]
+                               return(q.val[order(q.val)[1:2000]])
+                             },
+                             mc.cores = 4L)
+  
+  names(voom.eFDR.train) = names(voom.eFDR.2000.train) = var.pool.add 
+  
+  voom.test <- voom(counts = dat.expr.test,
+                    design = design.test,
+                    lib.size = colSums(dat.expr.test)*calcNormFactors(dat.expr.test))
+  
+  voom.fit.test <- lmFit(voom.test[["E"]],
+                         design = design.test,
+                         weights = voom.test[["weights"]])
+  
+  voom.eFDR.test <- mclapply(1:length(var.pool.add),
+                        function(i) {
+                          t <- voom.fit.test[["coefficients"]][, i + 1]/voom.fit.test[["stdev.unscaled"]][, i+1]/voom.fit.test[["sigma"]]
+                          p <- 2*pt(-abs(t), df = voom.fit.test[["df.residual"]])
+                          return(qvalue(p)) },
+                        mc.cores = 4L)
+  
+  voom.eFDR.2000.test <- mclapply(1:length(var.pool.add),
+                            function(i) {
+                              q.val <- voom.eFDR.test[[i]][["qvalues"]]
+                              return(q.val[order(q.val)[1:2000]])
+                            },
+                            mc.cores = 4L)
+  
+  names(voom.eFDR.test) = names(voom.eFDR.2000.test) = var.pool.add 
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, voom.train, voom.fit.train, voom.eFDR.train, voom.eFDR.2000.train, voom.test, voom.fit.test, voom.eFDR.test, voom.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
+  
+  
+  ##------voom + limma + eBayes------
+  #################################################################
+  ##         voom + limma + eBayes multivariate analysis         ##
+  #################################################################
+  voom.train <- voom(counts = dat.expr.train,
+                     design = design.train,
+                     lib.size = colSums(dat.expr.train)*calcNormFactors(dat.expr.train))
+  
+  eBayes.fit.train <- lmFit(voom.train[["E"]],
+                          design = design.train,
+                          weights = voom.train[["weights"]]) %>% 
+                      eBayes()
+  
+  eBayes.eFDR.train <- mclapply(1:length(var.pool.add),
+                         function(i) eBayes.fit.train[["p.value"]][, i + 1] %>% 
+                           qvalue(),
+                         mc.cores = 4L)
+  
+  eBayes.eFDR.2000.train <- mclapply(1:length(var.pool.add),
+                             function(i) {
+                               q.val <- eBayes.eFDR.train[[i]][["qvalues"]]
+                               return(q.val[order(q.val)[1:2000]])
+                               },
+                             mc.cores = 4L)
+  
+  names(eBayes.eFDR.train) = names(eBayes.eFDR.2000.train) = var.pool.add 
+  
+  voom.test <- voom(counts = dat.expr.test,
+                    design = design.test,
+                    lib.size = colSums(dat.expr.test)*calcNormFactors(dat.expr.test))
+  
+  eBayes.fit.test <- lmFit(voom.test[["E"]],
+                         design = design.test,
+                         weights = voom.test[["weights"]]) %>% 
+                     eBayes()
+  
+  eBayes.eFDR.test <- mclapply(1:length(var.pool.add),
+                        function(i) eBayes.fit.test[["p.value"]][, i + 1] %>% 
+                          qvalue(),
+                        mc.cores = 4L)
+  
+  eBayes.eFDR.2000.test <- mclapply(1:length(var.pool.add),
+                             function(i) {
+                               q.val <- eBayes.eFDR.test[[i]][["qvalues"]]
+                               return(q.val[order(q.val)[1:2000]]) 
+                               },
+                             mc.cores = 4L)
+  
+  names(eBayes.eFDR.test) = names(eBayes.eFDR.2000.test) = var.pool.add 
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, voom.train, eBayes.fit.train, eBayes.eFDR.train, eBayes.eFDR.2000.train, voom.test, eBayes.fit.test, eBayes.eFDR.test, eBayes.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/eBayesMultiInt2390.RData")
+  
+  
+  ##------edgeR------
+  #################################################################
+  ##                 edgeR multivariate analysis                 ##
+  #################################################################
+  y.train <- DGEList(counts = dat.expr.train, 
+                     lib.size = colSums(dat.expr.train)) %>% 
+               calcNormFactors() %>% 
+               estimateGLMTrendedDisp(design.train)
+  
+  edgeR.fit.train <- glmQLFit(y.train, design.train)
+  
+  qlf.train <- mclapply(1:length(var.pool.add),
+                        function(i) glmQLFTest(edgeR.fit.train, coef = i + 1),
+                        mc.cores = 4L)
+  
+  edgeR.eFDR.train <- mclapply(1:length(var.pool.add),
+                         function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
+                           qvalue(),
+                         mc.cores = 4L)
+  
+  edgeR.eFDR.2000.train <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                q.val <- edgeR.eFDR.train[[i]][["qvalues"]]
+                                return(q.val[order(q.val)[1:2000]]) 
+                              },
+                              mc.cores = 4L)
+  
+  names(qlf.train) = names(edgeR.eFDR.train) = names(edgeR.eFDR.2000.train) = var.pool.add 
+  
+  y.test <- DGEList(counts = dat.expr.test, 
+                    lib.size = colSums(dat.expr.test)) %>% 
+              calcNormFactors() %>% 
+              estimateGLMTrendedDisp(design.test)
+  
+  edgeR.fit.test <- glmQLFit(y.test, design.test)
+  
+  qlf.test <- mclapply(1:length(var.pool.add),
+                      function(i) glmQLFTest(edgeR.fit.test, coef = i + 1),
+                      mc.cores = 4L)
+  
+  edgeR.eFDR.test <- mclapply(1:length(var.pool.add),
+                        function(i) qlf.test[[i]][["table"]][["PValue"]] %>% 
+                          qvalue(),
+                        mc.cores = 4L)
+  
+  edgeR.eFDR.2000.test <- mclapply(1:length(var.pool.add),
+                             function(i) {
+                               q.val <- edgeR.eFDR.test[[i]][["qvalues"]]
+                               return(q.val[order(q.val)[1:2000]]) 
+                             },
+                             mc.cores = 4L)
+  
+  names(qlf.test) = names(edgeR.eFDR.test) = names(edgeR.eFDR.2000.test) = var.pool.add 
+  
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, voom.train, edgeR.fit.train, edgeR.eFDR.train, edgeR.eFDR.2000.train, voom.test, edgeR.fit.test, edgeR.eFDR.test, edgeR.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
+  
+    
+  ##------DESeq2------
+  ##################################################################
+  ##                 DESeq2 multivariate analysis                 ##
+  ##################################################################
+  cts.train <- as.matrix(dat.expr.train)
+  cts.test <- as.matrix(dat.expr.test)
+  coldata.train <- dat.pheno.train
+  coldata.test <- dat.pheno.test
+  
+  name.formula <- c("BMI_high_vs_low", 
+                    "AGE_old_vs_young", 
+                    "SEX_male_vs_female", 
+                    "MHABNWBC_yes_vs_no",
+                    "BMIhigh.SEXmale")  
+  
+  lib.size <- colSums(cts.train)
+  norm.factor <- calcNormFactors(cts.train, method = "TMM")
+  size.factor <- lib.size*norm.factor/exp(mean(log(lib.size*norm.factor))) 
+  
+  dds <- DESeqDataSetFromMatrix(countData = cts.train, 
+                                colData = coldata.train, 
+                                design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+  sizeFactors(dds) <- size.factor
+
+  res.train <- mclapply(1:length(var.pool.add), 
+                        function(i) {
+                          return(results(DESeq(dds), name = name.formula[i])) },
+                        mc.cores = 4L)
+  
+  DESeq2.eFDR.train <- mclapply(1:length(var.pool.add),
+                         function(i) qvalue(res.train[[i]][["pvalue"]])$qvalues,
+                         mc.cores = 4L)
+  
+  DESeq2.eFDR.2000.train <- mclapply(1:length(var.pool.add),
+                               function(i) {
+                                 q.val <- DESeq2.eFDR.train[[i]]
+                                 return(q.val[order(q.val)[1:2000]])
+                               },
+                               mc.cores = 4L)
+  
+  names(res.train) = names(DESeq2.eFDR.train) = names(DESeq2.eFDR.2000.train) = var.pool.add 
+  
+  lib.size <- colSums(cts.test)
+  norm.factor <- calcNormFactors(cts.test, method = "TMM")
+  size.factor <- lib.size*norm.factor/exp(mean(log(lib.size*norm.factor))) 
+  
+  dds <- DESeqDataSetFromMatrix(countData = cts.test, 
+                                colData = coldata.test, 
+                                design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+  sizeFactors(dds) <- size.factor
+  
+  res.test <- mclapply(1:length(var.pool.add), 
+                       function(i) {
+                         return(results(DESeq(dds), name = name.formula[i])) }, 
+                       mc.cores = 4L)
+  
+  DESeq2.eFDR.test <- mclapply(1:length(var.pool.add),
+                        function(i) qvalue(res.test[[i]][["pvalue"]])$qvalues,
+                        mc.cores = 4L)
+  
+  DESeq2.eFDR.2000.test <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                q.val <- DESeq2.eFDR.test[[i]]
+                                return(q.val[order(q.val)[1:2000]])
+                              },
+                              mc.cores = 4L)
+  
+  names(res.test) = names(DESeq2.eFDR.test) = names(DESeq2.eFDR.2000.test) = var.pool.add
+  
+  save(cts.train, cts.test, coldata.train, coldata.test, var.pool, var.pool.add, res.train, DESeq2.eFDR.train, DESeq2.eFDR.2000.train, res.test, DESeq2.eFDR.test, DESeq2.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
+```
+
+
+## Seed: 98907
+```{r}
+dat.expr.train <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.train98907.RDS")
+dat.expr.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.test98907.RDS")
+dat.pheno.train <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.train98907.RDS")
+dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test98907.RDS")
+```
+
+```{r}
+  var.pool <- c("BMI", "AGE", "SEX", "MHABNWBC")  
+  var.pool.add <- c(var.pool, "BMIxSEX")
+  
+  ##------BMAseq------
+  ##################################################################
+  ##                 BMAseq multivariate analysis                 ##
+  ##################################################################
+  output.multi.int1.train <- BMAseq.multi.postprob.norm(
+    dat.expr.counts = dat.expr.train,  
+    dat.pheno = dat.pheno.train, 
+    var.pool = var.pool, 
+    max.nvar = 4, 
+    interaction = "BMI&SEX", 
+    cut.BF = 1)
+  
+  output.multi.int2.train <- BMAseq.multi.DEG(
+    dat.pheno = output.multi.int1.train$dat.pheno.new,
+    model.space = output.multi.int1.train$model.space, 
+    post.modelprob = output.multi.int1.train$post.modelprob, 
+    var.pool = var.pool,
+    interact = T, 
+    cut.FDR = 0.05)
+  
+  output.multi.int1.test <- BMAseq.multi.postprob.norm(
+    dat.expr.counts = dat.expr.test, 
+    dat.pheno = dat.pheno.test, 
+    var.pool = var.pool, 
+    max.nvar = 4, 
+    interaction = "BMI&SEX", 
+    cut.BF = 1)
+  
+  output.multi.int2.test <- BMAseq.multi.DEG(
+    dat.pheno = output.multi.int1.test$dat.pheno.new,
+    model.space = output.multi.int1.test$model.space, 
+    post.modelprob = output.multi.int1.test$post.modelprob, 
+    var.pool = var.pool,
+    interact = T, 
+    cut.FDR = 0.05)
+  
+  BMAseq.eFDR.Main.2000.train <- mclapply(1:length(var.pool),
+                                   function(i) output.multi.int2.train$eFDR.Main[, i][order(output.multi.int2.train$eFDR.Main[, i])[1:2000]],
+                                   mc.cores = 4)
+  
+  BMAseq.eFDR.Main.2000.test <- mclapply(1:length(var.pool),
+                                  function(i) output.multi.int2.test$eFDR.Main[, i][order(output.multi.int2.test$eFDR.Main[, i])[1:2000]],
+                                  mc.cores = 4)
+
+  names(BMAseq.eFDR.Main.2000.train) = names(BMAseq.eFDR.Main.2000.test) = var.pool
+  
+  BMAseq.eFDR.Interaction.2000.train <- mclapply(1:length(var.pool),
+                                          function(i) output.multi.int2.train$eFDR.Interaction[, i][order(output.multi.int2.train$eFDR.Interaction[, i])[1:2000]],
+                                          mc.cores = 4)
+  
+  BMAseq.eFDR.Interaction.2000.test <- mclapply(1:length(var.pool),
+                                         function(i) output.multi.int2.test$eFDR.Interaction[, i][order(output.multi.int2.test$eFDR.Interaction[, i])[1:2000]],
+                                         mc.cores = 4)
+  
+  names(BMAseq.eFDR.Interaction.2000.train) = names(BMAseq.eFDR.Interaction.2000.test) = var.pool
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, output.multi.int1.train, output.multi.int2.train, output.multi.int1.test, output.multi.int2.test, BMAseq.eFDR.Main.2000.train, BMAseq.eFDR.Main.2000.test, BMAseq.eFDR.Interaction.2000.train, BMAseq.eFDR.Interaction.2000.test, file = "../ApplicationData/derived/RandomSeed/BMAseqMultiInt98907.RData")
+  
+  
+  ##------voom + limma------
+  ##################################################################
+  ##              voom + limma multivariate analysis              ##
+  ##################################################################
+  design.train <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.train)
+  design.test <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.test)
+    
+  voom.train <- voom(counts = dat.expr.train,
+                     design = design.train,
+                     lib.size = colSums(dat.expr.train)*calcNormFactors(dat.expr.train)) 
+  
+  voom.fit.train <- lmFit(voom.train[["E"]],
+                          design = design.train,
+                          weights = voom.train[["weights"]])
+  
+  voom.eFDR.train <- mclapply(1:length(var.pool.add),
+                         function(i) {
+                           t <- voom.fit.train[["coefficients"]][, i + 1]/voom.fit.train[["stdev.unscaled"]][, i+1]/voom.fit.train[["sigma"]]
+                           p <- 2*pt(-abs(t), df = voom.fit.train[["df.residual"]])
+                           return(qvalue(p)) },
+                         mc.cores = 4L)
+  
+  voom.eFDR.2000.train <- mclapply(1:length(var.pool.add),
+                             function(i) {
+                               q.val <- voom.eFDR.train[[i]][["qvalues"]]
+                               return(q.val[order(q.val)[1:2000]])
+                             },
+                             mc.cores = 4L)
+  
+  names(voom.eFDR.train) = names(voom.eFDR.2000.train) = var.pool.add 
+  
+  voom.test <- voom(counts = dat.expr.test,
+                    design = design.test,
+                    lib.size = colSums(dat.expr.test)*calcNormFactors(dat.expr.test))
+  
+  voom.fit.test <- lmFit(voom.test[["E"]],
+                         design = design.test,
+                         weights = voom.test[["weights"]])
+  
+  voom.eFDR.test <- mclapply(1:length(var.pool.add),
+                        function(i) {
+                          t <- voom.fit.test[["coefficients"]][, i + 1]/voom.fit.test[["stdev.unscaled"]][, i+1]/voom.fit.test[["sigma"]]
+                          p <- 2*pt(-abs(t), df = voom.fit.test[["df.residual"]])
+                          return(qvalue(p)) },
+                        mc.cores = 4L)
+  
+  voom.eFDR.2000.test <- mclapply(1:length(var.pool.add),
+                            function(i) {
+                              q.val <- voom.eFDR.test[[i]][["qvalues"]]
+                              return(q.val[order(q.val)[1:2000]])
+                            },
+                            mc.cores = 4L)
+  
+  names(voom.eFDR.test) = names(voom.eFDR.2000.test) = var.pool.add 
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, voom.train, voom.fit.train, voom.eFDR.train, voom.eFDR.2000.train, voom.test, voom.fit.test, voom.eFDR.test, voom.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt98907.RData")
+  
+  
+  ##------voom + limma + eBayes------
+  #################################################################
+  ##         voom + limma + eBayes multivariate analysis         ##
+  #################################################################
+  voom.train <- voom(counts = dat.expr.train,
+                     design = design.train,
+                     lib.size = colSums(dat.expr.train)*calcNormFactors(dat.expr.train))
+  
+  eBayes.fit.train <- lmFit(voom.train[["E"]],
+                          design = design.train,
+                          weights = voom.train[["weights"]]) %>% 
+                      eBayes()
+  
+  eBayes.eFDR.train <- mclapply(1:length(var.pool.add),
+                         function(i) eBayes.fit.train[["p.value"]][, i + 1] %>% 
+                           qvalue(),
+                         mc.cores = 4L)
+  
+  eBayes.eFDR.2000.train <- mclapply(1:length(var.pool.add),
+                             function(i) {
+                               q.val <- eBayes.eFDR.train[[i]][["qvalues"]]
+                               return(q.val[order(q.val)[1:2000]])
+                               },
+                             mc.cores = 4L)
+  
+  names(eBayes.eFDR.train) = names(eBayes.eFDR.2000.train) = var.pool.add 
+  
+  voom.test <- voom(counts = dat.expr.test,
+                    design = design.test,
+                    lib.size = colSums(dat.expr.test)*calcNormFactors(dat.expr.test))
+  
+  eBayes.fit.test <- lmFit(voom.test[["E"]],
+                         design = design.test,
+                         weights = voom.test[["weights"]]) %>% 
+                     eBayes()
+  
+  eBayes.eFDR.test <- mclapply(1:length(var.pool.add),
+                        function(i) eBayes.fit.test[["p.value"]][, i + 1] %>% 
+                          qvalue(),
+                        mc.cores = 4L)
+  
+  eBayes.eFDR.2000.test <- mclapply(1:length(var.pool.add),
+                             function(i) {
+                               q.val <- eBayes.eFDR.test[[i]][["qvalues"]]
+                               return(q.val[order(q.val)[1:2000]]) 
+                               },
+                             mc.cores = 4L)
+  
+  names(eBayes.eFDR.test) = names(eBayes.eFDR.2000.test) = var.pool.add 
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, voom.train, eBayes.fit.train, eBayes.eFDR.train, eBayes.eFDR.2000.train, voom.test, eBayes.fit.test, eBayes.eFDR.test, eBayes.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/eBayesMultiInt98907.RData")
+  
+  
+  ##------edgeR------
+  #################################################################
+  ##                 edgeR multivariate analysis                 ##
+  #################################################################
+  y.train <- DGEList(counts = dat.expr.train, 
+                     lib.size = colSums(dat.expr.train)) %>% 
+               calcNormFactors() %>% 
+               estimateGLMTrendedDisp(design.train)
+  
+  edgeR.fit.train <- glmQLFit(y.train, design.train)
+  
+  qlf.train <- mclapply(1:length(var.pool.add),
+                        function(i) glmQLFTest(edgeR.fit.train, coef = i + 1),
+                        mc.cores = 4L)
+  
+  edgeR.eFDR.train <- mclapply(1:length(var.pool.add),
+                         function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
+                           qvalue(),
+                         mc.cores = 4L)
+  
+  edgeR.eFDR.2000.train <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                q.val <- edgeR.eFDR.train[[i]][["qvalues"]]
+                                return(q.val[order(q.val)[1:2000]]) 
+                              },
+                              mc.cores = 4L)
+  
+  names(qlf.train) = names(edgeR.eFDR.train) = names(edgeR.eFDR.2000.train) = var.pool.add 
+  
+  y.test <- DGEList(counts = dat.expr.test, 
+                    lib.size = colSums(dat.expr.test)) %>% 
+              calcNormFactors() %>% 
+              estimateGLMTrendedDisp(design.test)
+  
+  edgeR.fit.test <- glmQLFit(y.test, design.test)
+  
+  qlf.test <- mclapply(1:length(var.pool.add),
+                      function(i) glmQLFTest(edgeR.fit.test, coef = i + 1),
+                      mc.cores = 4L)
+  
+  edgeR.eFDR.test <- mclapply(1:length(var.pool.add),
+                        function(i) qlf.test[[i]][["table"]][["PValue"]] %>% 
+                          qvalue(),
+                        mc.cores = 4L)
+  
+  edgeR.eFDR.2000.test <- mclapply(1:length(var.pool.add),
+                             function(i) {
+                               q.val <- edgeR.eFDR.test[[i]][["qvalues"]]
+                               return(q.val[order(q.val)[1:2000]]) 
+                             },
+                             mc.cores = 4L)
+  
+  names(qlf.test) = names(edgeR.eFDR.test) = names(edgeR.eFDR.2000.test) = var.pool.add 
+  
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, voom.train, edgeR.fit.train, edgeR.eFDR.train, edgeR.eFDR.2000.train, voom.test, edgeR.fit.test, edgeR.eFDR.test, edgeR.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/edgeRMultiInt98907.RData")
+  
+    
+  ##------DESeq2------
+  ##################################################################
+  ##                 DESeq2 multivariate analysis                 ##
+  ##################################################################
+  cts.train <- as.matrix(dat.expr.train)
+  cts.test <- as.matrix(dat.expr.test)
+  coldata.train <- dat.pheno.train
+  coldata.test <- dat.pheno.test
+  
+  name.formula <- c("BMI_high_vs_low", 
+                    "AGE_old_vs_young", 
+                    "SEX_male_vs_female", 
+                    "MHABNWBC_yes_vs_no",
+                    "BMIhigh.SEXmale")  
+  
+  lib.size <- colSums(cts.train)
+  norm.factor <- calcNormFactors(cts.train, method = "TMM")
+  size.factor <- lib.size*norm.factor/exp(mean(log(lib.size*norm.factor))) 
+  
+  dds <- DESeqDataSetFromMatrix(countData = cts.train, 
+                                colData = coldata.train, 
+                                design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+  sizeFactors(dds) <- size.factor
+
+  res.train <- mclapply(1:length(var.pool.add), 
+                        function(i) {
+                          return(results(DESeq(dds), name = name.formula[i])) },
+                        mc.cores = 4L)
+  
+  DESeq2.eFDR.train <- mclapply(1:length(var.pool.add),
+                         function(i) qvalue(res.train[[i]][["pvalue"]])$qvalues,
+                         mc.cores = 4L)
+  
+  DESeq2.eFDR.2000.train <- mclapply(1:length(var.pool.add),
+                               function(i) {
+                                 q.val <- DESeq2.eFDR.train[[i]]
+                                 return(q.val[order(q.val)[1:2000]])
+                               },
+                               mc.cores = 4L)
+  
+  names(res.train) = names(DESeq2.eFDR.train) = names(DESeq2.eFDR.2000.train) = var.pool.add 
+  
+  lib.size <- colSums(cts.test)
+  norm.factor <- calcNormFactors(cts.test, method = "TMM")
+  size.factor <- lib.size*norm.factor/exp(mean(log(lib.size*norm.factor))) 
+  
+  dds <- DESeqDataSetFromMatrix(countData = cts.test, 
+                                colData = coldata.test, 
+                                design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+  sizeFactors(dds) <- size.factor
+  
+  res.test <- mclapply(1:length(var.pool.add), 
+                       function(i) {
+                         return(results(DESeq(dds), name = name.formula[i])) }, 
+                       mc.cores = 4L)
+  
+  DESeq2.eFDR.test <- mclapply(1:length(var.pool.add),
+                        function(i) qvalue(res.test[[i]][["pvalue"]])$qvalues,
+                        mc.cores = 4L)
+  
+  DESeq2.eFDR.2000.test <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                q.val <- DESeq2.eFDR.test[[i]]
+                                return(q.val[order(q.val)[1:2000]])
+                              },
+                              mc.cores = 4L)
+  
+  names(res.test) = names(DESeq2.eFDR.test) = names(DESeq2.eFDR.2000.test) = var.pool.add
+  
+  save(cts.train, cts.test, coldata.train, coldata.test, var.pool, var.pool.add, res.train, DESeq2.eFDR.train, DESeq2.eFDR.2000.train, res.test, DESeq2.eFDR.test, DESeq2.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/DESeq2MultiInt98907.RData")
+```
+
+
+# Violin plot - distributions of eFDR/q-value of the top ranked 2000 genes
+## Seed: 2390
+```{r}
+load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/eBayesMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
+```
+
+
+### BMI
+```{r}
+BMI.eFDR.q.dat.2390 <- data.frame(Estimate = c(
+  BMAseq.eFDR.Main.2000.train$BMI, BMAseq.eFDR.Main.2000.test$BMI,
+  DESeq2.eFDR.2000.train$BMI, DESeq2.eFDR.2000.test$BMI, 
+  edgeR.eFDR.2000.train$BMI, edgeR.eFDR.2000.test$BMI,
+  eBayes.eFDR.2000.train$BMI, eBayes.eFDR.2000.test$BMI,
+  voom.eFDR.2000.train$BMI, voom.eFDR.2000.test$BMI),
+                                  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+                                  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- BMI.eFDR.q.dat.2390 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of BMI in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 2390
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMIMain_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+
+```
+
+
+### AGE
+```{r}
+AGE.eFDR.q.dat.2390 <- data.frame(Estimate = c(
+  BMAseq.eFDR.Main.2000.train$AGE, BMAseq.eFDR.Main.2000.test$AGE,
+  DESeq2.eFDR.2000.train$AGE, DESeq2.eFDR.2000.test$AGE, 
+  edgeR.eFDR.2000.train$AGE, edgeR.eFDR.2000.test$AGE,
+  eBayes.eFDR.2000.train$AGE, eBayes.eFDR.2000.test$AGE,
+  voom.eFDR.2000.train$AGE, voom.eFDR.2000.test$AGE),
+                                  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+                                  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- AGE.eFDR.q.dat.2390 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of AGE in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 2390
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "AGEMain_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+### SEX
+```{r}
+SEX.eFDR.q.dat.2390 <- data.frame(Estimate = c(
+  BMAseq.eFDR.Main.2000.train$SEX, BMAseq.eFDR.Main.2000.test$SEX,
+  DESeq2.eFDR.2000.train$SEX, DESeq2.eFDR.2000.test$SEX, 
+  edgeR.eFDR.2000.train$SEX, edgeR.eFDR.2000.test$SEX,
+  eBayes.eFDR.2000.train$SEX, eBayes.eFDR.2000.test$SEX,
+  voom.eFDR.2000.train$SEX, voom.eFDR.2000.test$SEX),
+                                  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+                                  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- SEX.eFDR.q.dat.2390 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of SEX in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 2390
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "SEXMain_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+### MHABNWBC
+```{r}
+MHABNWBC.eFDR.q.dat.2390 <- data.frame(Estimate = c(
+  BMAseq.eFDR.Main.2000.train$MHABNWBC, BMAseq.eFDR.Main.2000.test$MHABNWBC,
+  DESeq2.eFDR.2000.train$MHABNWBC, DESeq2.eFDR.2000.test$MHABNWBC, 
+  edgeR.eFDR.2000.train$MHABNWBC, edgeR.eFDR.2000.test$MHABNWBC,
+  eBayes.eFDR.2000.train$MHABNWBC, eBayes.eFDR.2000.test$MHABNWBC,
+  voom.eFDR.2000.train$MHABNWBC, voom.eFDR.2000.test$MHABNWBC),
+                                  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+                                  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- MHABNWBC.eFDR.q.dat.2390 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of MHABNWBC in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 2390
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "MHABNWBCMain_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+### BMI X SEX
+```{r}
+BMI.Int.eFDR.q.dat.2390 <- data.frame(
+  Estimate = c(
+    BMAseq.eFDR.Interaction.2000.train$BMI, BMAseq.eFDR.Interaction.2000.test$BMI, # same if use SEX
+    DESeq2.eFDR.2000.train$BMIxSEX, DESeq2.eFDR.2000.test$BMIxSEX, 
+    edgeR.eFDR.2000.train$BMIxSEX, edgeR.eFDR.2000.test$BMIxSEX,
+    eBayes.eFDR.2000.train$BMIxSEX, eBayes.eFDR.2000.test$BMIxSEX,
+    voom.eFDR.2000.train$BMIxSEX, voom.eFDR.2000.test$BMIxSEX),
+  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- BMI.Int.eFDR.q.dat.2390 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the interaction effect of BMI X AGE in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 2390
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMIInt_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+## Seed: 98907
+```{r}
+load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt98907.RData")
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt98907.RData")
+load("../ApplicationData/derived/RandomSeed/eBayesMultiInt98907.RData")
+load("../ApplicationData/derived/RandomSeed/edgeRMultiInt98907.RData")
+load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt98907.RData")
+```
+
+
+### BMI
+```{r}
+BMI.eFDR.q.dat.98907 <- data.frame(Estimate = c(
+  BMAseq.eFDR.Main.2000.train$BMI, BMAseq.eFDR.Main.2000.test$BMI,
+  DESeq2.eFDR.2000.train$BMI, DESeq2.eFDR.2000.test$BMI, 
+  edgeR.eFDR.2000.train$BMI, edgeR.eFDR.2000.test$BMI,
+  eBayes.eFDR.2000.train$BMI, eBayes.eFDR.2000.test$BMI,
+  voom.eFDR.2000.train$BMI, voom.eFDR.2000.test$BMI),
+                                  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+                                  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- BMI.eFDR.q.dat.98907 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of BMI in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 98907
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMIMain_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+### AGE
+```{r}
+AGE.eFDR.q.dat.98907 <- data.frame(Estimate = c(
+  BMAseq.eFDR.Main.2000.train$AGE, BMAseq.eFDR.Main.2000.test$AGE,
+  DESeq2.eFDR.2000.train$AGE, DESeq2.eFDR.2000.test$AGE, 
+  edgeR.eFDR.2000.train$AGE, edgeR.eFDR.2000.test$AGE,
+  eBayes.eFDR.2000.train$AGE, eBayes.eFDR.2000.test$AGE,
+  voom.eFDR.2000.train$AGE, voom.eFDR.2000.test$AGE),
+                                  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+                                  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- AGE.eFDR.q.dat.98907 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of AGE in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 98907
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "AGEMain_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+### SEX
+```{r}
+SEX.eFDR.q.dat.98907 <- data.frame(Estimate = c(
+  BMAseq.eFDR.Main.2000.train$SEX, BMAseq.eFDR.Main.2000.test$SEX,
+  DESeq2.eFDR.2000.train$SEX, DESeq2.eFDR.2000.test$SEX, 
+  edgeR.eFDR.2000.train$SEX, edgeR.eFDR.2000.test$SEX,
+  eBayes.eFDR.2000.train$SEX, eBayes.eFDR.2000.test$SEX,
+  voom.eFDR.2000.train$SEX, voom.eFDR.2000.test$SEX),
+                                  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+                                  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- SEX.eFDR.q.dat.98907 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of SEX in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 98907
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "SEXMain_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+### MHABNWBC
+```{r}
+MHABNWBC.eFDR.q.dat.98907 <- data.frame(Estimate = c(
+  BMAseq.eFDR.Main.2000.train$MHABNWBC, BMAseq.eFDR.Main.2000.test$MHABNWBC,
+  DESeq2.eFDR.2000.train$MHABNWBC, DESeq2.eFDR.2000.test$MHABNWBC, 
+  edgeR.eFDR.2000.train$MHABNWBC, edgeR.eFDR.2000.test$MHABNWBC,
+  eBayes.eFDR.2000.train$MHABNWBC, eBayes.eFDR.2000.test$MHABNWBC,
+  voom.eFDR.2000.train$MHABNWBC, voom.eFDR.2000.test$MHABNWBC),
+                                  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+                                  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- MHABNWBC.eFDR.q.dat.98907 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of MHABNWBC in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 98907
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "MHABNWBCMain_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+### BMI X SEX
+```{r}
+BMI.Int.eFDR.q.dat.98907 <- data.frame(
+  Estimate = c(
+    BMAseq.eFDR.Interaction.2000.train$BMI, BMAseq.eFDR.Interaction.2000.test$BMI, # same if use SEX
+    DESeq2.eFDR.2000.train$BMIxSEX, DESeq2.eFDR.2000.test$BMIxSEX, 
+    edgeR.eFDR.2000.train$BMIxSEX, edgeR.eFDR.2000.test$BMIxSEX,
+    eBayes.eFDR.2000.train$BMIxSEX, eBayes.eFDR.2000.test$BMIxSEX,
+    voom.eFDR.2000.train$BMIxSEX, voom.eFDR.2000.test$BMIxSEX),
+  Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
+  DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
+                                  )
+g <- BMI.Int.eFDR.q.dat.98907 %>% 
+  ggplot(aes(x = Data.type, 
+             y = Estimate,
+             fill = Data.type)) +
+  geom_violin() +
+  geom_boxplot(width = 0.1) + 
+  facet_wrap(~ DEG.method, nrow = 1) + 
+  scale_x_discrete(limits = c("Train", "Test")) + 
+  scale_fill_brewer(palette = "Set1",
+                    direction = -1) +
+  labs(x = "Data Type",
+       y = "Estimate",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the interaction effect of BMI X AGE in training and test sets per approach") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") 
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 98907
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMIInt_eFDR_qvalue", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+# GGally plot
+## Seed: 2390
+```{r}
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
+g <- GGally::ggpairs(data = dat.pheno.train[c("BMI", "AGE", "SEX", "MHABNWBC")],
+                xlab = "Variables",
+                ylab = "Variables",
+                title = "Relationships between variables in the training set") + 
+  ggplot2::theme_bw() + 
+  ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 2390
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "GGallyTrain", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+
+g <- GGally::ggpairs(data = dat.pheno.test[c("BMI", "AGE", "SEX", "MHABNWBC")],
+                xlab = "Variables",
+                ylab = "Variables",
+                title = "Relationships between variables in the test set") + 
+  ggplot2::theme_bw() + 
+  ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "GGallyTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+## Seed: 98907
+```{r}
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt98907.RData")
+g <- GGally::ggpairs(data = dat.pheno.train[c("BMI", "AGE", "SEX", "MHABNWBC")],
+                xlab = "Variables",
+                ylab = "Variables",
+                title = "Relationships between variables in the training set") + 
+  ggplot2::theme_bw() + 
+  ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+seed.num <- 90907
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "GGallyTrain", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+
+g <- GGally::ggpairs(data = dat.pheno.test[c("BMI", "AGE", "SEX", "MHABNWBC")],
+                xlab = "Variables",
+                ylab = "Variables",
+                title = "Relationships between variables in the test set") + 
+  ggplot2::theme_bw() + 
+  ggplot2::theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "GGallyTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+# BMI x SEX
+## Seed: 2390
+```{r}
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
+table(dat.pheno.train$BMI, dat.pheno.train$SEX)
+with(dat.pheno.train, chisq.test(x = BMI, y = SEX)$expected)
+with(dat.pheno.train, chisq.test(x = BMI, y = SEX, correct = F))
+
+table(dat.pheno.test$BMI, dat.pheno.test$SEX)
+with(dat.pheno.test, chisq.test(x = BMI, y = SEX)$expected)
+with(dat.pheno.test, chisq.test(x = BMI, y = SEX, correct = F))
+```
+
+
+## Seed: 98907
+```{r}
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt98907.RData")
+table(dat.pheno.train$BMI, dat.pheno.train$SEX)
+with(dat.pheno.train, chisq.test(x = BMI, y = SEX)$expected)
+with(dat.pheno.train, chisq.test(x = BMI, y = SEX, correct = F))
+
+table(dat.pheno.test$BMI, dat.pheno.test$SEX)
+with(dat.pheno.test, chisq.test(x = BMI, y = SEX)$expected)
+with(dat.pheno.test, chisq.test(x = BMI, y = SEX, correct = F))
+```
+
+
+# Boxplot
+## Seed: 2390 
+```{r}
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
+library(ggpubr)
+dat.expr.train.t <- t(dat.expr.train)
+all(order(rownames(dat.expr.train.t)) == order(rownames(dat.pheno.train))) # TRUE
+dat.bmi.sex.train <- cbind(dat.pheno.train[c("BMI", "SEX")], dat.expr.train.t)
+
+boxplot.fun <- function(dataset, var.x, var.y, set.status) {
+  dataset %>% ggplot(aes(y = get(var.y), x = get(var.x))) + 
+    geom_boxplot(mapping = aes(group = get(var.x), color = get(var.x))) +
+    geom_jitter(mapping = aes(color = get(var.x))) + 
+    facet_wrap(~SEX) + 
+    labs(title = paste0("Gene expression across different states of BMI and SEX \nin the ", set.status, " set"), y = paste0(var.y, " expression"), x = "BMI") +
+    theme_bw(base_size = 14) + 
+    scale_color_manual(values = c("#0073C2FF", "#EFC000FF")) + 
+    guides(color = "none")
+  }
+
+boxplot.bmi.sex.train <- names(dat.bmi.sex.train)[9] %>% 
+  map(.f = boxplot.fun, dataset = dat.bmi.sex.train, var.x = "BMI", set.status = "training")
+
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BoxplotTrain", "_", seed.num, ".png"),
+         plot = boxplot.bmi.sex.train[[1]],
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+
+# grid.arrange(do.call("arrangeGrob", c(boxplot.bmi.sex.train, ncol = 1)))
+
+dat.expr.test.t <- t(dat.expr.test)
+all(order(rownames(dat.expr.test.t)) == order(rownames(dat.pheno.test))) # TRUE
+dat.bmi.sex.test <- cbind(dat.pheno.test[c("BMI", "SEX")], dat.expr.test.t)
+boxplot.bmi.sex.test <- names(dat.bmi.sex.test)[9] %>% 
+  map(.f = boxplot.fun, dataset = dat.bmi.sex.test, var.x = "BMI", set.status = "test")
+
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BoxplotTest", "_", seed.num, ".png"),
+         plot = boxplot.bmi.sex.test[[1]],
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
+
+## Seed: 98907
+```{r}
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt98907.RData")
+dat.expr.train.t <- t(dat.expr.train)
+all(order(rownames(dat.expr.train.t)) == order(rownames(dat.pheno.train))) # TRUE
+dat.bmi.sex.train <- cbind(dat.pheno.train[c("BMI", "SEX")], dat.expr.train.t)
+
+boxplot.bmi.sex.train <- names(dat.bmi.sex.train)[12] %>% 
+  map(.f = boxplot.fun, dataset = dat.bmi.sex.train, var.x = "BMI", set.status = "training")
+
+seed.num <- 98907
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BoxplotTrain", "_", seed.num, ".png"),
+         plot = boxplot.bmi.sex.train[[1]],
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+
+# grid.arrange(do.call("arrangeGrob", c(boxplot.bmi.sex.train, ncol = 1)))
+
+dat.expr.test.t <- t(dat.expr.test)
+all(order(rownames(dat.expr.test.t)) == order(rownames(dat.pheno.test))) # TRUE
+dat.bmi.sex.test <- cbind(dat.pheno.test[c("BMI", "SEX")], dat.expr.test.t)
+boxplot.bmi.sex.test <- names(dat.bmi.sex.test)[9] %>% 
+  map(.f = boxplot.fun, dataset = dat.bmi.sex.test, var.x = "BMI", set.status = "test")
+
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BoxplotTest", "_", seed.num, ".png"),
+         plot = boxplot.bmi.sex.test[[1]],
+         device = "png",
+         width = 8,
+         height = 4,
+         units = "in")
+```
+
