@@ -90,21 +90,99 @@ for (i in 1:10) {data_func(seed.num = seed.num.vec[i])}
 ```
 
 
-# Check the first dataset under the seed 120
+# Check the datasets under the seeds 120, 233, and 556
 ```{r}
 dat.expr.train120 <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.train120.RDS")
-```
+dat.expr.test120 <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.test120.RDS")
+dat.pheno.train120 <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.train120.RDS")
+dat.pheno.test120 <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test120.RDS")
 
-
-# Check the first dataset under the seed 233
-```{r}
 dat.expr.train233 <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.train233.RDS")
+dat.expr.test233 <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.test233.RDS")
+dat.pheno.train233 <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.train233.RDS")
+dat.pheno.test233 <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test233.RDS")
+
+dat.expr.train556 <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.train556.RDS")
+dat.expr.test556 <- readRDS("../ApplicationData/derived/RandomSeed/dat.expr.test556.RDS")
+dat.pheno.train556 <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.train556.RDS")
+dat.pheno.test556 <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test556.RDS")
 ```
 
+
+## Check the sample names
 ```{r}
-# Intersection of samples between two training sets
-length(intersect(colnames(dat.expr.train120), colnames(dat.expr.train233)))
+length(colnames(dat.expr.train120)) # 202 samples
+intersect(colnames(dat.expr.train120), colnames(dat.expr.test120)) # Intersection of sample names between the training and the test set under the seed 120
+length(intersect(colnames(dat.expr.train120), colnames(dat.expr.train233))) # 95 common samples
+length(intersect(colnames(dat.expr.train120), colnames(dat.expr.train556))) # 101 common samples
+length(intersect(colnames(dat.expr.train233), colnames(dat.expr.train556))) # 102 common samples
 ```
+
+
+## Check the gene expression distributions across samples - heatmap of the count matrix
+```{r}
+# http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#heatmap-of-the-count-matrix
+library(pheatmap)
+# Select the top 500 genes with the high mean counts across samples 
+select.500 <- order(rowMeans(dat.expr.train120), decreasing = T)[1:500]
+pheatmap(dat.expr.train120[select.500, ], 
+         show_rownames = F,
+         show_colnames = F,
+         cluster_rows = F,
+         cluster_cols = F)
+
+select.500 <- order(rowMeans(dat.expr.train233), decreasing = T)[1:500]
+pheatmap(dat.expr.train233[select.500, ], 
+         show_rownames = F,
+         show_colnames = F,
+         cluster_rows = F,
+         cluster_cols = F)
+
+select.500 <- order(rowMeans(dat.expr.train556), decreasing = T)[1:500]
+pheatmap(dat.expr.train556[select.500, ], 
+         show_rownames = F,
+         show_colnames = F,
+         cluster_rows = F,
+         cluster_cols = F)
+```
+
+
+## Check the gene expression distributions between two BMI levels - heatmap of the count matrix
+```{r}
+select.500 <- order(rowMeans(dat.expr.train120), decreasing = T)[1:500]
+col.order <- c(rownames(dat.pheno.train120[dat.pheno.train120$BMI == "low", ]),
+               rownames(dat.pheno.train120[dat.pheno.train120$BMI == "high", ]))
+bmi <- dat.pheno.train120["BMI"]
+pheatmap(dat.expr.train120[select.500, col.order], 
+         show_rownames = F,
+         show_colnames = F,
+         cluster_rows = F,
+         cluster_cols = F,
+         annotation_col = bmi)
+
+select.500 <- order(rowMeans(dat.expr.train233), decreasing = T)[1:500]
+col.order <- c(rownames(dat.pheno.train233[dat.pheno.train233$BMI == "low", ]),
+               rownames(dat.pheno.train233[dat.pheno.train233$BMI == "high", ]))
+bmi <- dat.pheno.train233["BMI"]
+pheatmap(dat.expr.train233[select.500, col.order], 
+         show_rownames = F,
+         show_colnames = F,
+         cluster_rows = F,
+         cluster_cols = F,
+         annotation_col = bmi)
+
+select.500 <- order(rowMeans(dat.expr.train556), decreasing = T)[1:500]
+col.order <- c(rownames(dat.pheno.train556[dat.pheno.train556$BMI == "low", ]),
+               rownames(dat.pheno.train556[dat.pheno.train556$BMI == "high", ]))
+bmi <- dat.pheno.train556["BMI"]
+pheatmap(dat.expr.train556[select.500, col.order], 
+         show_rownames = F,
+         show_colnames = F,
+         cluster_rows = F,
+         cluster_cols = F,
+         annotation_col = bmi)
+```
+
 
 # Extract eFDR/q-value of the top ranked 2000 genes
 ## Seed: 2390
@@ -316,7 +394,14 @@ dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test2
                               },
                               mc.cores = 4L)
   
-  names(qlf.train) = names(edgeR.eFDR.train) = names(edgeR.eFDR.2000.train) = var.pool.add 
+  edgeR.eFDR.2000.GeneName.train <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                q.val <- edgeR.eFDR.train[[i]][["qvalues"]]
+                                return(rownames(dat.expr.train)[order(q.val)[1:2000]])
+                              },
+                              mc.cores = 4L)
+  
+  names(qlf.train) = names(edgeR.eFDR.train) = names(edgeR.eFDR.2000.train) = names(edgeR.eFDR.2000.GeneName.train) = var.pool.add 
   
   y.test <- DGEList(counts = dat.expr.test, 
                     lib.size = colSums(dat.expr.test)) %>% 
@@ -341,10 +426,16 @@ dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test2
                              },
                              mc.cores = 4L)
   
-  names(qlf.test) = names(edgeR.eFDR.test) = names(edgeR.eFDR.2000.test) = var.pool.add 
+  edgeR.eFDR.2000.GeneName.test <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                q.val <- edgeR.eFDR.test[[i]][["qvalues"]]
+                                return(rownames(dat.expr.test)[order(q.val)[1:2000]])
+                              },
+                              mc.cores = 4L)
   
+  names(qlf.test) = names(edgeR.eFDR.test) = names(edgeR.eFDR.2000.test) = names(edgeR.eFDR.2000.GeneName.test) = var.pool.add 
   
-  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, voom.train, edgeR.fit.train, edgeR.eFDR.train, edgeR.eFDR.2000.train, voom.test, edgeR.fit.test, edgeR.eFDR.test, edgeR.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, y.train, edgeR.fit.train, edgeR.eFDR.train, edgeR.eFDR.2000.train, edgeR.eFDR.2000.GeneName.train, y.test, edgeR.fit.test, edgeR.eFDR.test, edgeR.eFDR.2000.test, edgeR.eFDR.2000.GeneName.test, file = "../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
   
     
   ##------DESeq2------
@@ -387,7 +478,13 @@ dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test2
                                },
                                mc.cores = 4L)
   
-  names(res.train) = names(DESeq2.eFDR.train) = names(DESeq2.eFDR.2000.train) = var.pool.add 
+  DESeq2.eFDR.2000.GeneName.train <- mclapply(1:length(var.pool.add),
+                                function(i) {
+                                  q.val <- DESeq2.eFDR.train[[i]]
+                                  return(rownames(cts.train)[order(q.val)[1:2000]])},
+                                mc.cores = 4L)
+  
+  names(res.train) = names(DESeq2.eFDR.train) = names(DESeq2.eFDR.2000.train) = names(DESeq2.eFDR.2000.GeneName.train) = var.pool.add 
   
   lib.size <- colSums(cts.test)
   norm.factor <- calcNormFactors(cts.test, method = "TMM")
@@ -414,9 +511,15 @@ dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test2
                               },
                               mc.cores = 4L)
   
-  names(res.test) = names(DESeq2.eFDR.test) = names(DESeq2.eFDR.2000.test) = var.pool.add
+  DESeq2.eFDR.2000.GeneName.test <- mclapply(1:length(var.pool.add),
+                                function(i) {
+                                  q.val <- DESeq2.eFDR.test[[i]]
+                                  return(rownames(cts.test)[order(q.val)[1:2000]])},
+                                mc.cores = 4L)
   
-  save(cts.train, cts.test, coldata.train, coldata.test, var.pool, var.pool.add, res.train, DESeq2.eFDR.train, DESeq2.eFDR.2000.train, res.test, DESeq2.eFDR.test, DESeq2.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
+  names(res.test) = names(DESeq2.eFDR.test) = names(DESeq2.eFDR.2000.test) = names(DESeq2.eFDR.2000.GeneName.test) = var.pool.add
+  
+  save(cts.train, cts.test, coldata.train, coldata.test, var.pool, var.pool.add, res.train, DESeq2.eFDR.train, DESeq2.eFDR.2000.train, DESeq2.eFDR.2000.GeneName.train, res.test, DESeq2.eFDR.test, DESeq2.eFDR.2000.test, DESeq2.eFDR.2000.GeneName.test, file = "../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
 ```
 
 
@@ -629,7 +732,14 @@ dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test9
                               },
                               mc.cores = 4L)
   
-  names(qlf.train) = names(edgeR.eFDR.train) = names(edgeR.eFDR.2000.train) = var.pool.add 
+  edgeR.eFDR.2000.GeneName.train <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                q.val <- edgeR.eFDR.train[[i]][["qvalues"]]
+                                return(rownames(dat.expr.train)[order(q.val)[1:2000]])
+                              },
+                              mc.cores = 4L)
+  
+  names(qlf.train) = names(edgeR.eFDR.train) = names(edgeR.eFDR.2000.train) = names(edgeR.eFDR.2000.GeneName.train) = var.pool.add 
   
   y.test <- DGEList(counts = dat.expr.test, 
                     lib.size = colSums(dat.expr.test)) %>% 
@@ -654,10 +764,16 @@ dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test9
                              },
                              mc.cores = 4L)
   
-  names(qlf.test) = names(edgeR.eFDR.test) = names(edgeR.eFDR.2000.test) = var.pool.add 
+  edgeR.eFDR.2000.GeneName.test <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                q.val <- edgeR.eFDR.test[[i]][["qvalues"]]
+                                return(rownames(dat.expr.test)[order(q.val)[1:2000]])
+                              },
+                              mc.cores = 4L)
   
+  names(qlf.test) = names(edgeR.eFDR.test) = names(edgeR.eFDR.2000.test) = names(edgeR.eFDR.2000.GeneName.test) = var.pool.add 
   
-  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, voom.train, edgeR.fit.train, edgeR.eFDR.train, edgeR.eFDR.2000.train, voom.test, edgeR.fit.test, edgeR.eFDR.test, edgeR.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/edgeRMultiInt98907.RData")
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, y.train, edgeR.fit.train, edgeR.eFDR.train, edgeR.eFDR.2000.train, edgeR.eFDR.2000.GeneName.train, y.test, edgeR.fit.test, edgeR.eFDR.test, edgeR.eFDR.2000.test, edgeR.eFDR.2000.GeneName.test, file = "../ApplicationData/derived/RandomSeed/edgeRMultiInt98907.RData")
   
     
   ##------DESeq2------
@@ -700,7 +816,13 @@ dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test9
                                },
                                mc.cores = 4L)
   
-  names(res.train) = names(DESeq2.eFDR.train) = names(DESeq2.eFDR.2000.train) = var.pool.add 
+  DESeq2.eFDR.2000.GeneName.train <- mclapply(1:length(var.pool.add),
+                                function(i) {
+                                  q.val <- DESeq2.eFDR.train[[i]]
+                                  return(rownames(cts.train)[order(q.val)[1:2000]])},
+                                mc.cores = 4L)
+  
+  names(res.train) = names(DESeq2.eFDR.train) = names(DESeq2.eFDR.2000.train) = names(DESeq2.eFDR.2000.GeneName.train) = var.pool.add 
   
   lib.size <- colSums(cts.test)
   norm.factor <- calcNormFactors(cts.test, method = "TMM")
@@ -727,9 +849,15 @@ dat.pheno.test <- readRDS("../ApplicationData/derived/RandomSeed/dat.pheno.test9
                               },
                               mc.cores = 4L)
   
-  names(res.test) = names(DESeq2.eFDR.test) = names(DESeq2.eFDR.2000.test) = var.pool.add
+  DESeq2.eFDR.2000.GeneName.test <- mclapply(1:length(var.pool.add),
+                                function(i) {
+                                  q.val <- DESeq2.eFDR.test[[i]]
+                                  return(rownames(cts.test)[order(q.val)[1:2000]])},
+                                mc.cores = 4L)
   
-  save(cts.train, cts.test, coldata.train, coldata.test, var.pool, var.pool.add, res.train, DESeq2.eFDR.train, DESeq2.eFDR.2000.train, res.test, DESeq2.eFDR.test, DESeq2.eFDR.2000.test, file = "../ApplicationData/derived/RandomSeed/DESeq2MultiInt98907.RData")
+  names(res.test) = names(DESeq2.eFDR.test) = names(DESeq2.eFDR.2000.test) = names(DESeq2.eFDR.2000.GeneName.test) = var.pool.add
+  
+  save(cts.train, cts.test, coldata.train, coldata.test, var.pool, var.pool.add, res.train, DESeq2.eFDR.train, DESeq2.eFDR.2000.train, DESeq2.eFDR.2000.GeneName.train, res.test, DESeq2.eFDR.test, DESeq2.eFDR.2000.test, DESeq2.eFDR.2000.GeneName.test, file = "../ApplicationData/derived/RandomSeed/DESeq2MultiInt98907.RData")
 ```
 
 
@@ -1331,3 +1459,73 @@ ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_
          units = "in")
 ```
 
+
+# Venn digram
+## Seed: 2390 
+```{r}
+load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/eBayesMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
+
+# names(BMAseq.eFDR.Main.2000.train$BMI)
+
+g <- ggVennDiagram(list(BMAseq = intersect(names(BMAseq.eFDR.Main.2000.train$BMI), names(BMAseq.eFDR.Main.2000.test$BMI)), 
+                        DESeq2 = intersect(DESeq2.eFDR.2000.GeneName.train$BMI, DESeq2.eFDR.2000.GeneName.test$BMI),
+                        edgeR = intersect(edgeR.eFDR.2000.GeneName.train$BMI, edgeR.eFDR.2000.GeneName.test$BMI),
+                        eBayes = intersect(names(eBayes.eFDR.2000.train$BMI), names(eBayes.eFDR.2000.test$BMI)),
+                        voom.limma = intersect(names(voom.eFDR.2000.train$BMI), names(voom.eFDR.2000.test$BMI))),
+                   label_alpha = 0, label_color = "white") +
+  theme(legend.position = "none", 
+        plot.title = element_text(hjust = 0.5, colour = "red", size = 18)) + 
+  ggtitle("The intersection of common differentially expressed genes \nassociated with the main effect of BMI") + 
+  scale_fill_distiller(palette = "Dark2", direction = -1)
+                  
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMI.DEGIntersectionTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 10,
+         height = 7,
+         units = "in")
+```
+
+
+```{r}
+# Write a batch function
+
+```
+
+
+## Seed: 98907 
+```{r}
+load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt98907.RData")
+load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt98907.RData")
+load("../ApplicationData/derived/RandomSeed/edgeRMultiInt98907.RData")
+load("../ApplicationData/derived/RandomSeed/eBayesMultiInt98907.RData")
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt98907.RData")
+
+# names(BMAseq.eFDR.Main.2000.train$BMI)
+
+g <- ggVennDiagram(list(BMAseq = intersect(names(BMAseq.eFDR.Main.2000.train$BMI), names(BMAseq.eFDR.Main.2000.test$BMI)), 
+                        DESeq2 = intersect(DESeq2.eFDR.2000.GeneName.train$BMI, DESeq2.eFDR.2000.GeneName.test$BMI),
+                        edgeR = intersect(edgeR.eFDR.2000.GeneName.train$BMI, edgeR.eFDR.2000.GeneName.test$BMI),
+                        eBayes = intersect(names(eBayes.eFDR.2000.train$BMI), names(eBayes.eFDR.2000.test$BMI)),
+                        voom.limma = intersect(names(voom.eFDR.2000.train$BMI), names(voom.eFDR.2000.test$BMI))),
+                   label_alpha = 0, label_color = "white") +
+  theme(legend.position = "none", 
+        plot.title = element_text(hjust = 0.5, colour = "red", size = 18)) + 
+  ggtitle("The intersection of common differentially expressed genes \nassociated with the main effect of BMI") + 
+  scale_fill_distiller(palette = "Dark2", direction = -1)
+                  
+seed.num <- 98970
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMI.DEGIntersectionTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 10,
+         height = 7,
+         units = "in")
+```
