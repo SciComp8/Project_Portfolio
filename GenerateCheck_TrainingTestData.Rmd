@@ -1493,12 +1493,6 @@ date.analysis <- format(Sys.Date(), "%Y%b%d")
 ```
 
 
-```{r}
-# Write a batch function
-
-```
-
-
 ## Seed: 98907 
 ```{r}
 load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt98907.RData")
