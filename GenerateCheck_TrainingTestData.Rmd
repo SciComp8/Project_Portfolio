@@ -1523,3 +1523,87 @@ date.analysis <- format(Sys.Date(), "%Y%b%d")
          height = 7,
          units = "in")
 ```
+
+
+# Boxplot - expression distributions of top ranked 10 genes between the training and test set
+## Seed: 2390
+### BMI
+```{r}
+##------Prepare data------
+load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/eBayesMultiInt2390.RData")
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+# names(BMAseq.eFDR.Main.2000.train[["BMI"]][1:10]) # ENSG IDs of top ranked 10 genes based on the eFDR from the smallest to the largest in the training set
+
+library(ggpubr)
+library(purrr)
+library(gridExtra)
+
+##------Prepare plotting function------
+boxplot.fun <- function(dataset, var.x, var.y) {
+  dataset |> ggplot(mapping = aes(y = get(var.y), x = get(var.x))) + 
+    geom_boxplot(mapping = aes(group = get(var.x), color = get(var.x))) +
+    geom_jitter(mapping = aes(color = get(var.x))) + 
+    stat_compare_means(method = "wilcox.test", 
+                       label.x.npc = "right",
+                       label.y = 50,
+                       mapping = aes(label = ifelse(p < 1.e-3, "p < 0.001", sprintf("p = %4.3f", as.numeric(..p.format..))))) +
+    labs(y = var.y, 
+         x = "") +
+    theme_bw(base_size = 14) + 
+    scale_color_manual(values = c("#0073C2FF", "#EFC000FF")) + 
+    guides(color = "none")
+}
+
+
+for(i in seq(1, 1998, 9)) {
+  ##------Process data------
+  gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
+  dat.expr.train2390.top9 <- dat.expr.train[names(BMAseq.eFDR.Main.2000.train[["BMI"]])[gene.id], ]
+  dat.expr.train2390.top9.t <- t(dat.expr.train2390.top9) |> as.data.frame()
+dat.expr.train2390.top9.t$Data <- "Train"
+  dat.expr.test2390.traintop9 <- dat.expr.test[names(BMAseq.eFDR.Main.2000.train[["BMI"]])[gene.id], ]
+  dat.expr.test2390.traintop9.t <- t(dat.expr.test2390.traintop9) |> as.data.frame()
+  dat.expr.test2390.traintop9.t$Data <- "Test"
+  rownames(dat.expr.train2390.top9.t) = rownames(dat.expr.test2390.traintop9.t) = NULL
+  dat.expr.full2390.traintop9 <- rbind(dat.expr.train2390.top9.t,
+                                      dat.expr.test2390.traintop9.t)
+  p.vec <- NULL
+  for(j in 1:9) {
+    p.val <- wilcox.test(dat.expr.full2390.traintop9[[j]] ~ dat.expr.full2390.traintop9[["Data"]], data = dat.expr.full2390.traintop9)$p.value
+    p.vec <- c(p.vec, p.val)
+  }
+    
+  ##------Make boxplots------
+  if (any(!is.na(p.vec) & p.vec < 0.05)) {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match("Data", names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun, dataset = dat.expr.full2390.traintop9, var.x = "Data")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/Significant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+  print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  } else {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match("Data", names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun, dataset = dat.expr.full2390.traintop9, var.x = "Data")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/Insignificant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+    print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  }
+}
+```
