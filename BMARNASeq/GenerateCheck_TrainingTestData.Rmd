@@ -13,6 +13,18 @@ knitr::opts_chunk$set(
 )
 ```
 
+```{r}
+## RStudio keyboard shortcut
+# Jump to line: Alt+Shift+G (Windows) or Option+Shift+Cmd+G (Mac)
+# Cursor at the beginning of a command line: Ctrl+A
+# Cursor at the end of a command line: Ctrl+E
+# Clear all the code from your console: Ctrl+L
+# Create a pipe operator %>%: Ctrl+Shift+M (Windows) or Cmd+Shift+M (Mac)
+# Create an assignment operator <-: Alt+- (Windows) or Option+-(Mac) 
+# Knit a document (knitr): Ctrl+Shift+K (Windows) or Cmd+Shift+K (Mac)
+# Comment or uncomment current selection: Ctrl+Shift+C (Windows) or Cmd+Shift+C (Mac)
+```
+
 # Save and load images
 ```{r saveimage, eval=FALSE}
 image.date <- format(Sys.Date(), "%Y%b%d")
