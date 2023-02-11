@@ -86,7 +86,7 @@ mydt[, .(print(Age.at.Diagnosis), plot(Age.at.Diagnosis))]
 ```
 
 
-# Calculate the mean age by Clinical.N.Stage2 in the subsetted dataset
+# Calculate the mean age by Clinical.N.Stage in the subsetted dataset
 ```{r}
 myRes3 <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
                mean(Age.at.Diagnosis, na.rm = T),
