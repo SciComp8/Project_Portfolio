@@ -64,4 +64,186 @@ mydt[Race.Ethnicity2 %in% c("WA", "AA")]
 ```
 
 
+# Calculate the mean age in the subsetted dataset
+```{r}
+myRes2 <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", mean(Age.at.Diagnosis, na.rm = T)]
+myRes2 # 57.11228
 
+##------Basic operations------
+# Return `Clinical.T.Stage2` as a vector
+mydt[, Clinical.T.Stage2] 
+
+# Return `Clinical.T.Stage2` and `Race.Ethnicity2` as a data.table
+mydt[, .(Clinical.T.Stage2, Race.Ethnicity2)]
+# Equivalently
+mydt[, list(Clinical.T.Stage2, Race.Ethnicity2)]
+
+# Return the sum of all elements of `Age.at.Diagnosis` in a vector
+mydt[, sum(Age.at.Diagnosis)]
+
+# Return the mean of all elements of `Age.at.Diagnosis` and the std. dev. of all elements of `Age.at.Diagnosis` in a data.table
+mydt[, .(mean(Age.at.Diagnosis), sd(Age.at.Diagnosis))]
+mydt[, .(mean.age = mean(Age.at.Diagnosis), sd.age = sd(Age.at.Diagnosis))]
+
+# Select the `Age.at.Diagnosis` column and compute the std. dev. of all elements of `Age.at.Diagnosis`, which returns a single value and gets recycled
+mydt[, .(Age.at.Diagnosis, sd.age = sd(Age.at.Diagnosis))]
+
+# Print the `Age.at.Diagnosis` column and plot the std. dev. of all elements of `Age.at.Diagnosis`
+mydt[, .(print(Age.at.Diagnosis), plot(Age.at.Diagnosis))]
+```
+
+
+# Calculate the mean age by Clinical.N.Stage in the subsetted dataset
+```{r}
+myRes3 <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+               mean(Age.at.Diagnosis, na.rm = T),
+               by = Clinical.N.Stage]
+myRes3
+
+##------Basic operations------
+# Calculate the mean of variable `Age.at.Diagnosis`, grouped by `Clinical.N.Stage` over the subsetted dataset
+mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+     mean(Age.at.Diagnosis, na.rm = T),
+     by = Clinical.N.Stage]
+
+# Select the Clinical.N.Stage and mean of `Age.at.Diagnosis` where the mean is > 40 over the subsetted dataset (chaining)
+mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+     .(mean.age = mean(Age.at.Diagnosis, na.rm = T)),
+     by = Clinical.N.Stage][mean.age > 50]
+
+# Calculate the mean of `Age.at.Diagnosis`, grouped by decreasingly ordered `Clinical.N.Stage` over the subsetted dataset
+mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+     .(mean.age = mean(Age.at.Diagnosis, na.rm = T)),
+     by = Clinical.N.Stage][order(-Clinical.N.Stage)]
+
+# Calculate the mean of `Age.at.Diagnosis`, grouped by each combination of `Clinical.N.Stage` and `ER.LR` over the subsetted dataset
+mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+     .(mean.age = mean(Age.at.Diagnosis, na.rm = T)),
+     by = .(Clinical.N.Stage, ER.LR)]
+
+# Count the number of rows for every group in Clinical.N.Stage
+mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+     .N,
+     by = Clinical.N.Stage]
+```
+
+
+# Update columns - `:=`
+```{r}
+# Update one variable
+myRes <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+              .(mean.age = mean(Age.at.Diagnosis, na.rm = T)),
+              by = Clinical.N.Stage]
+myRes
+myRes[, mean.age:=round(mean.age, 2)]
+myRes
+
+# Update two variables
+myRes <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+              .(mean.age = mean(Age.at.Diagnosis, na.rm = T),
+                sd.age = sd(Age.at.Diagnosis, na.rm = T)),
+              by = Clinical.N.Stage]
+myRes
+myRes[, c("mean.age", "sd.age"):=list(round(mean.age, 2), round(sd.age, 2))]
+myRes
+# Alternative way
+myRes[, mean.age:= round(mean.age, 2)][, sd.age:=round(sd.age, 2)]
+myRes
+
+myRes[, ':='(mean.age=round(mean.age, 2),
+             sd.age=round(sd.age, 2))][] # [] Print the result to the screen
+
+# Remove `mean.age`
+myRes <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+              .(mean.age = mean(Age.at.Diagnosis, na.rm = T),
+                sd.age = sd(Age.at.Diagnosis, na.rm = T)),
+              by = Clinical.N.Stage]
+myRes[, mean.age:=NULL][]
+
+# Remove `mean.age` and `sd.age`
+myRes <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+              .(mean.age = mean(Age.at.Diagnosis, na.rm = T),
+                sd.age = sd(Age.at.Diagnosis, na.rm = T)),
+              by = Clinical.N.Stage]
+myRes[, c("mean.age", "sd.age"):=NULL][]
+
+myRes <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+              .(mean.age = mean(Age.at.Diagnosis, na.rm = T),
+                sd.age = sd(Age.at.Diagnosis, na.rm = T)),
+              by = Clinical.N.Stage]
+vars.rm=c("mean.age", "sd.age")
+myRes[, vars.rm:=NULL][] # Remove the column with the column name `vars.rm`
+myRes[, (vars.rm):=NULL][] # Remove the columns specified in the variable `vars.rm`
+```
+
+
+# `set` family
+```{r}
+rows <- list(2:3, 4:5)
+cols <- 2:3
+
+# Sequence along the values of rows and the values of columns, set the values of those elements as 0
+myRes <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+              .(mean.age = mean(Age.at.Diagnosis, na.rm = T),
+                sd.age = sd(Age.at.Diagnosis, na.rm = T)),
+              by = Clinical.N.Stage]
+for (j in c(2L,3L)) set(myRes, j=j, value=NA)
+myRes
+
+for(i in seq_along(rows)){ # seq_along(rows) = 1:2
+  set(myRes,
+      i=rows[[i]], # rows[[1]] = 2,3
+      j=cols[i], # cols[1] = 2
+      value=rep(c(2:3)))
+}
+myRes
+
+# Set name of `mean.age` to `Mean.Age`
+setnames(myRes, "mean.age", "Mean.Age")
+myRes
+
+# Set 2 column names
+setnames(myRes, c("mean.age", "sd.age"), c("Mean.Age", "Sd.Age"))
+myRes
+
+# Set column orders
+setcolorder(myRes, c("sd.age", "mean.age", "Clinical.N.Stage"))
+myRes
+```
+
+
+# `.SD` and `.SDcols`
+```{r}
+# A verbose way to return the whole table
+mydt[, .SD] 
+identical(mydt, mydt[, .SD])
+
+# A verbose way to select the first and last row 
+mydt[, .SD[c(1, .N)]]
+identical(mydt[c(1, .N)], mydt[, .SD[c(1, .N)]])
+
+# Calculate the difference of mean and median of age grouped by Clinical.N.Stage
+mydt[, lapply(.SD, median, na.rm=T), by=Clinical.N.Stage, .SDcols=c("T2LRDeath.ER", "T2LRDeath.PR")]
+
+```
+
+
+# Index and keys 
+
+# Join two data tables
+```{r}
+myRes4 <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
+               mean(Age.at.Diagnosis, na.rm = T),
+               by = Clinical.N.Stage]
+myRes4
+
+myRes5 <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T3|T4", 
+               mean(Age.at.Diagnosis, na.rm = T),
+               by = Clinical.N.Stage]
+myRes5
+
+setkey(myRes4, "Clinical.N.Stage")
+setkey(myRes5, "Clinical.N.Stage")
+myRes6 <- myRes4[myRes5]
+myRes6 
+```
