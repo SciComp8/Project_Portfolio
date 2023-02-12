@@ -222,13 +222,32 @@ identical(mydt, mydt[, .SD])
 mydt[, .SD[c(1, .N)]]
 identical(mydt[c(1, .N)], mydt[, .SD[c(1, .N)]])
 
-# Calculate the difference of mean and median of age grouped by Clinical.N.Stage
+# Calculate the median of each of time to events, grouped by Clinical.N.Stage
 mydt[, lapply(.SD, median, na.rm=T), by=Clinical.N.Stage, .SDcols=c("T2LRDeath.ER", "T2LRDeath.PR")]
 
 ```
 
 
 # Index and keys 
+```{r}
+setkey(myRes,Clinical.N.Stage)
+myRes["N0"] # Return all rows where the key column of `Clinical.N.Stage` has the value N0
+myRes[c("N0","N1")] # Return all rows where the key column of `Clinical.N.Stage` has the value N0 or N1
+
+setkey(mydt,Clinical.N.Stage)
+mydt["N0",mult="first"] # Return the first row of all rows that match the value N0 in the key column of `Clinical.N.Stage`
+mydt["N0",mult="last"] # Return the last row of all rows that match the value N0 in the key column of `Clinical.N.Stage`
+mydt[c("N0"),median(Age.at.Diagnosis)] # Return the total median of `Age.at.Diagnosis`, for rows of key column `Clinical.N.Stage` that have the value N0
+
+mydt[c("N0", "N1"),.(median.age=median(Age.at.Diagnosis)),by=.EACHI] # Return the median of `Age.at.Diagnosis` grouped by `Clinical.N.Stage`
+
+setkey(mydt,Clinical.N.Stage,Clinical.T.Stage) # Sort mydt by `Clinical.N.Stage` and then by `Clinical.T.Stage` within each group of Clinical.N.Stage (invisible)
+mydt
+
+mydt[.("N3", "T4")] # Select rows that have the value N3 for the first key (`Clinical.N.Stage`) & the value T4 for the second key (`Clinical.T.Stage`)
+mydt[.(c("N2", "N3"), "T4")] # Select rows that have the value N2 or N3 for the first key (`Clinical.N.Stage`) & the value T4 for the second key (`Clinical.T.Stage`)
+```
+
 
 # Join two data tables
 ```{r}
