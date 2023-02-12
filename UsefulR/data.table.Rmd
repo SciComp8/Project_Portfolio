@@ -1,7 +1,7 @@
 ---
 title: "Data Table"
 author: "Anni Liu"
-date: "`r Sys.Date()`"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: html_document
 ---
 
@@ -17,9 +17,8 @@ save.image(file = paste0(image.date, "_datatable_image_ALiu.RData"))
 ```
 
 ```{r loadimage}
-load("2023Feb10_datatable_image_ALiu.RData")
+load("2023Feb11_datatable_image_ALiu.RData")
 ```
-
 
 
 ```{r}
@@ -38,7 +37,7 @@ class(mydt2)
 ```{r}
 str(mydt)
 # mydt[i, j, by]
-# start with mydt, subset or reorder using i, calculate using j, and order by by.
+# start with mydt, subset rows using `i`, calculate using `j`, and group by `by`.
 ```
 
 
@@ -51,82 +50,17 @@ myRes
 # Select 1st to 6th row
 mydt[1:6, ] # Equivalently; mydt[1:6]
 
+# Select the penultimate row
+mydt[.N-1]
+
+# Return the number of rows
+mydt[, .N]
+
 # Select all rows that have value WA in the column `Race.Ethnicity2`
 mydt[Race.Ethnicity2 == "WA"] 
 
 # Select all rows that have value WA and AA in the column `Race.Ethnicity2`
 mydt[Race.Ethnicity2 %in% c("WA", "AA")]
-```
-
-
-# Calculate the mean age in the subsetted dataset
-```{r}
-myRes2 <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", mean(Age.at.Diagnosis, na.rm = T)]
-myRes2 # 57.11228
-
-##------Basic operations------
-# Return `Clinical.T.Stage2` as a vector
-mydt[, Clinical.T.Stage2] 
-
-# Return `Clinical.T.Stage2` and `Race.Ethnicity2` as a data.table
-mydt[, .(Clinical.T.Stage2, Race.Ethnicity2)]
-
-# Return the sum of all elements of `Age.at.Diagnosis` in a vector
-mydt[, sum(Age.at.Diagnosis)]
-
-# Return the mean of all elements of `Age.at.Diagnosis` and the std. dev. of all elements of `Age.at.Diagnosis` in a data.table
-mydt[, .(mean(Age.at.Diagnosis), sd(Age.at.Diagnosis))]
-mydt[, .(mean.age = mean(Age.at.Diagnosis), sd.age = sd(Age.at.Diagnosis))]
-
-# Select the `Age.at.Diagnosis` column and compute the std. dev. of all elements of `Age.at.Diagnosis`, which returns a single value and gets recycled
-mydt[, .(Age.at.Diagnosis, sd.age = sd(Age.at.Diagnosis))]
-
-# Print the `Age.at.Diagnosis` column and plot the std. dev. of all elements of `Age.at.Diagnosis`
-mydt[, .(print(Age.at.Diagnosis), plot(Age.at.Diagnosis))]
-```
-
-
-# Calculate the mean age by Clinical.N.Stage in the subsetted dataset
-```{r}
-myRes3 <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
-               mean(Age.at.Diagnosis, na.rm = T),
-               by = Clinical.N.Stage]
-myRes3
-
-##------Basic operations------
-# Calculate the mean of variable `Age.at.Diagnosis`, grouped by `Clinical.N.Stage` over the subsetted dataset
-mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
-     mean(Age.at.Diagnosis, na.rm = T),
-     by = Clinical.N.Stage]
-
-# Select the Clinical.N.Stage and mean.age of which the mean of variable `Age.at.Diagnosis` is > 40 over the subsetted dataset (chaining)
-mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
-     .(mean.age = mean(Age.at.Diagnosis, na.rm = T)),
-     by = Clinical.N.Stage][mean.age > 50]
-
-# Calculate the mean of variable `Age.at.Diagnosis`, grouped by decreasingly ordered `Clinical.N.Stage` over the subsetted dataset
-mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
-     .(mean.age = mean(Age.at.Diagnosis, na.rm = T)),
-     by = Clinical.N.Stage][order(-Clinical.N.Stage)]
-```
-
-
-# Join two data tables
-```{r}
-myRes4 <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T1|T2", 
-               mean(Age.at.Diagnosis, na.rm = T),
-               by = Clinical.N.Stage]
-myRes4
-
-myRes5 <- mydt[Race.Ethnicity2 == "WA" & Clinical.T.Stage2 == "T3|T4", 
-               mean(Age.at.Diagnosis, na.rm = T),
-               by = Clinical.N.Stage]
-myRes5
-
-setkey(myRes4, "Clinical.N.Stage")
-setkey(myRes5, "Clinical.N.Stage")
-myRes6 <- myRes4[myRes5]
-myRes6 
 ```
 
 
