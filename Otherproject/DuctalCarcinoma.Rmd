@@ -1,0 +1,664 @@
+---
+title: "Ductal Carcinoma In Situ Data Analysis"
+author: "Anni Liu"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+knit: knitautomator::knit_filename
+output:
+  word_document:
+    fig_caption: no
+    highlight: null
+    toc: yes
+    reference_docx: manuscript_style_V0.docx
+params:
+  date.analysis: !r format(Sys.Date(), "%Y%b%d")
+  plot.fig: TRUE
+  results.folder: FALSE
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r shorcut, include=FALSE}
+# Jump to line: Alt+Shift+G (Windows) or Option+Shift+Cmd+G (Mac)
+# Cursor at the beginning of a command line: Ctrl+A
+# Cursor at the end of a command line: Ctrl+E
+# Clear all the code from your console: Ctrl+L
+# Create a pipe operator %>%: Ctrl+Shift+M (Windows) or Cmd+Shift+M (Mac)
+# Create an assignment operator <-: Alt+- (Windows) or Option+-(Mac) 
+# Knit a document (knitr): Ctrl+Shift+K (Windows) or Cmd+Shift+K (Mac)
+# Comment or uncomment current selection: Ctrl+Shift+C (Windows) or Cmd+Shift+C (Mac)
+```
+
+
+```{r, include=FALSE}
+##------Attach the libraries and functions------
+easypackages::libraries("readxl", "data.table", "fst", "tidyverse", "microbenchmark", "BTKR", "multcomp", "parallel", "future.apply", "ragg")
+"%_%" <- function(m, n) paste0(m, "_", n)
+"%0%" <- function(m, n) paste0(m, n)
+```
+
+
+```{r global_options, include=FALSE}
+#################################################################
+##                          Automator                          ##
+#################################################################
+if (params$plot.fig) {
+  dir.fig <- "../report/figs" %_% params$date.analysis %0% "/"
+  # Need "/", otherwise, the images are saved directly under the report folder
+  
+  if (!dir.exists(dir.fig)) { 
+    # If the figure directory does not exist, we create a new directory under the folder report using the name figs + current date passed from the params$date.analysis in YAML
+    dir.create(dir.fig) 
+  }
+  
+  knitr::opts_chunk$set( # Setting parameters when figures are plotted
+    fig.width = 4, fig.height = 4, fig.align = "center",
+    fig.path = dir.fig, dev = "png", dpi = 300,
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+} else { # Setting parameters when figures are not plotted
+  knitr::opts_chunk$set(
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+}
+
+if (params$results.folder) { # Suitable when the results need to be stored outside the microsoft word report
+  dir.result <- "../report/results" %_% params$date.analysis
+  
+  if (!dir.exists(dir.result)) {
+    # If the directory does not exist, we create a new directory under the folder report using the name results + current date passed from the params$date.analysis in YAML 
+    
+    dir.create(dir.result)
+  }
+}
+
+loc.perl <- "C:/cygwin64/bin/perl" # This is the location of your perl interpreter. Are you going to run perl in RMarkdown?
+```
+
+
+```{r check_data, include=FALSE}
+dat.work <- read_fst(path = "../data/derived/2023Feb11_dat_DCIS.RData")
+```
+
+
+# Data preparations
+
+It is noticed that for patients with StudyIDs 675 and 715, recurrence="No" while Invasive.vs.non.invasive.recurrence = "Invasive ductal", please check to resolve the inconsistencies.
+
+Among patients with recurrence 68 (6.78%, n=1003), 17 patients don't have date of recurrence.
+
+```{r eval=FALSE, include=FALSE}
+##------Load the original data------
+dat0 <- read_xlsx("../data/raw/20220930b_WCMBMH_DCIS _clean.xlsx", 
+                  range = "A1:AG1004", col_types = c(rep("guess", 25), "date", rep("guess", 7)), na = c("Unknown", "")) |> data.frame() 
+
+##------Fix the column names------
+names(dat0) <- sapply(strsplit(names(dat0), split="\\."), function(x)
+  paste(x[x!=""], collapse="."))
+
+##------Recode the variables------
+dat0 <- as.data.table(dat0)
+dat0[,Race2:=factor(Race,levels=c("NHW","NHB","Asian","Hispanic","Other"))]
+dat0[,Race3:=factor(ifelse(Race=="NHW","NHW","Other"))]
+dat0[,NDI2:=as.numeric(NDI)]
+dat0[,Insurance2:=factor(Insurance,levels=c("Medicaid","Medicare","Private","Self-pay","Other"))]
+dat0[,DetectionMode:=factor(Mode.of.Detection,labels=c("MRI","Other","Physician","ScrMammo","ScrMammo","SelfDetect","Ultrasound"))|>factor(levels=c("ScrMammo","Ultrasound","MRI","SelfDetect","Physician","Other"))]
+dat0[,Grade2:=gsub("p","P",gsub(" differentiated| \\([1-3]\\)|ly","",Grade))|>factor(levels=c("Well","Moderate","Poor"))]
+dat0[,Grade3:=ifelse(Grade2=="Poor","High-grade","Non high-grade")]
+dat0[,ER:=gsub("p","P",ER.Status)]
+dat0[,PR:=gsub("p","P",PR.Status)]
+dat0[,HER2:=HER2.Status]
+dat0[,Surgery:=factor(Surgery,levels=c("Lumpectomy","Mastectomy","Bilateral mastectomy","Bilateral lumpectomy"))]
+dat0[,MarginPositive:=If.lumpectomy.positive.margins]
+dat0[,ReExcision:=factor(Re.excision,levels=c("No","Yes"))]
+dat0[,Recur:=ifelse(Any.recurrent.DCIS=="Yes",1,0)]
+dat0[,T2Recur:=as.numeric(as.Date(Date.of.recurrence)-as.Date(Date.of.Diagnosis))]
+dat0[,T2RecurLFU:=ifelse(Any.recurrent.DCIS=="Yes",as.numeric(as.Date(Date.of.recurrence)-as.Date(Date.of.Diagnosis)),as.numeric(as.Date(Date.of.Last.Follow.Up)-as.Date(Date.of.Diagnosis)))]
+dat0[,T2LFU:=as.numeric(as.Date(Date.of.Last.Follow.Up)-as.Date(Date.of.Diagnosis))]
+dat0[,InvasiveRecur:=Invasive.vs.non.invasive.recurrence]
+dat0[,Recur3yr:=rep(0,dim(dat0)[1])]
+dat0[Recur==1&!is.na(T2Recur)&T2Recur<365.25*3,Recur3yr:=1]
+dat0[Recur==0&T2LFU<365.25*3,Recur3yr:=NA]
+dat0[,Recur5yr:=rep(0, dim(dat0)[1])]
+dat0[Recur==1&!is.na(T2Recur)&T2Recur<365.25*5,Recur5yr:=1]
+dat0[Recur==0&T2LFU<365.25*5,Recur5yr:=NA]
+
+##------Add the additional variables------
+dat0[,ER.PR:=case_when(ER=="Positive"&PR=="Positive"~"ERpos.PRpos",ER=="Negative"&PR=="Positive"~"ERneg.PRpos",ER=="Positive"&PR=="Negative"~"ERpos.PRneg",ER=="Negative"&PR=="Negative"~"ERneg.PRneg")]
+dat0[,Surgery2:=ifelse(Surgery=="Lumpectomy","Lumpectomy","Other")]
+
+##------Check the categorical variables------
+all.char <- sapply(names(dat0)[sapply(dat0, is.character)], function(x) with(dat0, table(get(x), useNA = "ifany"))) 
+all.fac <- sapply(names(dat0)[sapply(dat0, is.factor)], function(x) with(dat0, table(get(x), useNA = "ifany"))) 
+all.cat <- list(all.char, all.fac)
+View(all.cat)
+
+##------Save the cleaned data------
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+write_fst(dat0, path = paste0("../data/derived/", date.analysis, "_dat_DCIS.RData"), compress = 50)
+fwrite(dat0, file = paste0("../data/derived/", date.analysis, "_dat_DCIS.csv"))
+```
+
+```{r}
+dat.work <- read_fst(path = "../data/derived/2023Feb11_dat_DCIS.RData")
+```
+
+```{r, results="hide"}
+vars.all <- c(
+  "Site",
+  "Race2",
+  "Race3",
+  "NDI2",
+  "Insurance2",
+  "BMI",
+  "Age.at.Diagnosis",
+  "DetectionMode",
+  "BRCA.1.2.Status",
+  "Laterality.of.DCIS",
+  "Grade2",
+  "Grade3",
+  "Architecture",
+  "ER",
+  "PR",
+  ##------New variable------
+  "ER.PR",
+  "HER2",
+  "Surgery",
+  ##------New variable------
+  "Surgery2",
+  "MarginPositive",
+  "ReExcision",
+  "Adjuvant.RT",
+  "Adjuvant.endocrine.therapy",
+  "Laterality.of.Recurrent.DCIS",
+  "Any.new.primary.invasive.breast.cancer",
+  "Laterality.of.Invasive.BC",
+  "Status.at.Last.Follow.Up",
+  "Recur",
+  "Recur3yr",
+  "Recur5yr",
+  "T2Recur",
+  "T2RecurLFU",
+  "T2LFU"
+)
+
+vars.cat <-rep(1, length(vars.all))
+vars.cat[vars.all %in% c("NDI2", "BMI", "Age.at.Diagnosis","T2Recur", "T2RecurLFU", "T2LFU")] <- 0
+```
+
+## Summary of patients characteristics by study site
+
+The association between a categorical variable and study sites was examined using Fisher's exact test. Difference in the value of a continuous variable between patients treated at the two sites was examined using the Wilcoxon rank sum test (p-value is  aligned with the median (IQR) summmaries in the following table). For variable with missing values, the difference in the proportion of missingness at the two sites was also examined.
+
+```{r results="hide"}
+id.rm <- which(vars.all %in% c("Site"))
+out <- fsmry.dmgrph(dat=dat.work, vars=vars.all[-id.rm], vars.cat=vars.cat[-id.rm],
+                    by="Site")
+```
+
+```{r results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Summary of patients characteristics by race
+
+The association between a categorical variable and race was examined using Fisher’s exact test. Difference in the value of a continuous variable among patients of five races was examined using the Wilcoxon rank sum test (p-value is aligned with the median (IQR) summmaries in the following table). For variable with missing values, the difference in the proportion of missingness across five races was also examined.
+
+```{r results="hide"}
+id.rm <- which(vars.all %in% c("Race2", "Race3"))
+out <- fsmry.dmgrph(dat=dat.work, vars=vars.all[-id.rm], vars.cat=vars.cat[-id.rm],
+                    by="Race2")
+```
+
+```{r results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Summary of patients characteristics by race (exclude race = other)
+
+The following summary table was generated excluding patients with other races. The association between a categorical variable and race was examined using Fisher's exact test. Difference in the value of a continuous variable across patients of four races was examined using the Wilcoxon rank sum test (p-value is aligned with the median (IQR) summaries in the following table). For variable with missing values, the difference in the proportion of missingness across four races was also examined.
+
+```{r results="hide"}
+dat.work2 <- dat.work[dat.work$Race2 != "Other", ]
+id.rm <- which(vars.all %in% c("Race2", "Race3"))
+out <- fsmry.dmgrph(dat=dat.work2, vars=vars.all[-id.rm], vars.cat=vars.cat[-id.rm],
+                    by="Race2")
+```
+
+```{r results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Summary of patients characteristics by race (NHW vs. all other combined)
+
+The association between a categorical variable and race was examined using Fisher’s exact test. Difference in the value of a continuous variable among patients of two races was examined using the Wilcoxon rank sum test (p-value is aligned with the median (IQR) summmaries in the following table). For variable with missing values, the difference in the proportion of missingness across two races was also examined.
+
+```{r results="hide"}
+id.rm <- which(vars.all %in% c("Race2", "Race3"))
+out <- fsmry.dmgrph(dat=dat.work, vars=vars.all[-id.rm], vars.cat=vars.cat[-id.rm], by="Race3")
+```
+
+```{r results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+## Summary of patients characteristics by PR status
+
+The association between a categorical variable and PR status was examined using Fisher’s exact test. Difference in the value of a continuous variable among patients of different PR statuses was examined using the Wilcoxon rank sum test (p-value is aligned with the median (IQR) summmaries in the following table). For variable with missing values, the difference in the proportion of missingness across two PR statuses was also examined.
+
+```{r results="hide"}
+id.rm <- which(vars.all %in% c("PR"))
+out <- fsmry.dmgrph(dat=dat.work, vars=vars.all[-id.rm], vars.cat=vars.cat[-id.rm],
+                    by="PR")
+```
+
+```{r results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+
+## Summary of patients characteristics by recurrence
+
+Note that the p-values in the following table should not be used for assessing association between each of the variables and recurrence as the analysis did not take into account different follow-up times. 
+```{r results="hide"}
+id.rm <- which(vars.all %in% c("Recur"))
+out <- fsmry.dmgrph(dat=dat.work, vars=vars.all[-id.rm], vars.cat=vars.cat[-id.rm],
+                    by="Recur")
+```
+
+```{r results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Summary of patients characteristics by 3 year recurrence 
+
+The following summary table was generated for patients with follow up time $\geq$ 3 years. The association between between a categorical variable and 3-year recurrence was examined using Fisher's exact test. Difference in the value of a continuous variable between patients with and without 3-year recurrence was examined using the Wilcoxon rank sum test (p-value is  aligned with the median (IQR) summaries in the following table). For variable with missing values, the difference in the proportion of missingness in those with or without 3-year recurrence was also examined.
+
+```{r results="hide"}
+id.keep <- which(!is.na(dat.work$Recur3yr))
+out <- fsmry.dmgrph(dat=dat.work[id.keep,], vars=vars.all[-id.rm], vars.cat=vars.cat[-id.rm],
+                    by="Recur3yr")
+```
+
+```{r results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+### Additional results for each categorical variable
+
+```{r, results="asis"}
+vars.ana <- c(
+  "Site",
+  "Race2",
+  "Race3",
+  # "NDI2",
+  "Insurance2",
+  # "BMI",
+  # "Age.at.Diagnosis",
+  "DetectionMode",
+  "BRCA.1.2.Status",
+  "Laterality.of.DCIS",
+  "Grade2",
+  "Grade3",
+  "Architecture",
+  "ER",
+  "PR",
+  ##------New variable------
+  "ER.PR",
+  # "HER2",
+  "Surgery",
+  ##------New variable------
+  "Surgery2",
+  "MarginPositive",
+  "ReExcision",
+  "Adjuvant.RT",
+  "Adjuvant.endocrine.therapy"
+  # "Laterality.of.Recurrent.DCIS",
+  # "Any.new.primary.invasive.breast.cancer",
+  # "Laterality.of.Invasive.BC",
+  # "Status.at.Last.Follow.Up",
+  # "Recur3yr",
+  # "T2Recur",
+  # "T2RecurLFU",
+  # "T2LFU"
+)
+
+id.keep <- which(!is.na(dat.work$Recur3yr))
+for (i in 1:length(vars.ana)){
+  out.i <- fsmry2.by.grp(y=dat.work$Recur3yr[id.keep], grp=dat.work[id.keep, vars.ana[i]], 
+                         cmp.method = "fisher")
+  cat(paste0("\n#### 3-year Recurrence ~ ", vars.ana[[i]], "\n"))
+  if(class(out.i)=="list") {
+    cat(paste0("\nSummary", "\n"))
+    print(knitr::kable(out.i[[1]]))
+    cat(paste0("\nMissingness", "\n"))
+    print(knitr::kable(out.i[[2]]))
+  } else
+    print(knitr::kable(out.i))
+  cat("\n")
+}
+```
+
+## Summary of patients characteristics by 5 year recurrence 
+
+The following summary table was generated for patients with follow up time $\geq$ 5 years. The association between a categorical variable and 5-year recurrence was examined using Fisher's exact test. Difference in the value of a continuous variable between patients with and without 5-year recurrence was examined using the Wilcoxon rank sum test (p-value is aligned with the median (IQR) summaries in the following table). For variable with missing values, the difference in the proportion of missingness in those with or without 5-year recurrence was also examined.
+
+```{r results="hide"}
+id.keep <- which(!is.na(dat.work$Recur5yr))
+out <- fsmry.dmgrph(dat=dat.work[id.keep,], vars=vars.all[-id.rm], vars.cat=vars.cat[-id.rm],
+                    by="Recur5yr")
+```
+
+```{r results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+### Additional results for each categorical variable
+
+```{r, results="asis"}
+vars.ana <- c(
+  "Site",
+  "Race2",
+  "Race3",
+  # "NDI2",
+  "Insurance2",
+  # "BMI",
+  # "Age.at.Diagnosis",
+  "DetectionMode",
+  "BRCA.1.2.Status",
+  "Laterality.of.DCIS",
+  "Grade2",
+  "Grade3",
+  "Architecture",
+  "ER",
+  "PR",
+  ##------New variable------
+  "ER.PR",
+  #"HER2",
+  "Surgery",
+  ##------New variable------
+  "Surgery2",
+  "MarginPositive",
+  "ReExcision",
+  "Adjuvant.RT",
+  "Adjuvant.endocrine.therapy"
+  # "Laterality.of.Recurrent.DCIS"          ,
+  # "Any.new.primary.invasive.breast.cancer",
+  # "Laterality.of.Invasive.BC",
+  # "Status.at.Last.Follow.Up",
+  # "Recur3yr",
+  # "T2Recur",
+  # "T2RecurLFU",
+  # "T2LFU"
+)
+
+id.keep <- which(!is.na(dat.work$Recur5yr))
+for (i in 1:length(vars.ana)){
+  out.i <- fsmry2.by.grp(y=dat.work$Recur5yr[id.keep], 
+                         grp=dat.work[id.keep, vars.ana[i]], 
+                         cmp.method = "fisher")
+  cat(paste0("\n#### 5-year Recurrence ~ ", vars.ana[[i]], "\n"))
+  if(class(out.i)=="list") {
+    cat(paste0("\nSummary", "\n"))
+    print(knitr::kable(out.i[[1]]))
+    cat(paste0("\nMissingness", "\n"))
+    print(knitr::kable(out.i[[2]]))
+  } else
+    print(knitr::kable(out.i))
+  cat("\n")
+}
+```
+
+
+# Univariate analysis for recurrence free survival 
+
+Note that patients without time to recurrence data were not included in the analysis. The association between each variable and DCIS recurrence free survival was assessed using the log rank test. The Cox-proportional hazards model was used to estimate the HR and corresponding 95% CI for each unit increase of a continuous variable, or with respect to the reference category for a categorical variable. For each predictor, if there were missing values, the association between missingness and DCIS recurrence free survival was also examined.  
+
+```{r, results="hide"}
+library(survival)
+
+vars.ana <- c(
+  "Site",
+  "Race2",
+  "Race3",
+  "NDI2",
+  "Insurance2",
+  "BMI",
+  "Age.at.Diagnosis",
+  "DetectionMode",
+  "BRCA.1.2.Status",
+  "Laterality.of.DCIS",
+  "Grade2",
+  "Grade3",
+  "Architecture",
+  "ER",
+  "PR",
+  ##------New variable------
+  "ER.PR",
+  "HER2",
+  "Surgery",
+  ##------New variable------
+  "Surgery2",
+  "MarginPositive",
+  "ReExcision",
+  "Adjuvant.RT",
+  "Adjuvant.endocrine.therapy"
+)
+
+out <- vector(length=length(vars.ana), mode="list")
+names(out) <- vars.ana
+for(i in 1:length(vars.ana)){
+  x.name <- vars.ana[i]
+  x <- dat.work[,x.name]
+  x.missing <- ifelse(is.na(x),"mis","nom")
+  mdl <- paste0("Surv(T2RecurLFU, Recur) ~ ", x.name)
+  mdl.missing <- "Surv(T2RecurLFU, Recur) ~ x.missing"
+  tmp <- coxph(formula(mdl), data=dat.work)
+  if(sum(x.missing=="mis")>0){
+    tmp2 <- coxph(formula(mdl.missing), data=dat.work)
+    out[[i]] <-list(tmp, tmp2)
+  } else {
+    out[[i]] <- list(tmp)
+  }
+}
+table(unlist(lapply(out, length)))
+
+out.stat <- lapply(out, function(x) lapply(x, fcphuni.stat))
+out.tbl <- lapply(out.stat, fcphuni.tbl)
+out.tbl <- do.call(rbind, out.tbl)
+row.names(out.tbl)<- NULL
+```
+
+
+## Summary table for the univariate analysis
+```{r results="asis"}
+knitr::kable(out.tbl)
+```
+
+```{r}
+cat("\n")
+cat("\n")
+cat("\n")
+```
+
+
+```{r eval=FALSE, include=FALSE}
+library(ggsurvfit)
+# Use the customized theme for all plots
+theme_set(theme_classic())
+theme_update(
+  legend.position = c(0.75, 0.35),
+  strip.background = element_blank(),
+  axis.text = element_text(size = 14),
+  axis.title = element_text(size = 16),
+  legend.text = element_text(size = 14))
+theme.list <- theme_get()
+
+var.grp <- c("Race3", "PR", "ER.PR", "Surgery2", "Adjuvant.RT", "Adjuvant.endocrine.therapy")
+
+##------P-value formatting function------
+format_number <- function (x, digits = 0) {
+  numform::round2(x, digits = digits) %>% 
+    format(nsmall = digits, scientific = FALSE, trim = TRUE)
+}
+
+format_p2 <- function (x, digits = 1) {
+    if (digits == 1) {
+        p_fmt <- dplyr::case_when(
+          x > 1 + 1e-15 ~ NA_character_, 
+          x < 0 - 1e-15 ~ NA_character_, 
+          x > 0.9 ~ paste0(">", format_number(x = 0.9, digits = 1)),
+          round(x, 1) >= 0.2 ~ format_number(x, digits = 3), 
+          round(x, 2) >= 0.1 ~ format_number(x, digits = 3), 
+          x >= 0.001 ~ format_number(x, digits = 3), x < 0.001 ~ paste0("<", format_number(x = 0.001, digits = 3)))
+    }
+    else if (digits == 2) {
+        p_fmt <- dplyr::case_when(
+          x > 1 + 1e-15 ~ NA_character_, 
+          x < 0 - 1e-15 ~ NA_character_, 
+          x > 0.99 ~ paste0(">", format_number(x = 0.99, digits = 2)),
+          round2(x, 2) >= 0.1 ~ format_number(x, digits = 2), 
+          x >= 0.001 ~ format_number(x, digits = 3), 
+          x < 0.001 ~ paste0("<", format_number(x = 0.001, digits = 3)))
+    }
+    else if (digits == 3) {
+        p_fmt <- dplyr::case_when(
+          x > 1 + 1e-15 ~ NA_character_, 
+          x < 0 - 1e-15 ~ NA_character_, 
+          x > 0.999 ~ paste0(">", format_number(x = 0.999, digits = 3)), 
+          x >= 0.001 ~ format_number(x, digits = 3), 
+          x < 0.001 ~ paste0("<", format_number(x = 0.001, digits = 3)))
+    }
+    else {
+        stop("The `digits=` argument must be 1, 2, or 3.")
+    }
+    p_fmt
+}
+
+out.i <- mclapply(var.grp,
+  function(i){ 
+    fit.i <- survfit2(formula(paste0("Surv(T2RecurLFU, Recur) ~ ", i)), data = dat.work) 
+    
+    if (i != "ER.PR") {
+      plot.i <- ggsurvfit(x = fit.i,
+                          type = "survival",
+                          linetype_aes = T,
+                          theme = list(theme.list)
+                          ) +
+                  add_risktable(risktable_height = 0.33, size = 4.5, 
+                                theme = list(theme_risktable_default(axis.text.y.size = 14, plot.title.size = 14), 
+                                             theme(plot.title = element_text(face = "bold"))
+        )) +
+                  add_confidence_interval() + 
+                  add_quantile(y_value = 0.5, color = "gray50", linewidth = 0.75) + 
+                  add_pvalue(location  = "annotation", x = 2*365.25, y = 0.15, size = 5) + 
+                  scale_x_continuous(limits = c(0, 365.25*12), breaks = c(seq(0, 365.25*12, 365.25*3)), labels = c(seq(0, 12, 3))) +
+                  scale_y_continuous(limits = c(0, 1), labels = scales::label_number(accuracy = 0.01), breaks = seq(0, 1, 0.25)) +
+                  scale_color_manual(values = c("#A73030FF", "#0073C2FF", "#82AC7C", "#868686FF")) +
+                  scale_fill_manual(values = c("#A73030FF", "#0073C2FF", "#82AC7C", "#868686FF")) +
+                  labs(x = "Follow-up time, years", y = "Survival probability") 
+    } else {
+        plot.i <- ggsurvfit(x = fit.i,
+                            type = "survival",
+                            linetype_aes = T,
+                            theme = list(theme.list)
+                            ) +
+                    add_risktable(risktable_height = 0.5, size = 4.5, 
+                                  theme = list(theme_risktable_default(axis.text.y.size = 14, plot.title.size = 14), 
+                                               theme(plot.title = element_text(face = "bold"))
+          )) +
+                    add_confidence_interval() + 
+                    add_quantile(y_value = 0.5, color = "gray50", linewidth = 0.75) + 
+                    add_pvalue(location  = "annotation", x = 2*365.25, y = 0.15, size = 5, pvalue_fun = format_p2) + 
+                    scale_x_continuous(limits = c(0, 365.25*12), breaks = c(seq(0, 365.25*12, 365.25*3)), labels = c(seq(0, 12, 3))) +
+                    scale_y_continuous(limits = c(0, 1), labels = scales::label_number(accuracy = 0.01), breaks = seq(0, 1, 0.25)) +
+                    scale_color_manual(values = c("#A73030FF", "#0073C2FF", "#82AC7C", "#868686FF")) +
+                    scale_fill_manual(values = c("#A73030FF", "#0073C2FF", "#82AC7C", "#868686FF")) +
+                    labs(x = "Follow-up time, years", y = "Survival probability") 
+    }
+    return(list(fit = fit.i, plot = plot.i))},
+  mc.cores = 4L)
+
+names(out.i) <- var.grp
+
+dir.fig <- "../report/figs_2023Feb15/"
+
+plan(multisession) # Parallelize using background R sessions
+future_lapply(X = 1:6, function(i) {
+  R.devices::suppressGraphics({
+    ggsave(filename = dir.fig %0% var.grp[i] %0% ".png", 
+    plot = out.i[[i]][["plot"]],
+    device = agg_png, 
+    scaling = 0.6,
+    width = 4, height = 4, units = "in", res = 300)}) 
+})
+```
+
+
+### Kaplan-Meier curves of local recurrence free survival by Race (NHW vs non-NHW)
+
+```{r}
+cat("\n")
+dir.fig <- "../report/figs_2023Feb15/"
+knitr::include_graphics(dir.fig %0% "Race3" %0% ".png")
+cat("\n")
+```
+
+### Kaplan-Meier curves of local recurrence free survival by PR
+
+```{r}
+cat("\n")
+knitr::include_graphics(dir.fig %0% "PR" %0% ".png")
+cat("\n")
+```
+
+
+### Kaplan-Meier curves of local recurrence free survival by ER.PR
+
+```{r}
+cat("\n")
+knitr::include_graphics(dir.fig %0% "ER.PR" %0% ".png")
+cat("\n")
+```
+
+
+### Kaplan-Meier curves of local recurrence free survival by Surgery2
+
+```{r}
+cat("\n")
+knitr::include_graphics(dir.fig %0% "Surgery2" %0% ".png")
+cat("\n")
+```
+
+
+### Kaplan-Meier curves of local recurrence free survival by Adjuvant RT
+
+```{r}
+cat("\n")
+knitr::include_graphics(dir.fig %0% "Adjuvant.RT" %0% ".png")
+cat("\n")
+```
+
+
+### Kaplan-Meier curves of local recurrence free survival by Adjuvant endocrine therapy 
+
+```{r}
+cat("\n")
+knitr::include_graphics(dir.fig %0% "Adjuvant.endocrine.therapy" %0% ".png")
+cat("\n")
+```
+
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
+
+
