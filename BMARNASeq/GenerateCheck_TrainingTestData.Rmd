@@ -26,18 +26,18 @@ knitr::opts_chunk$set(
 ```
 
 # Save and load images
-```{r saveimage, eval=FALSE}
+```{r save.image, eval=FALSE}
 image.date <- format(Sys.Date(), "%Y%b%d")
 save.image(file = paste0("../ApplicationData/derived/", image.date, "_checkdata_image_ALiu.RData"))
 ```
 
-```{r loadimage}
+```{r load.image}
 load("../ApplicationData/derived/2023Jan23_checkdata_image_ALiu.RData")
 ```
 
 
 # Attach libraries and functions
-```{r attach_lib_func}
+```{r attach.lib.func}
 suppressPackageStartupMessages(easypackages::libraries("microbenchmark", "fst", "parallel"))
 ```
 
@@ -70,7 +70,7 @@ dat.expr.new <- dat.expr[apply(dat.expr, 1, function(x) mad(x) > 0.8), ] # We ha
 
 
 # One function of checking the training and test data
-```{r data_func}
+```{r data.func}
 data_func <- function(seed.num = 999) {
   set.seed(seed.num)
   date.analysis <- format(Sys.Date(), "%Y%b%d")
