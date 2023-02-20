@@ -887,14 +887,22 @@ load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
 ### BMI
 ```{r}
 BMI.eFDR.q.dat.2390 <- data.frame(Estimate = c(
-  BMAseq.eFDR.Main.2000.train$BMI, BMAseq.eFDR.Main.2000.test$BMI,
-  DESeq2.eFDR.2000.train$BMI, DESeq2.eFDR.2000.test$BMI, 
-  edgeR.eFDR.2000.train$BMI, edgeR.eFDR.2000.test$BMI,
-  eBayes.eFDR.2000.train$BMI, eBayes.eFDR.2000.test$BMI,
-  voom.eFDR.2000.train$BMI, voom.eFDR.2000.test$BMI),
+  BMAseq.eFDR.Main.2000.train$BMI |> log10(),
+  BMAseq.eFDR.Main.2000.test$BMI |> log10(),
+  DESeq2.eFDR.2000.train$BMI |> log10(), 
+  DESeq2.eFDR.2000.test$BMI |> log10(), 
+  edgeR.eFDR.2000.train$BMI |> log10(), 
+  edgeR.eFDR.2000.test$BMI |> log10(),
+  eBayes.eFDR.2000.train$BMI |> log10(), 
+  eBayes.eFDR.2000.test$BMI |> log10(),
+  voom.eFDR.2000.train$BMI |> log10(), 
+  voom.eFDR.2000.test$BMI |> log10()),
                                   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
                                   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+BMI.eFDR.q.dat.2390$DEG.method <- factor(BMI.eFDR.q.dat.2390$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
+
+##------Log10------
 g <- BMI.eFDR.q.dat.2390 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -903,38 +911,52 @@ g <- BMI.eFDR.q.dat.2390 %>%
   geom_boxplot(width = 0.1) + 
   facet_wrap(~ DEG.method, nrow = 1) + 
   scale_x_discrete(limits = c("Train", "Test")) + 
+  # scale_y_log10() + 
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
+       y = "Log10 (estimate)",
        title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of BMI in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
-        legend.position = "none") 
+        legend.position = "none")
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 2390
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMIMain_eFDR_qvalue", "_", seed.num, ".png"),
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/2390/", date.analysis, "_", "BMIMain_eFDR_qvalue", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 8,
          height = 4,
          units = "in")
 
+# date.analysis <- format(Sys.Date(), "%Y%b%d")
+# model.type <- "Multi_Interaction"
+# plot.type <- "violinplot"
+# seed.num <- 2390
+# file.path <- sprintf("../ApplicationResult/%s/RandomSeed/TMM_Top2000/%s/%s/", model.type, plot.type, seed.num)
+# file.path
+# paste0(file.path, date.analysis, "_", "BMIMain_eFDR_qvalue", "_", seed.num, ".png")
 ```
 
 
 ### AGE
 ```{r}
 AGE.eFDR.q.dat.2390 <- data.frame(Estimate = c(
-  BMAseq.eFDR.Main.2000.train$AGE, BMAseq.eFDR.Main.2000.test$AGE,
-  DESeq2.eFDR.2000.train$AGE, DESeq2.eFDR.2000.test$AGE, 
-  edgeR.eFDR.2000.train$AGE, edgeR.eFDR.2000.test$AGE,
-  eBayes.eFDR.2000.train$AGE, eBayes.eFDR.2000.test$AGE,
-  voom.eFDR.2000.train$AGE, voom.eFDR.2000.test$AGE),
+  BMAseq.eFDR.Main.2000.train$AGE |> log10(), 
+  BMAseq.eFDR.Main.2000.test$AGE |> log10(),
+  DESeq2.eFDR.2000.train$AGE |> log10(), 
+  DESeq2.eFDR.2000.test$AGE |> log10(), 
+  edgeR.eFDR.2000.train$AGE |> log10(), 
+  edgeR.eFDR.2000.test$AGE |> log10(),
+  eBayes.eFDR.2000.train$AGE |> log10(), 
+  eBayes.eFDR.2000.test$AGE |> log10(),
+  voom.eFDR.2000.train$AGE |> log10(), 
+  voom.eFDR.2000.test$AGE |> log10()),
                                   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
                                   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+AGE.eFDR.q.dat.2390$DEG.method <- factor(AGE.eFDR.q.dat.2390$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
 g <- AGE.eFDR.q.dat.2390 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -946,7 +968,7 @@ g <- AGE.eFDR.q.dat.2390 %>%
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
+       y = "Log10 (estimate)",
        title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of AGE in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
@@ -954,7 +976,7 @@ g <- AGE.eFDR.q.dat.2390 %>%
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 2390
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "AGEMain_eFDR_qvalue", "_", seed.num, ".png"),
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/2390/", date.analysis, "_", "AGEMain_eFDR_qvalue", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 8,
@@ -966,14 +988,20 @@ ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_
 ### SEX
 ```{r}
 SEX.eFDR.q.dat.2390 <- data.frame(Estimate = c(
-  BMAseq.eFDR.Main.2000.train$SEX, BMAseq.eFDR.Main.2000.test$SEX,
-  DESeq2.eFDR.2000.train$SEX, DESeq2.eFDR.2000.test$SEX, 
-  edgeR.eFDR.2000.train$SEX, edgeR.eFDR.2000.test$SEX,
-  eBayes.eFDR.2000.train$SEX, eBayes.eFDR.2000.test$SEX,
-  voom.eFDR.2000.train$SEX, voom.eFDR.2000.test$SEX),
+  BMAseq.eFDR.Main.2000.train$SEX |> log10(), 
+  BMAseq.eFDR.Main.2000.test$SEX |> log10(),
+  DESeq2.eFDR.2000.train$SEX |> log10(), 
+  DESeq2.eFDR.2000.test$SEX |> log10(), 
+  edgeR.eFDR.2000.train$SEX |> log10(), 
+  edgeR.eFDR.2000.test$SEX |> log10(),
+  eBayes.eFDR.2000.train$SEX |> log10(), 
+  eBayes.eFDR.2000.test$SEX |> log10(),
+  voom.eFDR.2000.train$SEX |> log10(), 
+  voom.eFDR.2000.test$SEX |> log10()),
                                   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
                                   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+SEX.eFDR.q.dat.2390$DEG.method <- factor(SEX.eFDR.q.dat.2390$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
 g <- SEX.eFDR.q.dat.2390 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -985,7 +1013,7 @@ g <- SEX.eFDR.q.dat.2390 %>%
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
+       y = "Log10 (estimate)",
        title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of SEX in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
@@ -993,26 +1021,32 @@ g <- SEX.eFDR.q.dat.2390 %>%
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 2390
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "SEXMain_eFDR_qvalue", "_", seed.num, ".png"),
-         plot = g,
-         device = "png",
-         width = 8,
-         height = 4,
-         units = "in")
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/2390/", date.analysis, "_", "SEXMain_eFDR_qvalue", "_", seed.num, ".png"),
+       plot = g,
+       device = "png",
+       width = 8,
+       height = 4,
+       units = "in")
 ```
 
 
 ### MHABNWBC
 ```{r}
 MHABNWBC.eFDR.q.dat.2390 <- data.frame(Estimate = c(
-  BMAseq.eFDR.Main.2000.train$MHABNWBC, BMAseq.eFDR.Main.2000.test$MHABNWBC,
-  DESeq2.eFDR.2000.train$MHABNWBC, DESeq2.eFDR.2000.test$MHABNWBC, 
-  edgeR.eFDR.2000.train$MHABNWBC, edgeR.eFDR.2000.test$MHABNWBC,
-  eBayes.eFDR.2000.train$MHABNWBC, eBayes.eFDR.2000.test$MHABNWBC,
-  voom.eFDR.2000.train$MHABNWBC, voom.eFDR.2000.test$MHABNWBC),
+  BMAseq.eFDR.Main.2000.train$MHABNWBC |> log10(), 
+  BMAseq.eFDR.Main.2000.test$MHABNWBC |> log10(),
+  DESeq2.eFDR.2000.train$MHABNWBC |> log10(), 
+  DESeq2.eFDR.2000.test$MHABNWBC |> log10(), 
+  edgeR.eFDR.2000.train$MHABNWBC |> log10(), 
+  edgeR.eFDR.2000.test$MHABNWBC |> log10(),
+  eBayes.eFDR.2000.train$MHABNWBC |> log10(), 
+  eBayes.eFDR.2000.test$MHABNWBC |> log10(),
+  voom.eFDR.2000.train$MHABNWBC |> log10(), 
+  voom.eFDR.2000.test$MHABNWBC |> log10()),
                                   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
                                   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+MHABNWBC.eFDR.q.dat.2390$DEG.method <- factor(MHABNWBC.eFDR.q.dat.2390$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
 g <- MHABNWBC.eFDR.q.dat.2390 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -1024,7 +1058,7 @@ g <- MHABNWBC.eFDR.q.dat.2390 %>%
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
+       y = "Log10 (estimate)",
        title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of MHABNWBC in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
@@ -1032,7 +1066,7 @@ g <- MHABNWBC.eFDR.q.dat.2390 %>%
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 2390
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "MHABNWBCMain_eFDR_qvalue", "_", seed.num, ".png"),
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/2390/", date.analysis, "_", "MHABNWBCMain_eFDR_qvalue", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 8,
@@ -1045,14 +1079,21 @@ ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_
 ```{r}
 BMI.Int.eFDR.q.dat.2390 <- data.frame(
   Estimate = c(
-    BMAseq.eFDR.Interaction.2000.train$BMI, BMAseq.eFDR.Interaction.2000.test$BMI, # same if use SEX
-    DESeq2.eFDR.2000.train$BMIxSEX, DESeq2.eFDR.2000.test$BMIxSEX, 
-    edgeR.eFDR.2000.train$BMIxSEX, edgeR.eFDR.2000.test$BMIxSEX,
-    eBayes.eFDR.2000.train$BMIxSEX, eBayes.eFDR.2000.test$BMIxSEX,
-    voom.eFDR.2000.train$BMIxSEX, voom.eFDR.2000.test$BMIxSEX),
+    BMAseq.eFDR.Interaction.2000.train$BMI |> log10(), 
+    BMAseq.eFDR.Interaction.2000.test$BMI |> log10(), # same if use $SEX
+    DESeq2.eFDR.2000.train$BMIxSEX |> log10(), 
+    DESeq2.eFDR.2000.test$BMIxSEX |> log10(), 
+    edgeR.eFDR.2000.train$BMIxSEX |> log10(), 
+    edgeR.eFDR.2000.test$BMIxSEX |> log10(),
+    eBayes.eFDR.2000.train$BMIxSEX |> log10(), 
+    eBayes.eFDR.2000.test$BMIxSEX |> log10(),
+    voom.eFDR.2000.train$BMIxSEX |> log10(), 
+    voom.eFDR.2000.test$BMIxSEX |> log10()),
   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+BMI.Int.eFDR.q.dat.2390$DEG.method <- factor(BMI.Int.eFDR.q.dat.2390$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
+
 g <- BMI.Int.eFDR.q.dat.2390 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -1064,20 +1105,20 @@ g <- BMI.Int.eFDR.q.dat.2390 %>%
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
-       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the interaction effect of BMI X AGE in training and test sets per approach") +
+       y = "Log10 (estimate)",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the interaction effect of BMI X SEX in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
         legend.position = "none") 
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 2390
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMIInt_eFDR_qvalue", "_", seed.num, ".png"),
-         plot = g,
-         device = "png",
-         width = 8,
-         height = 4,
-         units = "in")
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/2390/", date.analysis, "_", "BMIInt_eFDR_qvalue", "_", seed.num, ".png"),
+       plot = g,
+       device = "png",
+       width = 8,
+       height = 4,
+       units = "in")
 ```
 
 
@@ -1094,14 +1135,22 @@ load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt98907.RData")
 ### BMI
 ```{r}
 BMI.eFDR.q.dat.98907 <- data.frame(Estimate = c(
-  BMAseq.eFDR.Main.2000.train$BMI, BMAseq.eFDR.Main.2000.test$BMI,
-  DESeq2.eFDR.2000.train$BMI, DESeq2.eFDR.2000.test$BMI, 
-  edgeR.eFDR.2000.train$BMI, edgeR.eFDR.2000.test$BMI,
-  eBayes.eFDR.2000.train$BMI, eBayes.eFDR.2000.test$BMI,
-  voom.eFDR.2000.train$BMI, voom.eFDR.2000.test$BMI),
+  BMAseq.eFDR.Main.2000.train$BMI |> log10(),
+  BMAseq.eFDR.Main.2000.test$BMI |> log10(),
+  DESeq2.eFDR.2000.train$BMI |> log10(), 
+  DESeq2.eFDR.2000.test$BMI |> log10(), 
+  edgeR.eFDR.2000.train$BMI |> log10(), 
+  edgeR.eFDR.2000.test$BMI |> log10(),
+  eBayes.eFDR.2000.train$BMI |> log10(), 
+  eBayes.eFDR.2000.test$BMI |> log10(),
+  voom.eFDR.2000.train$BMI |> log10(), 
+  voom.eFDR.2000.test$BMI |> log10()),
                                   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
                                   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+BMI.eFDR.q.dat.98907$DEG.method <- factor(BMI.eFDR.q.dat.98907$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
+
+##------Log10------
 g <- BMI.eFDR.q.dat.98907 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -1110,37 +1159,45 @@ g <- BMI.eFDR.q.dat.98907 %>%
   geom_boxplot(width = 0.1) + 
   facet_wrap(~ DEG.method, nrow = 1) + 
   scale_x_discrete(limits = c("Train", "Test")) + 
+  # scale_y_log10() + 
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
+       y = "Log10 (estimate)",
        title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of BMI in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
-        legend.position = "none") 
+        legend.position = "none")
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 98907
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMIMain_eFDR_qvalue", "_", seed.num, ".png"),
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/98907/", date.analysis, "_", "BMIMain_eFDR_qvalue", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 8,
          height = 4,
          units = "in")
+
 ```
 
 
 ### AGE
 ```{r}
 AGE.eFDR.q.dat.98907 <- data.frame(Estimate = c(
-  BMAseq.eFDR.Main.2000.train$AGE, BMAseq.eFDR.Main.2000.test$AGE,
-  DESeq2.eFDR.2000.train$AGE, DESeq2.eFDR.2000.test$AGE, 
-  edgeR.eFDR.2000.train$AGE, edgeR.eFDR.2000.test$AGE,
-  eBayes.eFDR.2000.train$AGE, eBayes.eFDR.2000.test$AGE,
-  voom.eFDR.2000.train$AGE, voom.eFDR.2000.test$AGE),
+  BMAseq.eFDR.Main.2000.train$AGE |> log10(), 
+  BMAseq.eFDR.Main.2000.test$AGE |> log10(),
+  DESeq2.eFDR.2000.train$AGE |> log10(), 
+  DESeq2.eFDR.2000.test$AGE |> log10(), 
+  edgeR.eFDR.2000.train$AGE |> log10(), 
+  edgeR.eFDR.2000.test$AGE |> log10(),
+  eBayes.eFDR.2000.train$AGE |> log10(), 
+  eBayes.eFDR.2000.test$AGE |> log10(),
+  voom.eFDR.2000.train$AGE |> log10(), 
+  voom.eFDR.2000.test$AGE |> log10()),
                                   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
                                   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+AGE.eFDR.q.dat.98907$DEG.method <- factor(AGE.eFDR.q.dat.98907$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
 g <- AGE.eFDR.q.dat.98907 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -1152,7 +1209,7 @@ g <- AGE.eFDR.q.dat.98907 %>%
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
+       y = "Log10 (estimate)",
        title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of AGE in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
@@ -1160,7 +1217,7 @@ g <- AGE.eFDR.q.dat.98907 %>%
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 98907
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "AGEMain_eFDR_qvalue", "_", seed.num, ".png"),
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/98907/", date.analysis, "_", "AGEMain_eFDR_qvalue", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 8,
@@ -1172,14 +1229,20 @@ ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_
 ### SEX
 ```{r}
 SEX.eFDR.q.dat.98907 <- data.frame(Estimate = c(
-  BMAseq.eFDR.Main.2000.train$SEX, BMAseq.eFDR.Main.2000.test$SEX,
-  DESeq2.eFDR.2000.train$SEX, DESeq2.eFDR.2000.test$SEX, 
-  edgeR.eFDR.2000.train$SEX, edgeR.eFDR.2000.test$SEX,
-  eBayes.eFDR.2000.train$SEX, eBayes.eFDR.2000.test$SEX,
-  voom.eFDR.2000.train$SEX, voom.eFDR.2000.test$SEX),
+  BMAseq.eFDR.Main.2000.train$SEX |> log10(), 
+  BMAseq.eFDR.Main.2000.test$SEX |> log10(),
+  DESeq2.eFDR.2000.train$SEX |> log10(), 
+  DESeq2.eFDR.2000.test$SEX |> log10(), 
+  edgeR.eFDR.2000.train$SEX |> log10(), 
+  edgeR.eFDR.2000.test$SEX |> log10(),
+  eBayes.eFDR.2000.train$SEX |> log10(), 
+  eBayes.eFDR.2000.test$SEX |> log10(),
+  voom.eFDR.2000.train$SEX |> log10(), 
+  voom.eFDR.2000.test$SEX |> log10()),
                                   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
                                   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+SEX.eFDR.q.dat.98907$DEG.method <- factor(SEX.eFDR.q.dat.98907$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
 g <- SEX.eFDR.q.dat.98907 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -1191,7 +1254,7 @@ g <- SEX.eFDR.q.dat.98907 %>%
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
+       y = "Log10 (estimate)",
        title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of SEX in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
@@ -1199,26 +1262,32 @@ g <- SEX.eFDR.q.dat.98907 %>%
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 98907
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "SEXMain_eFDR_qvalue", "_", seed.num, ".png"),
-         plot = g,
-         device = "png",
-         width = 8,
-         height = 4,
-         units = "in")
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/98907/", date.analysis, "_", "SEXMain_eFDR_qvalue", "_", seed.num, ".png"),
+       plot = g,
+       device = "png",
+       width = 8,
+       height = 4,
+       units = "in")
 ```
 
 
 ### MHABNWBC
 ```{r}
 MHABNWBC.eFDR.q.dat.98907 <- data.frame(Estimate = c(
-  BMAseq.eFDR.Main.2000.train$MHABNWBC, BMAseq.eFDR.Main.2000.test$MHABNWBC,
-  DESeq2.eFDR.2000.train$MHABNWBC, DESeq2.eFDR.2000.test$MHABNWBC, 
-  edgeR.eFDR.2000.train$MHABNWBC, edgeR.eFDR.2000.test$MHABNWBC,
-  eBayes.eFDR.2000.train$MHABNWBC, eBayes.eFDR.2000.test$MHABNWBC,
-  voom.eFDR.2000.train$MHABNWBC, voom.eFDR.2000.test$MHABNWBC),
+  BMAseq.eFDR.Main.2000.train$MHABNWBC |> log10(), 
+  BMAseq.eFDR.Main.2000.test$MHABNWBC |> log10(),
+  DESeq2.eFDR.2000.train$MHABNWBC |> log10(), 
+  DESeq2.eFDR.2000.test$MHABNWBC |> log10(), 
+  edgeR.eFDR.2000.train$MHABNWBC |> log10(), 
+  edgeR.eFDR.2000.test$MHABNWBC |> log10(),
+  eBayes.eFDR.2000.train$MHABNWBC |> log10(), 
+  eBayes.eFDR.2000.test$MHABNWBC |> log10(),
+  voom.eFDR.2000.train$MHABNWBC |> log10(), 
+  voom.eFDR.2000.test$MHABNWBC |> log10()),
                                   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
                                   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+MHABNWBC.eFDR.q.dat.98907$DEG.method <- factor(MHABNWBC.eFDR.q.dat.98907$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
 g <- MHABNWBC.eFDR.q.dat.98907 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -1230,7 +1299,7 @@ g <- MHABNWBC.eFDR.q.dat.98907 %>%
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
+       y = "Log10 (estimate)",
        title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the main effect of MHABNWBC in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
@@ -1238,7 +1307,7 @@ g <- MHABNWBC.eFDR.q.dat.98907 %>%
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 98907
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "MHABNWBCMain_eFDR_qvalue", "_", seed.num, ".png"),
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/98907/", date.analysis, "_", "MHABNWBCMain_eFDR_qvalue", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 8,
@@ -1251,14 +1320,21 @@ ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_
 ```{r}
 BMI.Int.eFDR.q.dat.98907 <- data.frame(
   Estimate = c(
-    BMAseq.eFDR.Interaction.2000.train$BMI, BMAseq.eFDR.Interaction.2000.test$BMI, # same if use SEX
-    DESeq2.eFDR.2000.train$BMIxSEX, DESeq2.eFDR.2000.test$BMIxSEX, 
-    edgeR.eFDR.2000.train$BMIxSEX, edgeR.eFDR.2000.test$BMIxSEX,
-    eBayes.eFDR.2000.train$BMIxSEX, eBayes.eFDR.2000.test$BMIxSEX,
-    voom.eFDR.2000.train$BMIxSEX, voom.eFDR.2000.test$BMIxSEX),
+    BMAseq.eFDR.Interaction.2000.train$BMI |> log10(), 
+    BMAseq.eFDR.Interaction.2000.test$BMI |> log10(), # same if use $SEX
+    DESeq2.eFDR.2000.train$BMIxSEX |> log10(), 
+    DESeq2.eFDR.2000.test$BMIxSEX |> log10(), 
+    edgeR.eFDR.2000.train$BMIxSEX |> log10(), 
+    edgeR.eFDR.2000.test$BMIxSEX |> log10(),
+    eBayes.eFDR.2000.train$BMIxSEX |> log10(), 
+    eBayes.eFDR.2000.test$BMIxSEX |> log10(),
+    voom.eFDR.2000.train$BMIxSEX |> log10(), 
+    voom.eFDR.2000.test$BMIxSEX |> log10()),
   Data.type = rep(c("Train", "Test"), each = 2000, times = 5),
   DEG.method = rep(c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"), each = 4000)
                                   )
+BMI.Int.eFDR.q.dat.98907$DEG.method <- factor(BMI.Int.eFDR.q.dat.98907$DEG.method, levels = c("BMAseq", "DESeq2", "edgeR", "voom+limma+eBayes", "voom+limma"))
+
 g <- BMI.Int.eFDR.q.dat.98907 %>% 
   ggplot(aes(x = Data.type, 
              y = Estimate,
@@ -1270,20 +1346,20 @@ g <- BMI.Int.eFDR.q.dat.98907 %>%
   scale_fill_brewer(palette = "Set1",
                     direction = -1) +
   labs(x = "Data Type",
-       y = "Estimate",
-       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the interaction effect of BMI X AGE in training and test sets per approach") +
+       y = "Log10 (estimate)",
+       title = "The distributions of top 2000 lowest eFDRs and q-values \nassociated with the interaction effect of BMI X SEX in training and test sets per approach") +
   theme_bw() + 
   theme(plot.title = element_text(hjust = 0.5),
         legend.position = "none") 
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 seed.num <- 98907
-ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/", date.analysis, "_", "BMIInt_eFDR_qvalue", "_", seed.num, ".png"),
-         plot = g,
-         device = "png",
-         width = 8,
-         height = 4,
-         units = "in")
+ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/violinplot/98907/", date.analysis, "_", "BMIInt_eFDR_qvalue", "_", seed.num, ".png"),
+       plot = g,
+       device = "png",
+       width = 8,
+       height = 4,
+       units = "in")
 ```
 
 
@@ -1387,7 +1463,7 @@ with(dat.pheno.test, chisq.test(x = BMI, y = SEX, correct = F))
 ```
 
 
-# Boxplot
+# Boxplot - gene expression across different states of BMI and SEX
 ## Seed: 2390 
 ```{r}
 load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
@@ -1505,6 +1581,12 @@ date.analysis <- format(Sys.Date(), "%Y%b%d")
 ```
 
 
+```{r}
+# Write a batch function
+
+```
+
+
 ## Seed: 98907 
 ```{r}
 load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt98907.RData")
@@ -1537,7 +1619,7 @@ date.analysis <- format(Sys.Date(), "%Y%b%d")
 ```
 
 
-# Boxplot - expression distributions of top ranked genes between the training and test set (take the BMAseq as an example)
+# Boxplot - expression distributions of top ranked genes between the training and test set
 ## Seed: 2390
 ### Top 2000 genes (associated with BMI) list from the training set
 ```{r}
@@ -1572,6 +1654,7 @@ boxplot.fun <- function(dataset, var.x, var.y) {
     guides(color = "none")
 }
 
+##------BMAseq------
 for(i in seq(1, 1998, 9)) {
   ##------Process data------
   gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
@@ -2183,11 +2266,8 @@ if ((!is.na(sumDis)) & (sumDis > 0)) {
 ### SEX
 #### Top 2000 genes list from the training set
 ```{r}
+##------BMAseq------
 load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt2390.RData")
-load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
-load("../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
-load("../ApplicationData/derived/RandomSeed/eBayesMultiInt2390.RData")
-load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
 SEX <- c(dat.pheno.train[["SEX"]], dat.pheno.test[["SEX"]])
 
 seed.num <- 2390
@@ -2239,7 +2319,7 @@ dat.expr.train2390.top9.t$Data <- "Train"
     map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
     g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
     print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
-    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/TrainTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/BMAseq/TrainTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
            plot = g, device = "png", width = 16, height = 8, units = "in")
   print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
   } else {
@@ -2247,7 +2327,7 @@ dat.expr.train2390.top9.t$Data <- "Train"
     map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
     g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
     print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
-    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/TrainTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/BMAseq/TrainTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
            plot = g, device = "png", width = 16, height = 8, units = "in")
     print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
   }
@@ -2277,7 +2357,7 @@ if ((!is.na(sumDis)) & (sumDis > 0)) {
   map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
   g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
   print(paste0("[", i, "] Plot a 2-boxplot matrix successfully!"))
-  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/TrainTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/BMAseq/TrainTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
          plot = g, device = "png", width = 16, height = 8, units = "in")
   print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
 } else {
@@ -2285,7 +2365,350 @@ if ((!is.na(sumDis)) & (sumDis > 0)) {
   map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
   g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
   print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
-  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/TrainTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/BMAseq/TrainTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+}
+
+
+##------DESeq2------
+load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
+SEX <- c(coldata.train[["SEX"]], coldata.test[["SEX"]])
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+for(i in seq(1, 1998, 9)) {
+  gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
+  temp.ENSG <- DESeq2.eFDR.2000.GeneName.train[["SEX"]][gene.id]
+  cts.train2390.top9 <- cts.train[temp.ENSG, ]
+  cts.train2390.top9.t <- t(cts.train2390.top9) |> as.data.frame()
+  cts.train2390.top9.t$Data <- "Train"
+  cts.test2390.traintop9 <- cts.test[temp.ENSG, ]
+  cts.test2390.traintop9.t <- t(cts.test2390.traintop9) |> as.data.frame()
+  cts.test2390.traintop9.t$Data <- "Test"
+  rownames(cts.train2390.top9.t) = rownames(cts.test2390.traintop9.t) = NULL
+  dat.expr.full2390.traintop9 <- rbind(cts.train2390.top9.t,
+                                       cts.test2390.traintop9.t)
+  dat.expr.full2390.traintop9 <- data.frame(dat.expr.full2390.traintop9, SEX)
+
+  sumDis <- 0
+  for(j in 1:9) {
+    p.val.train <- wilcox.test(dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Train", ][[j]] ~ dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Train", ][["SEX"]], data = dat.expr.full2390.traintop9)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Test", ][[j]] ~ dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Test", ][["SEX"]], data = dat.expr.full2390.traintop9)$p.value
+    
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1 }
+  }
+  
+  if ((!is.na(sumDis)) & (sumDis > 0)) {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/DESeq2/TrainTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  } else {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/DESeq2/TrainTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+    print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  }
+}
+
+gene.id <- c(1999, 2000)
+temp.ENSG <- DESeq2.eFDR.2000.GeneName.train[["SEX"]][gene.id]
+cts.train2390.top2 <- cts.train[temp.ENSG, ]
+cts.train2390.top2.t <- t(cts.train2390.top2) |> as.data.frame()
+cts.train2390.top2.t$Data <- "Train"
+cts.test2390.traintop2 <- cts.test[temp.ENSG, ]
+cts.test2390.traintop2.t <- t(cts.test2390.traintop2) |> as.data.frame()
+cts.test2390.traintop2.t$Data <- "Test"
+rownames(cts.train2390.top2.t) = rownames(cts.test2390.traintop2.t) = NULL
+dat.expr.full2390.traintop2 <- rbind(cts.train2390.top2.t,
+                                     cts.test2390.traintop2.t)
+dat.expr.full2390.traintop2 <- data.frame(dat.expr.full2390.traintop2, SEX)
+
+sumDis <- 0
+for(j in 1:2) {
+    p.val.train <- wilcox.test(dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Train", ][[j]] ~ dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Train", ][["SEX"]], data = dat.expr.full2390.traintop2)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Test", ][[j]] ~ dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Test", ][["SEX"]], data = dat.expr.full2390.traintop2)$p.value
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1}
+}
+
+if ((!is.na(sumDis)) & (sumDis > 0)) {
+  boxplot.full2390.traintop2 <- names(dat.expr.full2390.traintop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/DESeq2/TrainTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+} else {
+  boxplot.full2390.traintop2 <- names(dat.expr.full2390.traintop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/DESeq2/TrainTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+}
+
+
+##------edgeR------
+load("../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
+SEX <- c(dat.pheno.train[["SEX"]], dat.pheno.test[["SEX"]])
+
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+for(i in seq(1, 1998, 9)) {
+  gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
+  temp.ENSG <- edgeR.eFDR.2000.GeneName.train[["SEX"]][gene.id]
+  dat.expr.train2390.top9 <- dat.expr.train[temp.ENSG, ]
+  dat.expr.train2390.top9.t <- t(dat.expr.train2390.top9) |> as.data.frame()
+  dat.expr.train2390.top9.t$Data <- "Train"
+  dat.expr.test2390.traintop9 <- dat.expr.test[temp.ENSG, ]
+  dat.expr.test2390.traintop9.t <- t(dat.expr.test2390.traintop9) |> as.data.frame()
+  dat.expr.test2390.traintop9.t$Data <- "Test"
+  rownames(dat.expr.train2390.top9.t) = rownames(dat.expr.test2390.traintop9.t) = NULL
+  dat.expr.full2390.traintop9 <- rbind(dat.expr.train2390.top9.t,
+                                       dat.expr.test2390.traintop9.t)
+  dat.expr.full2390.traintop9 <- data.frame(dat.expr.full2390.traintop9, SEX)
+
+  sumDis <- 0
+  for(j in 1:9) {
+    p.val.train <- wilcox.test(dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Train", ][[j]] ~ dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Train", ][["SEX"]], data = dat.expr.full2390.traintop9)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Test", ][[j]] ~ dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Test", ][["SEX"]], data = dat.expr.full2390.traintop9)$p.value
+    
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1 }
+  }
+  
+  if ((!is.na(sumDis)) & (sumDis > 0)) {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/edgeR/TrainTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  } else {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/edgeR/TrainTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+    print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  }
+}
+
+gene.id <- c(1999, 2000)
+temp.ENSG <- edgeR.eFDR.2000.GeneName.train[["SEX"]][gene.id]
+dat.expr.train2390.top2 <- dat.expr.train[temp.ENSG, ]
+dat.expr.train2390.top2.t <- t(dat.expr.train2390.top2) |> as.data.frame()
+dat.expr.train2390.top2.t$Data <- "Train"
+dat.expr.test2390.traintop2 <- dat.expr.test[temp.ENSG, ]
+dat.expr.test2390.traintop2.t <- t(dat.expr.test2390.traintop2) |> as.data.frame()
+dat.expr.test2390.traintop2.t$Data <- "Test"
+rownames(dat.expr.train2390.top2.t) = rownames(dat.expr.test2390.traintop2.t) = NULL
+dat.expr.full2390.traintop2 <- rbind(dat.expr.train2390.top2.t,
+                                     dat.expr.test2390.traintop2.t)
+dat.expr.full2390.traintop2 <- data.frame(dat.expr.full2390.traintop2, SEX)
+
+sumDis <- 0
+for(j in 1:2) {
+    p.val.train <- wilcox.test(dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Train", ][[j]] ~ dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Train", ][["SEX"]], data = dat.expr.full2390.traintop2)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Test", ][[j]] ~ dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Test", ][["SEX"]], data = dat.expr.full2390.traintop2)$p.value
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1}
+}
+
+if ((!is.na(sumDis)) & (sumDis > 0)) {
+  boxplot.full2390.traintop2 <- names(dat.expr.full2390.traintop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/edgeR/TrainTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+} else {
+  boxplot.full2390.traintop2 <- names(dat.expr.full2390.traintop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/edgeR/TrainTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+}
+
+
+##------eBayes------
+load("../ApplicationData/derived/RandomSeed/eBayesMultiInt2390.RData")
+SEX <- c(dat.pheno.train[["SEX"]], dat.pheno.test[["SEX"]])
+
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+for(i in seq(1, 1998, 9)) {
+  gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
+  dat.expr.train2390.top9 <- dat.expr.train[names(eBayes.eFDR.2000.train[["SEX"]])[gene.id], ]
+  dat.expr.train2390.top9.t <- t(dat.expr.train2390.top9) |> as.data.frame()
+dat.expr.train2390.top9.t$Data <- "Train"
+  dat.expr.test2390.traintop9 <- dat.expr.test[names(eBayes.eFDR.2000.train[["SEX"]])[gene.id], ]
+  dat.expr.test2390.traintop9.t <- t(dat.expr.test2390.traintop9) |> as.data.frame()
+  dat.expr.test2390.traintop9.t$Data <- "Test"
+  rownames(dat.expr.train2390.top9.t) = rownames(dat.expr.test2390.traintop9.t) = NULL
+  dat.expr.full2390.traintop9 <- rbind(dat.expr.train2390.top9.t,
+                                       dat.expr.test2390.traintop9.t)
+  
+  dat.expr.full2390.traintop9 <- data.frame(dat.expr.full2390.traintop9, SEX)
+  sumDis <- 0
+  for(j in 1:9) {
+    p.val.train <- wilcox.test(dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Train", ][[j]] ~ dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Train", ][["SEX"]], data = dat.expr.full2390.traintop9)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Test", ][[j]] ~ dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Test", ][["SEX"]], data = dat.expr.full2390.traintop9)$p.value
+    
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1 }
+  }
+    
+  if ((!is.na(sumDis)) & (sumDis > 0)) {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/eBayes/TrainTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  } else {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/eBayes/TrainTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+    print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  }
+}
+
+gene.id <- c(1999, 2000)
+dat.expr.train2390.top2 <- dat.expr.train[names(eBayes.eFDR.2000.train[["SEX"]])[gene.id], ]
+dat.expr.train2390.top2.t <- t(dat.expr.train2390.top2) |> as.data.frame()
+dat.expr.train2390.top2.t$Data <- "Train"
+dat.expr.test2390.traintop2 <- dat.expr.test[names(eBayes.eFDR.2000.train[["SEX"]])[gene.id], ]
+dat.expr.test2390.traintop2.t <- t(dat.expr.test2390.traintop2) |> as.data.frame()
+dat.expr.test2390.traintop2.t$Data <- "Test"
+rownames(dat.expr.train2390.top2.t) = rownames(dat.expr.test2390.traintop2.t) = NULL
+dat.expr.full2390.traintop2 <- rbind(dat.expr.train2390.top2.t,
+                                     dat.expr.test2390.traintop2.t)
+dat.expr.full2390.traintop2 <- data.frame(dat.expr.full2390.traintop2, SEX)
+
+sumDis <- 0
+for(j in 1:2) {
+    p.val.train <- wilcox.test(dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Train", ][[j]] ~ dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Train", ][["SEX"]], data = dat.expr.full2390.traintop2)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Test", ][[j]] ~ dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Test", ][["SEX"]], data = dat.expr.full2390.traintop2)$p.value
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1}
+}
+    
+if ((!is.na(sumDis)) & (sumDis > 0)) {
+  boxplot.full2390.traintop2 <- names(dat.expr.full2390.traintop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
+  print(paste0("[", i, "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/eBayes/TrainTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+} else {
+  boxplot.full2390.traintop2 <- names(dat.expr.full2390.traintop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/eBayes/TrainTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+}
+
+
+##------voom + limma------
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
+SEX <- c(dat.pheno.train[["SEX"]], dat.pheno.test[["SEX"]])
+
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+for(i in seq(1, 1998, 9)) {
+  gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
+  dat.expr.train2390.top9 <- dat.expr.train[names(voom.eFDR.2000.train[["SEX"]])[gene.id], ]
+  dat.expr.train2390.top9.t <- t(dat.expr.train2390.top9) |> as.data.frame()
+dat.expr.train2390.top9.t$Data <- "Train"
+  dat.expr.test2390.traintop9 <- dat.expr.test[names(voom.eFDR.2000.train[["SEX"]])[gene.id], ]
+  dat.expr.test2390.traintop9.t <- t(dat.expr.test2390.traintop9) |> as.data.frame()
+  dat.expr.test2390.traintop9.t$Data <- "Test"
+  rownames(dat.expr.train2390.top9.t) = rownames(dat.expr.test2390.traintop9.t) = NULL
+  dat.expr.full2390.traintop9 <- rbind(dat.expr.train2390.top9.t,
+                                       dat.expr.test2390.traintop9.t)
+  
+  dat.expr.full2390.traintop9 <- data.frame(dat.expr.full2390.traintop9, SEX)
+  sumDis <- 0
+  for(j in 1:9) {
+    p.val.train <- wilcox.test(dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Train", ][[j]] ~ dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Train", ][["SEX"]], data = dat.expr.full2390.traintop9)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Test", ][[j]] ~ dat.expr.full2390.traintop9[dat.expr.full2390.traintop9$Data == "Test", ][["SEX"]], data = dat.expr.full2390.traintop9)$p.value
+    
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1 }
+  }
+    
+  if ((!is.na(sumDis)) & (sumDis > 0)) {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/voom/TrainTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  } else {
+    boxplot.full2390.traintop9 <- names(dat.expr.full2390.traintop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/voom/TrainTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+    print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  }
+}
+
+gene.id <- c(1999, 2000)
+dat.expr.train2390.top2 <- dat.expr.train[names(voom.eFDR.2000.train[["SEX"]])[gene.id], ]
+dat.expr.train2390.top2.t <- t(dat.expr.train2390.top2) |> as.data.frame()
+dat.expr.train2390.top2.t$Data <- "Train"
+dat.expr.test2390.traintop2 <- dat.expr.test[names(voom.eFDR.2000.train[["SEX"]])[gene.id], ]
+dat.expr.test2390.traintop2.t <- t(dat.expr.test2390.traintop2) |> as.data.frame()
+dat.expr.test2390.traintop2.t$Data <- "Test"
+rownames(dat.expr.train2390.top2.t) = rownames(dat.expr.test2390.traintop2.t) = NULL
+dat.expr.full2390.traintop2 <- rbind(dat.expr.train2390.top2.t,
+                                     dat.expr.test2390.traintop2.t)
+dat.expr.full2390.traintop2 <- data.frame(dat.expr.full2390.traintop2, SEX)
+
+sumDis <- 0
+for(j in 1:2) {
+    p.val.train <- wilcox.test(dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Train", ][[j]] ~ dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Train", ][["SEX"]], data = dat.expr.full2390.traintop2)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Test", ][[j]] ~ dat.expr.full2390.traintop2[dat.expr.full2390.traintop2$Data == "Test", ][["SEX"]], data = dat.expr.full2390.traintop2)$p.value
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1}
+}
+    
+if ((!is.na(sumDis)) & (sumDis > 0)) {
+  boxplot.full2390.traintop2 <- names(dat.expr.full2390.traintop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
+  print(paste0("[", i, "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/voom/TrainTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+} else {
+  boxplot.full2390.traintop2 <- names(dat.expr.full2390.traintop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.traintop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.traintop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.traintop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/voom/TrainTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
          plot = g, device = "png", width = 16, height = 8, units = "in")
   print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
 }
@@ -2294,11 +2717,8 @@ if ((!is.na(sumDis)) & (sumDis > 0)) {
 
 #### Top 2000 genes list from the test set
 ```{r}
+##------BMAseq------
 load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt2390.RData")
-load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
-load("../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
-load("../ApplicationData/derived/RandomSeed/eBayesMultiInt2390.RData")
-load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
 SEX <- c(dat.pheno.train[["SEX"]], dat.pheno.test[["SEX"]])
 
 seed.num <- 2390
@@ -2323,7 +2743,6 @@ boxplot.fun.2 <- function(dataset, var.x, var.y) {
 }
 
 for(i in seq(1, 1998, 9)) {
-  ##------Process data------
   gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
   dat.expr.train2390.testtop9 <- dat.expr.train[names(BMAseq.eFDR.Main.2000.test[["SEX"]])[gene.id], ]
   dat.expr.train2390.testtop9.t <- t(dat.expr.train2390.testtop9) |> as.data.frame()
@@ -2344,13 +2763,12 @@ dat.expr.train2390.testtop9.t$Data <- "Train"
     if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1 }
   }
     
-  ##------Make boxplots------
   if ((!is.na(sumDis)) & (sumDis > 0)) {
     boxplot.full2390.testtop9 <- names(dat.expr.full2390.testtop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop9))] |> 
     map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
     g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
     print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
-    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/TestTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/BMAseq/TestTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 16,
@@ -2362,7 +2780,7 @@ dat.expr.train2390.testtop9.t$Data <- "Train"
     map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
     g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
     print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
-    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/TestTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/BMAseq/TestTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 16,
@@ -2395,8 +2813,8 @@ if ((!is.na(sumDis)) & (sumDis > 0)) {
   boxplot.full2390.testtop2 <- names(dat.expr.full2390.testtop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop2))] |> 
   map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
   g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
-  print(paste0("[", i, "] Plot a 2-boxplot matrix successfully!"))
-  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/TestTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/BMAseq/TestTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 16,
@@ -2408,7 +2826,381 @@ if ((!is.na(sumDis)) & (sumDis > 0)) {
   map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
   g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
   print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
-  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/TestTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/BMAseq/TestTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+}
+
+##------DESeq2------
+load("../ApplicationData/derived/RandomSeed/DESeq2MultiInt2390.RData")
+SEX <- c(coldata.train[["SEX"]], coldata.test[["SEX"]])
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+for(i in seq(1, 1998, 9)) {
+  gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
+  temp.ENSG <- DESeq2.eFDR.2000.GeneName.test[["SEX"]][gene.id]
+  cts.train2390.testtop9 <- cts.test[temp.ENSG, ]
+  cts.train2390.testtop9.t <- t(cts.train2390.testtop9) |> as.data.frame()
+  cts.train2390.testtop9.t$Data <- "Train"
+  cts.test2390.top9 <- cts.test[temp.ENSG, ]
+  cts.test2390.top9.t <- t(cts.test2390.top9) |> as.data.frame()
+  cts.test2390.top9.t$Data <- "Test"
+  rownames(cts.train2390.testtop9.t) = rownames(cts.test2390.top9.t) = NULL
+  dat.expr.full2390.testtop9 <- rbind(cts.train2390.testtop9.t,
+                                      cts.test2390.top9.t)
+  dat.expr.full2390.testtop9 <- data.frame(dat.expr.full2390.testtop9, SEX)
+
+  sumDis <- 0
+  for(j in 1:9) {
+    p.val.train <- wilcox.test(dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Train", ][[j]] ~ dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Train", ][["SEX"]], data = dat.expr.full2390.testtop9)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Test", ][[j]] ~ dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Test", ][["SEX"]], data = dat.expr.full2390.testtop9)$p.value
+    
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1 }
+  }
+  
+  if ((!is.na(sumDis)) & (sumDis > 0)) {
+    boxplot.full2390.testtop9 <- names(dat.expr.full2390.testtop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/DESeq2/TestTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  } else {
+    boxplot.full2390.testtop9 <- names(dat.expr.full2390.testtop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/DESeq2/TestTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+    print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  }
+}
+
+gene.id <- c(1999, 2000)
+temp.ENSG <- DESeq2.eFDR.2000.GeneName.train[["SEX"]][gene.id]
+cts.train2390.testtop2 <- cts.test[temp.ENSG, ]
+cts.train2390.testtop2.t <- t(cts.train2390.testtop2) |> as.data.frame()
+cts.train2390.testtop2.t$Data <- "Train"
+cts.test2390.top2 <- cts.test[temp.ENSG, ]
+cts.test2390.top2.t <- t(cts.test2390.top2) |> as.data.frame()
+cts.test2390.top2.t$Data <- "Test"
+rownames(cts.train2390.testtop2.t) = rownames(cts.test2390.top2.t) = NULL
+dat.expr.full2390.testtop2 <- rbind(cts.train2390.testtop2.t,
+                                    cts.test2390.top2.t)
+dat.expr.full2390.testtop2 <- data.frame(dat.expr.full2390.testtop2, SEX)
+
+sumDis <- 0
+for(j in 1:2) {
+    p.val.train <- wilcox.test(dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Train", ][[j]] ~ dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Train", ][["SEX"]], data = dat.expr.full2390.testtop2)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Test", ][[j]] ~ dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Test", ][["SEX"]], data = dat.expr.full2390.testtop2)$p.value
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1}
+}
+
+if ((!is.na(sumDis)) & (sumDis > 0)) {
+  boxplot.full2390.testtop2 <- names(dat.expr.full2390.testtop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/DESeq2/TestTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+} else {
+  boxplot.full2390.testtop2 <- names(dat.expr.full2390.testtop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/DESeq2/TestTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+}
+
+
+##------edgeR------
+load("../ApplicationData/derived/RandomSeed/edgeRMultiInt2390.RData")
+SEX <- c(dat.pheno.train[["SEX"]], dat.pheno.test[["SEX"]])
+
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+for(i in seq(1, 1998, 9)) {
+  gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
+  temp.ENSG <- edgeR.eFDR.2000.GeneName.test[["SEX"]][gene.id]
+  dat.expr.train2390.testtop9 <- dat.expr.test[temp.ENSG, ]
+  dat.expr.train2390.testtop9.t <- t(dat.expr.train2390.testtop9) |> as.data.frame()
+  dat.expr.train2390.testtop9.t$Data <- "Train"
+  dat.expr.test2390.top9 <- dat.expr.test[temp.ENSG, ]
+  dat.expr.test2390.top9.t <- t(dat.expr.test2390.top9) |> as.data.frame()
+  dat.expr.test2390.top9.t$Data <- "Test"
+  rownames(dat.expr.train2390.testtop9.t) = rownames(dat.expr.test2390.top9.t) = NULL
+  dat.expr.full2390.testtop9 <- rbind(dat.expr.train2390.testtop9.t,
+                                      dat.expr.test2390.top9.t)
+  dat.expr.full2390.testtop9 <- data.frame(dat.expr.full2390.testtop9, SEX)
+
+  sumDis <- 0
+  for(j in 1:9) {
+    p.val.train <- wilcox.test(dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Train", ][[j]] ~ dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Train", ][["SEX"]], data = dat.expr.full2390.testtop9)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Test", ][[j]] ~ dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Test", ][["SEX"]], data = dat.expr.full2390.testtop9)$p.value
+    
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1 }
+  }
+  
+  if ((!is.na(sumDis)) & (sumDis > 0)) {
+    boxplot.full2390.testtop9 <- names(dat.expr.full2390.testtop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/edgeR/TestTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  } else {
+    boxplot.full2390.testtop9 <- names(dat.expr.full2390.testtop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/edgeR/TestTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+           plot = g, device = "png", width = 16, height = 8, units = "in")
+    print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  }
+}
+
+gene.id <- c(1999, 2000)
+temp.ENSG <- edgeR.eFDR.2000.GeneName.test[["SEX"]][gene.id]
+dat.expr.train2390.testtop2 <- dat.expr.test[temp.ENSG, ]
+dat.expr.train2390.testtop2.t <- t(dat.expr.train2390.testtop2) |> as.data.frame()
+dat.expr.train2390.testtop2.t$Data <- "Train"
+dat.expr.test2390.top2 <- dat.expr.test[temp.ENSG, ]
+dat.expr.test2390.top2.t <- t(dat.expr.test2390.top2) |> as.data.frame()
+dat.expr.test2390.top2.t$Data <- "Test"
+rownames(dat.expr.train2390.testtop2.t) = rownames(dat.expr.test2390.top2.t) = NULL
+dat.expr.full2390.testtop2 <- rbind(dat.expr.train2390.testtop2.t,
+                                    dat.expr.test2390.top2.t)
+dat.expr.full2390.testtop2 <- data.frame(dat.expr.full2390.testtop2, SEX)
+
+sumDis <- 0
+for(j in 1:2) {
+    p.val.train <- wilcox.test(dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Train", ][[j]] ~ dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Train", ][["SEX"]], data = dat.expr.full2390.testtop2)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Test", ][[j]] ~ dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Test", ][["SEX"]], data = dat.expr.full2390.testtop2)$p.value
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1}
+}
+
+if ((!is.na(sumDis)) & (sumDis > 0)) {
+  boxplot.full2390.testtop2 <- names(dat.expr.full2390.testtop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/edgeR/TestTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+} else {
+  boxplot.full2390.testtop2 <- names(dat.expr.full2390.testtop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/edgeR/TestTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g, device = "png", width = 16, height = 8, units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+}
+
+
+##------eBayes------
+load("../ApplicationData/derived/RandomSeed/eBayesMultiInt2390.RData")
+SEX <- c(dat.pheno.train[["SEX"]], dat.pheno.test[["SEX"]])
+
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+for(i in seq(1, 1998, 9)) {
+  gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
+  dat.expr.train2390.testtop9 <- dat.expr.train[names(eBayes.eFDR.2000.test[["SEX"]])[gene.id], ]
+  dat.expr.train2390.testtop9.t <- t(dat.expr.train2390.testtop9) |> as.data.frame()
+dat.expr.train2390.testtop9.t$Data <- "Train"
+  dat.expr.test2390.top9 <- dat.expr.test[names(eBayes.eFDR.2000.test[["SEX"]])[gene.id], ]
+  dat.expr.test2390.top9.t <- t(dat.expr.test2390.top9) |> as.data.frame()
+  dat.expr.test2390.top9.t$Data <- "Test"
+  rownames(dat.expr.train2390.testtop9.t) = rownames(dat.expr.test2390.top9.t) = NULL
+  dat.expr.full2390.testtop9 <- rbind(dat.expr.train2390.testtop9.t,
+                                       dat.expr.test2390.top9.t)
+  
+  dat.expr.full2390.testtop9 <- data.frame(dat.expr.full2390.testtop9, SEX)
+  sumDis <- 0
+  for(j in 1:9) {
+    p.val.train <- wilcox.test(dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Train", ][[j]] ~ dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Train", ][["SEX"]], data = dat.expr.full2390.testtop9)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Test", ][[j]] ~ dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Test", ][["SEX"]], data = dat.expr.full2390.testtop9)$p.value
+    
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1 }
+  }
+    
+  if ((!is.na(sumDis)) & (sumDis > 0)) {
+    boxplot.full2390.testtop9 <- names(dat.expr.full2390.testtop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/eBayes/TestTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+  print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  } else {
+    boxplot.full2390.testtop9 <- names(dat.expr.full2390.testtop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/eBayes/TestTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+    print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  }
+}
+
+gene.id <- c(1999, 2000)
+dat.expr.train2390.testtop2 <- dat.expr.train[names(eBayes.eFDR.2000.test[["SEX"]])[gene.id], ]
+dat.expr.train2390.testtop2.t <- t(dat.expr.train2390.testtop2) |> as.data.frame()
+dat.expr.train2390.testtop2.t$Data <- "Train"
+dat.expr.test2390.top2 <- dat.expr.test[names(eBayes.eFDR.2000.test[["SEX"]])[gene.id], ]
+dat.expr.test2390.top2.t <- t(dat.expr.test2390.top2) |> as.data.frame()
+dat.expr.test2390.top2.t$Data <- "Test"
+rownames(dat.expr.train2390.testtop2.t) = rownames(dat.expr.test2390.top2.t) = NULL
+dat.expr.full2390.testtop2 <- rbind(dat.expr.train2390.testtop2.t,
+                                     dat.expr.test2390.top2.t)
+dat.expr.full2390.testtop2 <- data.frame(dat.expr.full2390.testtop2, SEX)
+
+sumDis <- 0
+for(j in 1:2) {
+    p.val.train <- wilcox.test(dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Train", ][[j]] ~ dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Train", ][["SEX"]], data = dat.expr.full2390.testtop2)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Test", ][[j]] ~ dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Test", ][["SEX"]], data = dat.expr.full2390.testtop2)$p.value
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1}
+}
+    
+if ((!is.na(sumDis)) & (sumDis > 0)) {
+  boxplot.full2390.testtop2 <- names(dat.expr.full2390.testtop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/eBayes/TestTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+} else {
+  boxplot.full2390.testtop2 <- names(dat.expr.full2390.testtop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/eBayes/TestTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+}
+
+
+##------voom + limma------
+load("../ApplicationData/derived/RandomSeed/VoomLimmaMultiInt2390.RData")
+SEX <- c(dat.pheno.train[["SEX"]], dat.pheno.test[["SEX"]])
+
+seed.num <- 2390
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+for(i in seq(1, 1998, 9)) {
+  gene.id <- c(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8)
+  dat.expr.train2390.testtop9 <- dat.expr.train[names(voom.eFDR.2000.test[["SEX"]])[gene.id], ]
+  dat.expr.train2390.testtop9.t <- t(dat.expr.train2390.testtop9) |> as.data.frame()
+dat.expr.train2390.testtop9.t$Data <- "Train"
+  dat.expr.test2390.top9 <- dat.expr.test[names(voom.eFDR.2000.test[["SEX"]])[gene.id], ]
+  dat.expr.test2390.top9.t <- t(dat.expr.test2390.top9) |> as.data.frame()
+  dat.expr.test2390.top9.t$Data <- "Test"
+  rownames(dat.expr.train2390.testtop9.t) = rownames(dat.expr.test2390.top9.t) = NULL
+  dat.expr.full2390.testtop9 <- rbind(dat.expr.train2390.testtop9.t,
+                                       dat.expr.test2390.top9.t)
+  
+  dat.expr.full2390.testtop9 <- data.frame(dat.expr.full2390.testtop9, SEX)
+  sumDis <- 0
+  for(j in 1:9) {
+    p.val.train <- wilcox.test(dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Train", ][[j]] ~ dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Train", ][["SEX"]], data = dat.expr.full2390.testtop9)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Test", ][[j]] ~ dat.expr.full2390.testtop9[dat.expr.full2390.testtop9$Data == "Test", ][["SEX"]], data = dat.expr.full2390.testtop9)$p.value
+    
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1 }
+  }
+    
+  if ((!is.na(sumDis)) & (sumDis > 0)) {
+    boxplot.full2390.testtop9 <- names(dat.expr.full2390.testtop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/voom/TestTop2000/Discordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+  print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  } else {
+    boxplot.full2390.testtop9 <- names(dat.expr.full2390.testtop9)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop9))] |> 
+    map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop9, var.x = "SEX")
+    g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop9, ncol = 3)))
+    print(paste0("[", i, "] Plot a 9-boxplot matrix successfully!"))
+    ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/voom/TestTop2000/Concordant/", date.analysis, "_", i, "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+    print(paste0("[", i, "] Save a 9-boxplot matrix successfully!"))
+  }
+}
+
+gene.id <- c(1999, 2000)
+dat.expr.train2390.testtop2 <- dat.expr.train[names(voom.eFDR.2000.test[["SEX"]])[gene.id], ]
+dat.expr.train2390.testtop2.t <- t(dat.expr.train2390.testtop2) |> as.data.frame()
+dat.expr.train2390.testtop2.t$Data <- "Train"
+dat.expr.test2390.top2 <- dat.expr.test[names(voom.eFDR.2000.test[["SEX"]])[gene.id], ]
+dat.expr.test2390.top2.t <- t(dat.expr.test2390.top2) |> as.data.frame()
+dat.expr.test2390.top2.t$Data <- "Test"
+rownames(dat.expr.train2390.testtop2.t) = rownames(dat.expr.test2390.top2.t) = NULL
+dat.expr.full2390.testtop2 <- rbind(dat.expr.train2390.testtop2.t,
+                                     dat.expr.test2390.top2.t)
+dat.expr.full2390.testtop2 <- data.frame(dat.expr.full2390.testtop2, SEX)
+
+sumDis <- 0
+for(j in 1:2) {
+    p.val.train <- wilcox.test(dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Train", ][[j]] ~ dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Train", ][["SEX"]], data = dat.expr.full2390.testtop2)$p.value
+    p.val.test <- wilcox.test(dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Test", ][[j]] ~ dat.expr.full2390.testtop2[dat.expr.full2390.testtop2$Data == "Test", ][["SEX"]], data = dat.expr.full2390.testtop2)$p.value
+    if ((p.val.train < 0.05 & p.val.test >= 0.05) | (p.val.train >= 0.05 & p.val.test < 0.05)) { sumDis <- sumDis + 1}
+}
+    
+if ((!is.na(sumDis)) & (sumDis > 0)) {
+  boxplot.full2390.testtop2 <- names(dat.expr.full2390.testtop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/voom/TestTop2000/Discordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
+         plot = g,
+         device = "png",
+         width = 16,
+         height = 8,
+         units = "in")
+  print(paste0("[", gene.id[1], "] Save a 2-boxplot matrix successfully!"))
+} else {
+  boxplot.full2390.testtop2 <- names(dat.expr.full2390.testtop2)[-match(c("Data", "SEX"), names(dat.expr.full2390.testtop2))] |> 
+  map(.f = boxplot.fun.2, dataset = dat.expr.full2390.testtop2, var.x = "SEX")
+  g <- grid.arrange(do.call("arrangeGrob", c(boxplot.full2390.testtop2, ncol = 2)))
+  print(paste0("[", gene.id[1], "] Plot a 2-boxplot matrix successfully!"))
+  ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Boxplot/2390/SEX/voom/TestTop2000/Concordant/", date.analysis, "_", gene.id[1], "GeneExpBoxplotTrainTest", "_", seed.num, ".png"),
          plot = g,
          device = "png",
          width = 16,
@@ -4418,4 +5210,3 @@ dat.expr.new <- rbind(dat.expr.train.new, dat.expr.test.new)
 
 boxplot.Discordant.ENSG.voom <- Discordant.ENSG |> map(.f = boxplot.fun, dataset = dat.expr.new, var.x = "Data")
 ```
-
