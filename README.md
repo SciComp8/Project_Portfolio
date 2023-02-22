@@ -1,6 +1,6 @@
 # Research project-oriented programming
 
-Here lists my coding work affiliated with collaborative and individual research projects spanning from statistical omics to clinical research.
+A compiled list of my programming work affiliated with collaborative and individual research projects, which cover from statistical omics to healthcare research.
 
 
 ## **Bayesian model averaging for bulk RNA-Seq data (use R programming)**
