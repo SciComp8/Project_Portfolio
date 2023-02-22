@@ -15,12 +15,12 @@ knitr::opts_chunk$set(
 
 
 ### Save and load images
-```{r saveimage, eval=FALSE}
+```{r save.image, eval=FALSE}
 image.date <- format(Sys.Date(), "%Y%b%d")
 save.image(file = paste0("../ApplicationData/derived/", image.date, "_image_RData"))
 ```
 
-```{r loadimage}
+```{r load.image}
 load("../ApplicationData/derived/2023Jan05_image_RData")
 ```
 
