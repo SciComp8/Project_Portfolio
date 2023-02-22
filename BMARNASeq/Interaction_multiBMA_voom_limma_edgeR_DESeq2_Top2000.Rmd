@@ -15,12 +15,12 @@ knitr::opts_chunk$set(
 
 
 # Save and load images
-```{r saveimage, eval=FALSE}
+```{r save_image, eval=FALSE}
 image.date <- format(Sys.Date(), "%Y%b%d")
 save.image(file = paste0("../ApplicationData/derived/", image.date, "_multiInt_image_ALiu.RData"))
 ```
 
-```{r loadimage}
+```{r load_image}
 load("../ApplicationData/derived/2023Jan16_multiInt_image_ALiu.RData")
 ```
 
@@ -34,7 +34,7 @@ source("./2022Dec8Version_ALiu/R/Bayesfactor.R")
 
 
 # Load original data
-```{r read.data}
+```{r read_data}
 dat.expr <- dget("../ApplicationData/derived/dat.expr.Subcutaneous") 
 dat.pheno <- dget("../ApplicationData/derived/dat.pheno.Subcutaneous") 
 dim(dat.expr) # 24660 genes and 404 subjects
@@ -46,7 +46,7 @@ paste0("The column names of gene expression data", ifelse(all(colnames(dat.expr)
 
 
 # Preprocess expression data
-```{r filter.gene}
+```{r filter_gene}
 # Pre-filter the genes
 # Here we perform the median absolute deviation with the threshold of 0.8 to select genes that are most likely to distinguish the samples
 dat.expr.new <- dat.expr[apply(dat.expr, 1, function(x) mad(x) > 0.8), ] # We have 24455 genes
