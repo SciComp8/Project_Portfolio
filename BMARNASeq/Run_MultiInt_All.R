@@ -50,7 +50,7 @@ multiInt_ana_TMM_top <- function(seed.num = 999, threshold = 2000) {
                                          function(i) output.multi.int2.test$eFDR.Main[, i][order(output.multi.int2.test$eFDR.Main[, i])[1:threshold]],
                                          mc.cores = 4)
   
-  names(BMAseq.eFDR.Main.train) = names(BMAseq.eFDR.Main.2000.test) = var.pool
+  names(BMAseq.eFDR.Main.train) = names(BMAseq.eFDR.Main.test) = var.pool
   
   BMAseq.eFDR.Interaction.train <- mclapply(1:length(var.pool),
                                             function(i) output.multi.int2.train$eFDR.Interaction[, i][order(output.multi.int2.train$eFDR.Interaction[, i])[1:threshold]],
