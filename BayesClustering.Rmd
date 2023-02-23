@@ -1414,7 +1414,6 @@ clinical_data_cluster <- clinical_data_cluster %>%
   mutate(CLSB = ifelse(CLSB == "Yes", "Yes", "No "),
          cluster_label = ifelse(cluster_label == 1, "Cluster 1", "Cluster 2"))
 
-###### 画PCA时不需要运行下面代码  
 clinical_data_cluster %>%
   dplyr::select(cluster_label, Age, Race, Ethnicity, Menopausal, TumorPheno, Invasive, BRCA.mut, BRCA.type, BMI, BMI.cat1, BMI.cat2, TotalFat.percent, TotalFatMass.kg, TotalLeanMass.kg, FatLeanRatio, TrunkFat.percent, TrunkFatMass.kg, WaistHip.Ratio, Dyslipidemia, AdipocyteDiameter, CLSB.cm2, CLSB, CLSB.cm2.cat, RQ.Aromatase, log.RQ.Aromatase, HTN, DM, Leptin, IL.6, log.IL.6) %>%
   tbl_summary(by = cluster_label,
