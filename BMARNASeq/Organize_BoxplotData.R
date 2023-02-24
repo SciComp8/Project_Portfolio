@@ -11,3 +11,5 @@ for (threshold.i in threshold.vec) {
     boxplot.data.new <- rbind(boxplot.data.new, boxplot_data(threshold.i, seed.i))
   }
 }
+
+save.image(file = "../ApplicationData/derived/overlapplot_image.RData")
