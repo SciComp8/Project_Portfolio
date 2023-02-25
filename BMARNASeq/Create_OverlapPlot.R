@@ -30,7 +30,7 @@ g <- boxplot.data.new2[variable==var.i] |>
   geom_boxplot() + 
   stat_summary(fun = median, geom = "line", aes(group = 1), color = "#0073C2FF") +  
   facet_wrap(vars(threshold)) + 
-  labs(y = "Number of common differentially expressed genes", x = "Method") + 
+  labs(y = "Rate of common differentially expressed genes", x = "Method") + 
   theme_bw() + 
   theme(legend.position = "none",
         axis.text.x = element_text(size = 9, angle = 90, hjust = 1, color = "black", vjust = 0.5))
