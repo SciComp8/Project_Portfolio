@@ -345,8 +345,8 @@ res.test <- mclapply(1:length(vars),
                       mc.cores = 10L)
 
 eFDR.test <- mclapply(1:length(vars),
-                 function(i) qvalue(res.test[[i]][["pvalue"]])$qvalues, # Here, I calculate the eFDR using the original gene order
-                 mc.cores = 10L) 
+                      function(i) qvalue(res.test[[i]][["pvalue"]])$qvalues, # Here, I calculate the eFDR using the original gene order
+                      mc.cores = 10L) 
 
 DESeq2.DEG.test <- mclapply(1:length(vars),
                             function(i) rownames(cts.test)[eFDR.test[[i]] < 0.25],
@@ -621,9 +621,9 @@ uni_ana_noTMM <- function(seed.num = 999) {
                         mc.cores = 4L)
   
   eFDR.train <- mclapply(1:length(vars),
-                        function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
-                          qvalue(),
-                        mc.cores = 4L)
+                         function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
+                           qvalue(),
+                         mc.cores = 4L)
   
   edgeR.DEG.train <- mclapply(1:length(vars),
                               function(i) rownames(dat.expr.train)[ eFDR.train[[i]][["qvalues"]] < 0.25 ],
@@ -696,7 +696,7 @@ uni_ana_noTMM <- function(seed.num = 999) {
                                                         colData = coldata.train, 
                                                         design = formula(paste0("~", vars[i])))
                           return(results(DESeq(dds)))},
-                      mc.cores = 4L) 
+                        mc.cores = 4L) 
   
   eFDR.train <- mclapply(1:length(vars),
                          function(i) qvalue(res.train[[i]][["pvalue"]])$qvalues,
@@ -1017,9 +1017,9 @@ uni_ana_TMM <- function(seed.num = 999) {
                         mc.cores = 4L)
   
   eFDR.train <- mclapply(1:length(vars),
-                        function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
-                          qvalue(),
-                        mc.cores = 4L)
+                         function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
+                           qvalue(),
+                         mc.cores = 4L)
   
   edgeR.DEG.train <- mclapply(1:length(vars),
                               function(i) rownames(dat.expr.train)[ eFDR.train[[i]][["qvalues"]] < 0.25 ],
@@ -1099,7 +1099,7 @@ uni_ana_TMM <- function(seed.num = 999) {
                                                         design = formula(paste0("~", vars[i])))
                           sizeFactors(dds) <- size.factor
                           return(results(DESeq(dds)))},
-                      mc.cores = 4L) 
+                        mc.cores = 4L) 
   
   eFDR.train <- mclapply(1:length(vars),
                          function(i) qvalue(res.train[[i]][["pvalue"]])$qvalues,
