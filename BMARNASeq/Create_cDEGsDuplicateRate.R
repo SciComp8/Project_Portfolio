@@ -11,8 +11,9 @@ duplicated_rate_cDEGs <- function(var.name = "BMI", method.name = "BMAseq") {
                                     names(get(sprintf("%s.eFDR.Main.test", method.name))[[var.name]][1:threshold.i])))
         } else if (method.name == "BMAseq" & var.name == "BMIxSEX") {
         load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
-        cDEGs <- c(cDEGs, intersect(names(get(sprintf("%s.eFDR.Interaction.train", method.name))[[var.name]][1:threshold.i]), 
-                                    names(get(sprintf("%s.eFDR.Interaction.test", method.name))[[var.name]][1:threshold.i])))
+        var.name2 <- "BMI"
+        cDEGs <- c(cDEGs, intersect(names(get(sprintf("%s.eFDR.Interaction.train", method.name))[[var.name2]][1:threshold.i]), 
+                                    names(get(sprintf("%s.eFDR.Interaction.test", method.name))[[var.name2]][1:threshold.i])))
       } else if (method.name %in% c("DESeq2", "edgeR")) {
         load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
         cDEGs <- c(cDEGs, intersect(get(sprintf("%s.eFDR.GeneName.train", method.name))[[var.name]][1:threshold.i], 
@@ -32,8 +33,3 @@ duplicated_rate_cDEGs <- function(var.name = "BMI", method.name = "BMAseq") {
     cDEGs <- NULL
   }
 }
-
-
-mapply(duplicated_rate_cDEGs,
-       c("BMI","AGE","SEX","WBC","BMIxSEX"), 
-       c("BMAseq", "DESeq2", "edgeR", "eBayes", "VoomLimma"))
