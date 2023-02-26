@@ -13,10 +13,10 @@ duplicated_rate_cDEGs <- function(var.name = "BMI", method.name = "BMAseq") {
         load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
         cDEGs <- c(cDEGs, intersect(names(get(sprintf("%s.eFDR.Interaction.train", method.name))[[var.name]][1:threshold.i]), 
                                     names(get(sprintf("%s.eFDR.Interaction.test", method.name))[[var.name]][1:threshold.i])))
-      } else if (method.name %in% c("DESeq", "edgeR")) {
+      } else if (method.name %in% c("DESeq2", "edgeR")) {
         load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
-        cDEGs <- c(cDEGs, intersect(names(get(sprintf("%s.eFDR.GeneName.train", method.name))[[var.name]][1:threshold.i]), 
-                                    names(get(sprintf("%s.eFDR.GeneName.test", method.name))[[var.name]][1:threshold.i])))
+        cDEGs <- c(cDEGs, intersect(get(sprintf("%s.eFDR.GeneName.train", method.name))[[var.name]][1:threshold.i], 
+                                    get(sprintf("%s.eFDR.GeneName.test", method.name))[[var.name]][1:threshold.i]))
       } else if (method.name == "VoomLimma") {
         load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
         method.name2 <- "voom"
