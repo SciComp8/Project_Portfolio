@@ -15,7 +15,7 @@ The goal of this project is to evaluate the performance  of our novel `BMAseq` a
 - [GenerateCheck_TrainingTestData.Rmd](BMARNASeq/GenerateCheck_TrainingTestData.Rmd)
   
 ## **Differential expression analysis pipeline for single cell data (use Python-based snakemake workflow and R programming)**
-A bioinformatics pipeline for the next-generation single cell data from the mouse B lymphocytes is developed to streamline main phases of differential gene expression analysis from `Trim Galore`-based trimming reads from raw FASTQ files, `kallisto`-based quantifying abundances of transcripts from RNA-Seq data, to `DESeq2`-based differential gene expression analysis. 
+The bioinformatics pipeline developed for the next-generation single cell data from the mouse B lymphocytes aims to streamline the entire process of differential gene expression analysis. This involves several key phases, including the initial trimming of reads from raw FASTQ files using `Trim Galore`, quantifying the abundance of transcripts using `kallisto`, and finally, performing the differential gene expression analysis using `DESeq2`. The pipeline is designed to be efficient in the command-line interface, enabling researchers to easily analyze and interpret large datasets of single cell gene expression data with desirable accuracy and reproducibility. 
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
 
 ## **Bayesian integrative clustering for multi-omics data (use R programming)**
