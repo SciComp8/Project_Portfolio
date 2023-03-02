@@ -1161,5 +1161,5 @@ uni_ana_TMM <- function(seed.num = 999) {
 # Ten trials to assess the reproducibility of BMAseq, voom + limma, edgeR, and DESeq2 with TMM
 ```{r}
 seed.num.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
-for (i in 1:10L) {uni_ana_TMM(seed.num = seed.num.vec[i])}
+for (i in 1:10) {uni_ana_TMM(seed.num = seed.num.vec[i])}
 ```
