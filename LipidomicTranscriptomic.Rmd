@@ -25,7 +25,8 @@ knitr::opts_chunk$set(
 )
 ```
 
-# Load images and libraries
+# Load saved images and libraries
+
 ```{r start, eval=FALSE}
 # Load image
 load(file = "2022Oct9.RData")
