@@ -2,10 +2,10 @@
 
 This is a compiled list of my programming work affiliated with collaborative and individual research projects, which cover the topics from statistical omics to healthcare research. 
 
-<details><summary>Table of Contents</summary><p>
+<details>Table of Contents<p>
 
 * [Bayesian model averaging for RNA-Seq](#Bayesian-model-averaging-for-bulk-RNA-Seq-data)
-* [Differential expression analysis pipeline for single cell data](#Differential expression analysis pipeline for single cell data)
+* [Differential expression analysis pipeline for single cell data](#Differential-expression-analysis-pipeline-for-single-cell-data)
 * [Bayesian integrative clustering for multi-omics data](#Bayesian integrative clustering for multi-omics data)
 * [Lipidomics and transcriptomics analysis](#Lipidomics and transcriptomics analysis)
 * [Statistical analysis for breast cancer surgery clinical data](#Statistical analysis for breast cancer surgery clinical data)
