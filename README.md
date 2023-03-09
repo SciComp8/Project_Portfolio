@@ -1,9 +1,18 @@
 # Research project-oriented programming
 
-This is a compiled list of my programming work affiliated with collaborative and individual research projects, which cover the topics from statistical omics to healthcare research. The specific projects include:
+This is a compiled list of my programming work affiliated with collaborative and individual research projects, which cover the topics from statistical omics to healthcare research. 
+
+<details><summary>Table of Contents</summary><p>
+
+* [Bayesian model averaging for RNA-Seq](#Bayesian model averaging for bulk RNA-Seq data)
+* [Differential expression analysis pipeline for single cell data](#Differential expression analysis pipeline for single cell data)
+* [Bayesian integrative clustering for multi-omics data](#Bayesian integrative clustering for multi-omics data)
+* [Lipidomics and transcriptomics analysis](#Lipidomics and transcriptomics analysis)
+* [Statistical analysis for breast cancer surgery clinical data](#Statistical analysis for breast cancer surgery clinical data)
+</p></details><p></p>
 
 
-## **Bayesian model averaging for bulk RNA-Seq data (use R programming)**
+## **Bayesian model averaging for bulk RNA-Seq data**
 The goal of this project is to evaluate the performance  of our novel `BMAseq` and other three existing computational biology approaches: `DESeq2`, `edgeR`, `voom + limma + eBayes`, and `voom + limma` on identifying differentially expressed genes in the setting of univariable, multivaribles, and multivaribles coupled with interaction terms. All subjects are randomly divided into 50% training set and 50% test set. Each method of BMAseq,  voom + limma, edgeR, and DESeq2 is applied to construct the univariate, multivariate, multivariate with interaction models for the six phenotypes: BMI, AGE, SEX, MHABNWBC, MHARTHTS, and MHCVD. The approach-specific Venn diagram panel is plotted to intuitively reveal the absolute number and relative proportion of common differentially expressed genes (cDEGs) associated with each variable between the training and test set. The distribution of cDEGs associated with each variable is compared across five approaches.
 
 - [UniBMA_voom_limma_edgeR_DESeq2.Rmd](BMARNASeq/UniBMA_voom_limma_edgeR_DESeq2.Rmd)
@@ -14,19 +23,19 @@ The goal of this project is to evaluate the performance  of our novel `BMAseq` a
 - [Interaction_multiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](BMARNASeq/Interaction_multiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
 - [GenerateCheck_TrainingTestData.Rmd](BMARNASeq/GenerateCheck_TrainingTestData.Rmd)
   
-## **Differential expression analysis pipeline for single cell data (use Python-based snakemake workflow and R programming)**
+## **Differential expression analysis pipeline for single cell data**
 The bioinformatics pipeline developed for the next-generation single cell data from the mouse B lymphocytes aims to streamline the entire process of differential gene expression analysis for single cell RNA-seq data. This involves several key phases, including the initial trimming of reads from raw FASTQ files using `Trim Galore`, quantifying the abundance of transcripts using `kallisto`, and finally, performing the differential gene expression analysis using `DESeq2`. The pipeline is designed to be efficient in the command-line interface, enabling researchers to analyze and interpret large datasets of single cell gene expression data with the desirable speed, accuracy, and reproducibility.
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
 
-## **Bayesian integrative clustering for multi-omics data (use R programming)**
+## **Bayesian integrative clustering for multi-omics data**
 This project characterizes the shared patterns underlying the transcriptomic and lipidomic profiles in women at high risk or diagnosed with breast cancers and explores the relationships between these shared patterns and clinical and biological phenotypes. A novel Bayesian latent variable approach which jointly models the non-tumorous breast tissue transcriptomic expression levels and plasma lipidomic expression levels is constructed and further tuned with key parameters to identify clinically and biologically relevant clusters co-driven by transcriptomic and lipidomic features.
   - [BayesClustering.Rmd](BayesClustering.Rmd)
  
-## **Lipidomics and transcriptomics analysis (use R programming)**
+## **Lipidomics and transcriptomics analysis**
 The goal of this lipidomics and transcriptomics analysis is to test the hypothesis that lipid and gene molecules may be co-up- or co-down-regulated in different phenotypes (e.g., body mass index, trunk fat percent, adipocyte diameter states) and these differences may enable useful insights into the pathogenic mechanisms of breast cancer, to pave the way for developing more targeted prevention and intervention strategies for breast cancer patients. The main theme of analysis starts from processing lipidomic and transcriptomic expression data, analyzing the co-expression patterns in different phenotypes, to creating heatmap presentations. 
   - [LipidomicTranscriptomic.Rmd](LipidomicTranscriptomic.Rmd)
 
-## **Statistical analysis for breast cancer surgery clinical data (use R/Python programming)**
+## **Statistical analysis for breast cancer surgery clinical data**
 **TNBC project** - This project aims to evaluate the incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. The incidence rates of local recurrence and new primary breast cancer are estimated in 1, 2, 3, 5, 10 years, separately, using the Kaplan-Meier approach. The cumulative incidence rates of local recurrence and new primary breast cancer with ER, PR, HER2 marker values are estimated in 1, 2, 3, 5, 10 years, separately, using the cumulative incidence function which considers the positive marker and the negative marker (e.g., ER positive vs ER negative) as competing risks. A by-product of this project is to construct a pipeline which predicts the subsequent breast cancer event in 5 years using the existing machine learning approaches (e.g., random forest).
 
 - [TNBC.Rmd](TNBC.Rmd)
