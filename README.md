@@ -2,7 +2,7 @@
 
 This is a compiled list of my programming work affiliated with collaborative and individual research projects, which cover the topics from statistical omics to healthcare research. 
 
-<summary>Table of Contents</summary>
+## Table of Contents
 
 * [Bayesian model averaging for RNA-Seq](#Bayesian-model-averaging-for-bulk-RNA-Seq-data)
 * [Differential expression analysis pipeline for single cell data](#Differential-expression-analysis-pipeline-for-single-cell-data)
