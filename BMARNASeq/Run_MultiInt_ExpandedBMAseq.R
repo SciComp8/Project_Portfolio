@@ -25,7 +25,7 @@ multiInt_ana_TMM_top_v2 <- function(seed.num = 999, threshold = 2000) {
   var.pool.add <- c(var.pool, "BMIxSEX")
   
   
-  ##------BMAseq------
+  ##------Expanded BMAseq------
   output.multi.int1.train <- BMAseq.multi.postprob.MSout.norm(
     dat.expr.counts = dat.expr.train, 
     dat.pheno = MS.default.train$dat.pheno.new,
