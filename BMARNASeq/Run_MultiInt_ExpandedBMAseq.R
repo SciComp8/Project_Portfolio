@@ -18,6 +18,11 @@ MS.default.train <- Modelspace(dat.pheno = dat.pheno.train,
                                max.nvar = 4, # Maximum number of main-effect variables 
                                interaction = "BMI&SEX")
 
+MS.default.test <- Modelspace(dat.pheno = dat.pheno.test, 
+                              var.pool = var.pool, 
+                              max.nvar = 4, 
+                              interaction = "BMI&SEX")
+
 multiInt_ana_TMM_top_v2 <- function(seed.num = 999, threshold = 2000) {
   
   ##------set variables of interest------
