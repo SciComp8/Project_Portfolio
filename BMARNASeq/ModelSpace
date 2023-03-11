@@ -1,80 +1,65 @@
 # Model space for the interaction analysis
-~1+BMI+SEX+BMIhigh.SEXmale
-~1+BMI+SEX+BMIhigh.SEXmale+AGE
-~1+BMI+SEX+BMIhigh.SEXmale+MHABNWBC
-~1+BMI+SEX+BMIhigh.SEXmale+AGE+MHABNWBC
-
-~1+BMIhigh.SEXmale+SEX
-~1+BMIhigh.SEXmale+SEX+AGE
-~1+BMIhigh.SEXmale+SEX+MHABNWBC
-~1+BMIhigh.SEXmale+SEX+AGE+MHABNWBC
-
-~1+BMIhigh.SEXmale+BMIhigh.SEXfemale.BMIlow.SEXmale
-~1+BMIhigh.SEXmale+BMIhigh.SEXfemale.BMIlow.SEXmale+AGE
-~1+BMIhigh.SEXmale+BMIhigh.SEXfemale.BMIlow.SEXmale+MHABNWBC
-~1+BMIhigh.SEXmale+BMIhigh.SEXfemale.BMIlow.SEXmale+AGE+MHABNWBC
-
-~1+BMIhigh.SEXmale+BMI
-~1+BMIhigh.SEXmale+BMI+AGE
-~1+BMIhigh.SEXmale+BMI+MHABNWBC
-~1+BMIhigh.SEXmale+BMI+AGE+MHABNWBC
-
-~1+BMIlow.SEXmale+BMI
-~1+BMIlow.SEXmale+BMI+AGE
-~1+BMIlow.SEXmale+BMI+MHABNWBC
-~1+BMIlow.SEXmale+BMI+AGE+MHABNWBC
-
-~1+BMIhigh.SEXfemale+BMIlow.SEXfemale.BMIhigh.SEXmale
-~1+BMIhigh.SEXfemale+BMIlow.SEXfemale.BMIhigh.SEXmale+AGE
-~1+BMIhigh.SEXfemale+BMIlow.SEXfemale.BMIhigh.SEXmale+MHABNWBC
-~1+BMIhigh.SEXfemale+BMIlow.SEXfemale.BMIhigh.SEXmale+AGE+MHABNWBC
-
-~1+BMIhigh.SEXfemale+SEX
-~1+BMIhigh.SEXfemale+SEX+AGE
-~1+BMIhigh.SEXfemale+SEX+MHABNWBC
-~1+BMIhigh.SEXfemale+SEX+AGE+MHABNWBC
-
-~1+SEX
-~1+SEX+AGE
-~1+SEX+MHABNWBC
-~1+SEX+AGE+MHABNWBC
-
-~1+BMIhigh.SEXmale
-~1+BMIhigh.SEXmale+AGE
-~1+BMIhigh.SEXmale+MHABNWBC
-~1+BMIhigh.SEXmale+AGE+MHABNWBC
-
-~1+BMI
-~1+BMI+AGE
-~1+BMI+MHABNWBC
-~1+BMI+AGE+MHABNWBC
-
-~1+BMIlow.SEXmale
-~1+BMIlow.SEXmale+AGE
-~1+BMIlow.SEXmale+MHABNWBC
-~1+BMIlow.SEXmale+AGE+MHABNWBC
-
-~1+BMIlow.SEXfemale.BMIhigh.SEXmale
-~1+BMIlow.SEXfemale.BMIhigh.SEXmale+AGE
-~1+BMIlow.SEXfemale.BMIhigh.SEXmale+MHABNWBC
-~1+BMIlow.SEXfemale.BMIhigh.SEXmale+AGE+MHABNWBC
-
-~1+BMIhigh.SEXfemale
-~1+BMIhigh.SEXfemale+AGE
-~1+BMIhigh.SEXfemale+MHABNWBC
-~1+BMIhigh.SEXfemale+AGE+MHABNWBC
-
-~1+BMIlow.SEXfemale
-~1+BMIlow.SEXfemale+AGE
-~1+BMIlow.SEXfemale+MHABNWBC
-~1+BMIlow.SEXfemale+AGE+MHABNWBC
-
-~1
-~1+AGE
-~1+MHABNWBC
-~1+AGE+MHABNWBC
-
-~1+BMI+SEX
-~1+BMI+SEX+AGE
-~1+BMI+SEX+MHABNWBC
-~1+BMI+SEX+AGE+MHABNWBC
+ [1] "~1"                                                                
+ [2] "~1+BMI"                                                            
+ [3] "~1+SEX"                                                            
+ [4] "~1+BMI+SEX"                                                        
+ [5] "~1+BMIlow.SEXfemale"                                               
+ [6] "~1+BMIlow.SEXmale"                                                 
+ [7] "~1+BMIhigh.SEXfemale"                                              
+ [8] "~1+BMIhigh.SEXmale"                                                
+ [9] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale"                               
+[10] "~1+BMI+BMIlow.SEXmale"                                             
+[11] "~1+SEX+BMIhigh.SEXfemale"                                          
+[12] "~1+BMI+BMIhigh.SEXmale"                                            
+[13] "~1+SEX+BMIhigh.SEXmale"                                            
+[14] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXfemale"             
+[15] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXmale"               
+[16] "~1+BMI+SEX+BMIhigh.SEXmale"                                        
+[17] "~1+AGE"                                                            
+[18] "~1+BMI+AGE"                                                        
+[19] "~1+SEX+AGE"                                                        
+[20] "~1+BMI+SEX+AGE"                                                    
+[21] "~1+BMIlow.SEXfemale+AGE"                                           
+[22] "~1+BMIlow.SEXmale+AGE"                                             
+[23] "~1+BMIhigh.SEXfemale+AGE"                                          
+[24] "~1+BMIhigh.SEXmale+AGE"                                            
+[25] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+AGE"                           
+[26] "~1+BMI+BMIlow.SEXmale+AGE"                                         
+[27] "~1+SEX+BMIhigh.SEXfemale+AGE"                                      
+[28] "~1+BMI+BMIhigh.SEXmale+AGE"                                        
+[29] "~1+SEX+BMIhigh.SEXmale+AGE"                                        
+[30] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXfemale+AGE"         
+[31] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXmale+AGE"           
+[32] "~1+BMI+SEX+BMIhigh.SEXmale+AGE"                                    
+[33] "~1+MHABNWBC"                                                       
+[34] "~1+BMI+MHABNWBC"                                                   
+[35] "~1+SEX+MHABNWBC"                                                   
+[36] "~1+BMI+SEX+MHABNWBC"                                               
+[37] "~1+BMIlow.SEXfemale+MHABNWBC"                                      
+[38] "~1+BMIlow.SEXmale+MHABNWBC"                                        
+[39] "~1+BMIhigh.SEXfemale+MHABNWBC"                                     
+[40] "~1+BMIhigh.SEXmale+MHABNWBC"                                       
+[41] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+MHABNWBC"                      
+[42] "~1+BMI+BMIlow.SEXmale+MHABNWBC"                                    
+[43] "~1+SEX+BMIhigh.SEXfemale+MHABNWBC"                                 
+[44] "~1+BMI+BMIhigh.SEXmale+MHABNWBC"                                   
+[45] "~1+SEX+BMIhigh.SEXmale+MHABNWBC"                                   
+[46] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXfemale+MHABNWBC"    
+[47] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXmale+MHABNWBC"      
+[48] "~1+BMI+SEX+BMIhigh.SEXmale+MHABNWBC"                               
+[49] "~1+AGE+MHABNWBC"                                                   
+[50] "~1+BMI+AGE+MHABNWBC"                                               
+[51] "~1+SEX+AGE+MHABNWBC"                                               
+[52] "~1+BMI+SEX+AGE+MHABNWBC"                                           
+[53] "~1+BMIlow.SEXfemale+AGE+MHABNWBC"                                  
+[54] "~1+BMIlow.SEXmale+AGE+MHABNWBC"                                    
+[55] "~1+BMIhigh.SEXfemale+AGE+MHABNWBC"                                 
+[56] "~1+BMIhigh.SEXmale+AGE+MHABNWBC"                                   
+[57] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+AGE+MHABNWBC"                  
+[58] "~1+BMI+BMIlow.SEXmale+AGE+MHABNWBC"                                
+[59] "~1+SEX+BMIhigh.SEXfemale+AGE+MHABNWBC"                             
+[60] "~1+BMI+BMIhigh.SEXmale+AGE+MHABNWBC"                               
+[61] "~1+SEX+BMIhigh.SEXmale+AGE+MHABNWBC"                               
+[62] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXfemale+AGE+MHABNWBC"
+[63] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXmale+AGE+MHABNWBC"  
+[64] "~1+BMI+SEX+BMIhigh.SEXmale+AGE+MHABNWBC"    
