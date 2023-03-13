@@ -38,9 +38,10 @@ The goal of this lipidomics and transcriptomics analysis is to test the hypothes
 ## **Statistical analysis for breast cancer surgery clinical data**
 **TNBC project** - This project aims to evaluate the incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. The incidence rates of local recurrence and new primary breast cancer are estimated in 1, 2, 3, 5, 10 years, separately, using the Kaplan-Meier approach. The cumulative incidence rates of local recurrence and new primary breast cancer with ER, PR, HER2 marker values are estimated in 1, 2, 3, 5, 10 years, separately, using the cumulative incidence function which considers the positive marker and the negative marker (e.g., ER positive vs ER negative) as competing risks. A by-product of this project is to construct a pipeline which predicts the subsequent breast cancer event in 5 years using the existing machine learning approaches (e.g., random forest).
 
-- [TNBC.Rmd](TNBC.Rmd)
-- [MachineLearningPipeline.py](MachineLearningPipeline.py)
-- [TNBC_StatisticalPlan.md](TNBC_StatisticalPlan.md)
+- [TNBC_v1.Rmd](TNBC/TNBC_v1.Rmd)
+- [TNBC_v2.Rmd](TNBC/TNBC_v2.Rmd)
+- [MachineLearningPipeline.py](TNBC/MachineLearningPipeline.py)
+- [TNBC_StatisticalPlan.md](TNBC/TNBC_StatisticalPlan.md)
 
 **Micrometastatic axillary nodal disease project** - In this project, most analytical work centers on the descriptive analysis, for example, estimate the number of patients undergoing completion axillary lymph node dissection (ALND), number of cases with additional positive nodes if completion ALND, and frequency of axillary recurrence stratified by whether ALND was performed and by whether radiation was delivered. The univariate survival analysis using the Cox-proportional hazards model is performed to interrogate the factors associated with the recurrence-free survival. Specially, recurrence-free survival time is defined as a composite endpoint which combines the time to recurrence, time to death, and time to last follow-up into a univariate time to the first event or censoring. 
 
