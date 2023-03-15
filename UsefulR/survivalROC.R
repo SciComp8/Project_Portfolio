@@ -3,7 +3,7 @@ library(survivalROC)
 library(tidyverse)
 dat0 <- read.csv("tumor_mutation_burden.csv")
 
-dat0$OS_YEARS <- dat0$OS_MONTHS/12
+dat0$OS_YEARS <- dat0$OS_MONTHS / 12
 
 dat0 <- dat0 |>
   mutate(OS_STATUS2 = ifelse(dat0$OS_STATUS == "1:DECEASED", 1, 0)) |>
