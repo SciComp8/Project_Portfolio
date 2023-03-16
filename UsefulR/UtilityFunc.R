@@ -9,3 +9,6 @@ mapply(c, geno_import[, seq(1, ncol(geno_import), 2)], geno_import[, seq(2, ncol
 
 # Check the arguments of a function
 args(mapply)
+
+# Calculate the Moore-Penrose generalized inverse of a matrix X
+ginv(t(x) %*% x)
