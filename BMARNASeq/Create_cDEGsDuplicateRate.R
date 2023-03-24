@@ -1,3 +1,11 @@
+# Definition of the metric:
+# The duplicate rate of a common differentially expressed gene associated with a variable is the occurrences of this common differentially expressed gene associated with a variable, 
+# which is identified by a particular model (e.g., multivariable BMAseq with interaction terms), among 10 random seed trials, divided by 10, within the particular ranking threshold (e.g., top 2000)
+
+# The overall duplicate rate of common differentially expressed genes associated with a variable is estimated by 
+# taking the median of duplicated rates of all common differentially expressed genes associated with a variable within the particular ranking threshold
+
+
 cDEGs = cDEGs.list = NULL
 threshold.vec <- seq(1000, 5000, 1000)
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
