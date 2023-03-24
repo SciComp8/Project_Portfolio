@@ -43,8 +43,7 @@ duplicate_rate_cDEGs_per_variable <- function(var.name = "BMI", method.name = "B
     # Create a matrix that shows the occurrence of each unique gene among the 10 random seed trials
     cDEGs.matrix <- matrix(0, nrow = length(cDEGs.unique), ncol = 10)
     rownames(cDEGs.matrix) <- cDEGs.unique
-    colnames(cDEGs.matrix) <- seed.vec
-    
+    colnames(cDEGs.matrix) <- seed.vec   
     for (i in 1:10) {
       cDEGs.i.seed <- cDEGs.list[[i]]
       for (j in 1:length(cDEGs.unique)) {
@@ -57,6 +56,7 @@ duplicate_rate_cDEGs_per_variable <- function(var.name = "BMI", method.name = "B
     Percent <- Sum/10
     cDEGs.matrix <- cbind(cDEGs.matrix, Sum, Percent) # Add two new columns to the matrix
     saveRDS(cDEGs.matrix, sprintf("../ApplicationData/derived/RandomSeed/DuplicatedRateMatrix/%sMultiInt%s_%s.RDS", method.name, var.name, threshold.i))
+    
     print(paste("Complete the duplicated rate matrix of cDEGs associated with", var.name, "identified by", method.name, "among 10 random seeds for the threshold", threshold.i))
     cDEGs = cDEGs.list =  NULL
   }
