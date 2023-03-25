@@ -1,0 +1,762 @@
+---
+title: "Reproducibilities of multivariable BMAseq and other single-model approaches with interaction terms"
+author: "Anni Liu"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: rmarkdown::html_vignette
+---
+
+```{r,echo=FALSE}
+knitr::opts_chunk$set(
+  # options(scipen = 999, digits = 3),
+  cache = TRUE,
+  error = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  tidy.opts = list(width.cutoff = 60),
+  fig.width = 8,
+  fig.height = 6
+)
+```
+
+We evaluate the capacities of multivariable BMAseq and other single-model approaches including DESeq2, edgeR, voom+limma+eBayes, and voom+limma with interaction terms on inferring the replicable differentially expressed genes, that is the common differentially expressed genes (cDEGs) between the training and test sets.
+
+# Attach libraries and functions
+```{r}
+easypackages::libraries("BMAseq", "limma", "qvalue", "parallel", "tidyverse", "edgeR", "DESeq2", "data.table") |> suppressPackageStartupMessages()
+walk(c("Bayesfactor.R"), source)
+```
+
+
+# Process data
+```{r}
+dat.expr <- dget("../ApplicationData/derived/dat.expr.Subcutaneous") 
+dat.pheno <- dget("../ApplicationData/derived/dat.pheno.Subcutaneous") 
+dim(dat.expr) # 24660 genes and 404 subjects
+dim(dat.pheno) # 404 subjects and 13 phenotypes
+dat.pheno[1:5, ]
+dat.expr[1:5, 1:5]
+paste0("The column names of gene expression data", ifelse(all(colnames(dat.expr) == rownames(dat.pheno)), " MATCH ", "NOT MATCH"), "the row names of phenotype data.")
+
+# Pre-filter the genes
+# Here we perform the median absolute deviation with the threshold of 0.8 to select genes that are most likely to distinguish the samples
+dat.expr.new <- dat.expr[apply(dat.expr, 1, function(x) mad(x) > 0.8), ] # We have 24455 genes
+
+seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+for (seed.i in seed.vec) {
+  test.ind <- sample(1:nrow(dat.pheno), ceiling(0.5*nrow(dat.pheno)))
+  dat.pheno.train <- dat.pheno[-test.ind, ]
+  dat.pheno.test <- dat.pheno[test.ind, ]
+  dat.expr.train <- dat.expr.new[, rownames(dat.pheno.train)]
+  dat.expr.test <- dat.expr.new[, rownames(dat.pheno.test)]
+    
+  print(paste0("The column names of training gene expression data", ifelse(all(colnames(dat.expr.train) == rownames(dat.pheno.train)), " MATCH ", "NOT MATCH"), "the row names of training phenotype data."))
+  print(paste0("The column names of test gene expression data", ifelse(all(colnames(dat.expr.test) == rownames(dat.pheno.test)), " MATCH ", "NOT MATCH"), "the row names of test phenotype data."))
+  
+  saveRDS(dat.expr.train, 
+          file = sprintf("../ApplicationData/derived/RandomSeed/dat.expr.train%s.RDS", seed.i))
+  saveRDS(dat.expr.train, 
+          file = sprintf("../ApplicationData/derived/RandomSeed/dat.expr.test%s.RDS", seed.i))
+  saveRDS(dat.expr.train, 
+          file = sprintf("../ApplicationData/derived/RandomSeed/dat.pheno.train%s.RDS", seed.i))
+  saveRDS(dat.expr.train, 
+          file = sprintf("../ApplicationData/derived/RandomSeed/dat.pheno.test%s.RDS", seed.i))
+}
+```
+
+
+# Modify BMAseq functions to be compatible with the trimmed-mean of M-values (TMM)
+```{r}
+BMAseq.multi.postprob.norm <- function(dat.expr.counts, dat.pheno, var.pool, max.nvar, interaction = NULL, cut.BF = 1) {
+
+
+    if (sum(colnames(dat.expr.counts) != rownames(dat.pheno)) > 0)
+        stop("Two datasets dat.expr.counts and dat.pheno must be matched by subjects.")
+    if (is.null(var.pool) || length(var.pool) < 2)
+        stop("Must provide at least two variables of interest.")
+    if (sum(var.pool %in% colnames(dat.pheno)) != length(var.pool))
+        stop("Variables of interest must be in datasets dat.pheno.")
+    if (is.null(max.nvar))
+        stop("Must provide max.nvar.")
+
+
+    n.var <- length(var.pool)
+    n.gene <- nrow(dat.expr.counts)
+
+
+    # estimate voom weights
+    y0 <- voom(counts = dat.expr.counts, 
+               lib.size = colSums(dat.expr.counts)*calcNormFactors(dat.expr.counts)) # ALiu: Use TMM normalization factor
+    input.dat.expr <- y0$E
+    input.weights <- y0$weights
+
+
+    # build model space
+    result.modelspace <- Modelspace(dat.pheno, var.pool, max.nvar, interaction = interaction)
+    input.model.space <- result.modelspace$model.space
+    input.dat.pheno <- result.modelspace$dat.pheno.new
+
+
+    # calculate Bayes factor
+    out.bf <- vapply(1:length(input.model.space), function(i) {
+        print(paste0(i, ". ", input.model.space[i]))
+        design <- model.matrix(formula(input.model.space[i]), data = input.dat.pheno)
+        colnames(design)[1] <- "Int"
+        vapply(1:n.gene, function(k) Bayesfactor(design, input.dat.expr[k, ], input.weights[k, ]), FUN.VALUE = as.double(1))
+    }, FUN.VALUE = as.double(1:n.gene))
+
+
+    # obtain prior model probability
+    bf.max <- t(apply(out.bf, 1, function(x) ifelse(x == max(x) & x > cut.BF, 1, 0)))
+    prior.modelprob <- apply(bf.max, 2, sum)/n.gene
+    pm.est <- prior.modelprob
+    n.model <- length(prior.modelprob)
+    pm.prior0 <- pm.prior1 <- rep(0.5/(n.model - 1), n.model - 1)
+    alpha <- 0.2
+    for (j in 1:30) {
+        pm.prior1 <- pm.est[-1]/apply(t(apply(out.bf[, -1], 1, function(x) x/(1 - sum(pm.prior0) + sum(x * pm.prior0)))), 2,
+            mean)
+        pm.prior0 <- pm.prior0 + (pm.prior1 - pm.prior0) * alpha
+    }
+    prior.modelprob <- c(1 - sum(pm.prior0), pm.prior0)
+
+
+    # calculate posterior model probability
+    post.modelprob <- t(apply(out.bf, 1, function(x) x * prior.modelprob/sum(x * prior.modelprob)))
+    rownames(post.modelprob) <- rownames(dat.expr.counts)
+    colnames(post.modelprob) <- input.model.space
+
+
+
+    return(list(dat.expr.logcpm = input.dat.expr, weights = input.weights, model.space = input.model.space, dat.pheno.new = input.dat.pheno,
+        post.modelprob = post.modelprob))
+}
+```
+
+
+# Create functions of building multivariable models with interaction terms
+```{r}
+multiInt_TMM_top <- function(seed.num = 999, threshold = 2000) {
+  
+  ##------set variables of interest------
+  var.pool <- c("BMI", "AGE", "SEX", "MHABNWBC")  
+  var.pool.add <- c(var.pool, "BMIxSEX")
+  
+  
+  ##------BMAseq------
+  output.multi.int1.train <- BMAseq.multi.postprob.norm(
+    dat.expr.counts = dat.expr.train,  
+    dat.pheno = dat.pheno.train, 
+    var.pool = var.pool, 
+    max.nvar = 4, 
+    interaction = "BMI&SEX", 
+    cut.BF = 1)
+  
+  output.multi.int2.train <- BMAseq.multi.DEG(
+    dat.pheno = output.multi.int1.train$dat.pheno.new,
+    model.space = output.multi.int1.train$model.space, 
+    post.modelprob = output.multi.int1.train$post.modelprob, 
+    var.pool = var.pool,
+    interact = T, 
+    cut.FDR = 0.05)
+  
+  output.multi.int1.test <- BMAseq.multi.postprob.norm(
+    dat.expr.counts = dat.expr.test, 
+    dat.pheno = dat.pheno.test, 
+    var.pool = var.pool, 
+    max.nvar = 4, 
+    interaction = "BMI&SEX", 
+    cut.BF = 1)
+  
+  output.multi.int2.test <- BMAseq.multi.DEG(
+    dat.pheno = output.multi.int1.test$dat.pheno.new,
+    model.space = output.multi.int1.test$model.space, 
+    post.modelprob = output.multi.int1.test$post.modelprob, 
+    var.pool = var.pool,
+    interact = T, 
+    cut.FDR = 0.05)
+  
+  BMAseq.eFDR.Main.train <- mclapply(1:length(var.pool),
+                                     function(i) output.multi.int2.train$eFDR.Main[, i][order(output.multi.int2.train$eFDR.Main[, i])[1:threshold]],
+                                     mc.cores = 4)
+  
+  BMAseq.eFDR.Main.test <- mclapply(1:length(var.pool),
+                                         function(i) output.multi.int2.test$eFDR.Main[, i][order(output.multi.int2.test$eFDR.Main[, i])[1:threshold]],
+                                         mc.cores = 4)
+  
+  names(BMAseq.eFDR.Main.train) = names(BMAseq.eFDR.Main.test) = var.pool
+  
+  BMAseq.eFDR.Interaction.train <- mclapply(1:length(var.pool),
+                                            function(i) output.multi.int2.train$eFDR.Interaction[, i][order(output.multi.int2.train$eFDR.Interaction[, i])[1:threshold]],
+                                            mc.cores = 4)
+  
+  BMAseq.eFDR.Interaction.test <- mclapply(1:length(var.pool),
+                                           function(i) output.multi.int2.test$eFDR.Interaction[, i][order(output.multi.int2.test$eFDR.Interaction[, i])[1:threshold]],
+                                           mc.cores = 4)
+  
+  names(BMAseq.eFDR.Interaction.train) = names(BMAseq.eFDR.Interaction.test) = var.pool
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, 
+       output.multi.int1.train, output.multi.int2.train, output.multi.int1.test, output.multi.int2.test, 
+       BMAseq.eFDR.Main.train, BMAseq.eFDR.Main.test, BMAseq.eFDR.Interaction.train, BMAseq.eFDR.Interaction.test, 
+       file = sprintf("../ApplicationData/derived/RandomSeed/Top%s/BMAseqMultiInt%s.RData", threshold, seed.num)) 
+  
+  
+  ##------voom + limma------
+  design.train <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.train)
+  design.test <- model.matrix(~BMI + AGE + SEX + MHABNWBC + BMI*SEX, data = dat.pheno.test)
+  
+  voom.train <- voom(counts = dat.expr.train,
+                     design = design.train,
+                     lib.size = colSums(dat.expr.train)*calcNormFactors(dat.expr.train)) 
+  
+  voom.fit.train <- lmFit(voom.train[["E"]],
+                          design = design.train,
+                          weights = voom.train[["weights"]])
+  
+  voom.eFDR.train <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                t <- voom.fit.train[["coefficients"]][, i + 1]/voom.fit.train[["stdev.unscaled"]][, i + 1]/voom.fit.train[["sigma"]]
+                                p <- 2*pt(-abs(t), df = voom.fit.train[["df.residual"]])
+                                return(qvalue(p)) },
+                              mc.cores = 4)
+  
+  voom.eFDR.train2 <- mclapply(1:length(var.pool.add),
+                               function(i) {
+                                 q.val <- voom.eFDR.train[[i]][["qvalues"]]
+                                 return(q.val[order(q.val)[1:threshold]])
+                               },
+                               mc.cores = 4)
+  
+  names(voom.eFDR.train) = names(voom.eFDR.train2) = var.pool.add 
+  
+  voom.test <- voom(counts = dat.expr.test,
+                    design = design.test,
+                    lib.size = colSums(dat.expr.test)*calcNormFactors(dat.expr.test))
+  
+  voom.fit.test <- lmFit(voom.test[["E"]],
+                         design = design.test,
+                         weights = voom.test[["weights"]])
+  
+  voom.eFDR.test <- mclapply(1:length(var.pool.add),
+                             function(i) {
+                               t <- voom.fit.test[["coefficients"]][, i + 1]/voom.fit.test[["stdev.unscaled"]][, i + 1]/voom.fit.test[["sigma"]]
+                               p <- 2*pt(-abs(t), df = voom.fit.test[["df.residual"]])
+                               return(qvalue(p)) },
+                             mc.cores = 4)
+  
+  voom.eFDR.test2 <- mclapply(1:length(var.pool.add),
+                              function(i) {
+                                q.val <- voom.eFDR.test[[i]][["qvalues"]]
+                                return(q.val[order(q.val)[1:threshold]])
+                              },
+                                mc.cores = 4)
+  
+  names(voom.eFDR.test) = names(voom.eFDR.test2) = var.pool.add 
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, 
+       design.train, design.test, voom.train, voom.fit.train, voom.eFDR.train, voom.eFDR.train2, 
+       voom.test, voom.fit.test, voom.eFDR.test, voom.eFDR.test2, 
+       file = sprintf("../ApplicationData/derived/RandomSeed/Top%s/VoomLimmaMultiInt%s.RData", threshold, seed.num))
+  
+  
+  ##------voom + limma + eBayes------
+  voom.train <- voom(counts = dat.expr.train,
+                     design = design.train,
+                     lib.size = colSums(dat.expr.train)*calcNormFactors(dat.expr.train))
+  
+  eBayes.fit.train <- lmFit(voom.train[["E"]],
+                            design = design.train,
+                            weights = voom.train[["weights"]]) %>% 
+    eBayes()
+  
+  eBayes.eFDR.train <- mclapply(1:length(var.pool.add),
+                                function(i) eBayes.fit.train[["p.value"]][, i + 1] %>% 
+                                  qvalue(),
+                                mc.cores = 4)
+  
+  eBayes.eFDR.train2 <- mclapply(1:length(var.pool.add),
+                                 function(i) {
+                                   q.val <- eBayes.eFDR.train[[i]][["qvalues"]]
+                                   return(q.val[order(q.val)[1:threshold]])
+                                 },
+                                 mc.cores = 4)
+  
+  names(eBayes.eFDR.train) = names(eBayes.eFDR.train2) = var.pool.add 
+  
+  voom.test <- voom(counts = dat.expr.test,
+                    design = design.test,
+                    lib.size = colSums(dat.expr.test)*calcNormFactors(dat.expr.test))
+  
+  eBayes.fit.test <- lmFit(voom.test[["E"]],
+                           design = design.test,
+                           weights = voom.test[["weights"]]) %>% 
+    eBayes()
+  
+  eBayes.eFDR.test <- mclapply(1:length(var.pool.add),
+                               function(i) eBayes.fit.test[["p.value"]][, i + 1] %>% 
+                                 qvalue(),
+                               mc.cores = 4)
+  
+  eBayes.eFDR.test2 <- mclapply(1:length(var.pool.add),
+                                function(i) {
+                                  q.val <- eBayes.eFDR.test[[i]][["qvalues"]]
+                                  return(q.val[order(q.val)[1:threshold]]) 
+                                },
+                                mc.cores = 4)
+  
+  names(eBayes.eFDR.test) = names(eBayes.eFDR.test2) = var.pool.add 
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, 
+       design.train, design.test, voom.train, eBayes.fit.train, eBayes.eFDR.train, eBayes.eFDR.train2, 
+       voom.test, eBayes.fit.test, eBayes.eFDR.test, eBayes.eFDR.test2, 
+       file = sprintf("../ApplicationData/derived/RandomSeed/Top%s/eBayesMultiInt%s.RData", threshold, seed.num))
+  
+  
+  ##------edgeR------
+  y.train <- DGEList(counts = dat.expr.train, 
+                     lib.size = colSums(dat.expr.train)) %>% 
+    calcNormFactors() %>% 
+    estimateGLMTrendedDisp(design.train)
+  
+  edgeR.fit.train <- glmQLFit(y.train, design.train)
+  
+  qlf.train <- mclapply(1:length(var.pool.add),
+                        function(i) glmQLFTest(edgeR.fit.train, coef = i + 1),
+                        mc.cores = 4)
+  
+  edgeR.eFDR.train <- mclapply(1:length(var.pool.add),
+                               function(i) qlf.train[[i]][["table"]][["PValue"]] %>%
+                                 qvalue(),
+                               mc.cores = 4)
+  
+  edgeR.eFDR.train2 <- mclapply(1:length(var.pool.add),
+                                function(i) {
+                                  q.val <- edgeR.eFDR.train[[i]][["qvalues"]]
+                                  return(q.val[order(q.val)[1:threshold]]) 
+                                },
+                                mc.cores = 4)
+  
+  edgeR.eFDR.GeneName.train <- mclapply(1:length(var.pool.add),
+                                        function(i) {
+                                          q.val <- edgeR.eFDR.train[[i]][["qvalues"]]
+                                          return(rownames(dat.expr.train)[order(q.val)[1:threshold]])
+                                        },
+                                        mc.cores = 4)
+  
+  names(qlf.train) = names(edgeR.eFDR.train) = names(edgeR.eFDR.train2) = names(edgeR.eFDR.GeneName.train) = var.pool.add 
+  
+  y.test <- DGEList(counts = dat.expr.test, 
+                    lib.size = colSums(dat.expr.test)) %>% 
+    calcNormFactors() %>% 
+    estimateGLMTrendedDisp(design.test)
+  
+  edgeR.fit.test <- glmQLFit(y.test, design.test)
+  
+  qlf.test <- mclapply(1:length(var.pool.add),
+                       function(i) glmQLFTest(edgeR.fit.test, coef = i + 1),
+                       mc.cores = 4)
+  
+  edgeR.eFDR.test <- mclapply(1:length(var.pool.add),
+                              function(i) qlf.test[[i]][["table"]][["PValue"]] %>% 
+                                qvalue(),
+                              mc.cores = 4)
+  
+  edgeR.eFDR.test2 <- mclapply(1:length(var.pool.add),
+                               function(i) {
+                                 q.val <- edgeR.eFDR.test[[i]][["qvalues"]]
+                                 return(q.val[order(q.val)[1:threshold]]) 
+                               },
+                               mc.cores = 4)
+  
+  edgeR.eFDR.GeneName.test <- mclapply(1:length(var.pool.add),
+                                       function(i) {
+                                         q.val <- edgeR.eFDR.test[[i]][["qvalues"]]
+                                         return(rownames(dat.expr.test)[order(q.val)[1:threshold]])
+                                       },
+                                       mc.cores = 4)
+  
+  names(qlf.test) = names(edgeR.eFDR.test) = names(edgeR.eFDR.test2) = names(edgeR.eFDR.GeneName.test) = var.pool.add 
+  
+  save(dat.expr.train, dat.expr.test, dat.pheno.train, dat.pheno.test, var.pool, var.pool.add, design.train, design.test, 
+       y.train, edgeR.fit.train, edgeR.eFDR.train, edgeR.eFDR.train2, edgeR.eFDR.GeneName.train, 
+       y.test, edgeR.fit.test, edgeR.eFDR.test, edgeR.eFDR.test2, edgeR.eFDR.GeneName.test, 
+       file = sprintf("../ApplicationData/derived/RandomSeed/Top%s/edgeRMultiInt%s.RData", threshold, seed.num))
+  
+  
+  ##------DESeq2------
+  cts.train <- as.matrix(dat.expr.train)
+  cts.test <- as.matrix(dat.expr.test)
+  coldata.train <- dat.pheno.train
+  coldata.test <- dat.pheno.test
+  
+  name.formula <- c("BMI_high_vs_low", "AGE_old_vs_young", "SEX_male_vs_female", 
+                    "MHABNWBC_yes_vs_no", "BMIhigh.SEXmale")  
+  
+  lib.size <- colSums(cts.train)
+  norm.factor <- calcNormFactors(cts.train, method = "TMM")
+  size.factor <- lib.size*norm.factor/exp(mean(log(lib.size*norm.factor))) 
+  
+  dds <- DESeqDataSetFromMatrix(countData = cts.train, 
+                                colData = coldata.train, 
+                                design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+  sizeFactors(dds) <- size.factor
+  
+  res.train <- mclapply(1:length(var.pool.add), 
+                        function(i) {
+                          return(results(DESeq(dds), name = name.formula[i])) },
+                        mc.cores = 4)
+  
+  DESeq2.eFDR.train <- mclapply(1:length(var.pool.add),
+                                function(i) qvalue(res.train[[i]][["pvalue"]])$qvalues,
+                                mc.cores = 4)
+  
+  DESeq2.eFDR.train2 <- mclapply(1:length(var.pool.add),
+                                 function(i) {
+                                   q.val <- DESeq2.eFDR.train[[i]]
+                                   return(q.val[order(q.val)[1:threshold]])
+                                 },
+                                 mc.cores = 4)
+  
+  DESeq2.eFDR.GeneName.train <- mclapply(1:length(var.pool.add),
+                                         function(i) {
+                                           q.val <- DESeq2.eFDR.train[[i]]
+                                           return(rownames(cts.train)[order(q.val)[1:threshold]])
+                                         },
+                                         mc.cores = 4)
+  
+  names(res.train) = names(DESeq2.eFDR.train) = names(DESeq2.eFDR.train2) = names(DESeq2.eFDR.GeneName.train) = var.pool.add 
+  
+  lib.size <- colSums(cts.test)
+  norm.factor <- calcNormFactors(cts.test, method = "TMM")
+  size.factor <- lib.size*norm.factor/exp(mean(log(lib.size*norm.factor))) 
+  
+  dds <- DESeqDataSetFromMatrix(countData = cts.test, 
+                                colData = coldata.test, 
+                                design = ~BMI + AGE + SEX + MHABNWBC + BMI*SEX)
+  sizeFactors(dds) <- size.factor
+  
+  res.test <- mclapply(1:length(var.pool.add), 
+                       function(i) {
+                         return(results(DESeq(dds), name = name.formula[i])) }, 
+                       mc.cores = 4)
+  
+  DESeq2.eFDR.test <- mclapply(1:length(var.pool.add),
+                               function(i) qvalue(res.test[[i]][["pvalue"]])$qvalues,
+                               mc.cores = 4)
+  
+  DESeq2.eFDR.test2 <- mclapply(1:length(var.pool.add),
+                                function(i) {
+                                  q.val <- DESeq2.eFDR.test[[i]]
+                                  return(q.val[order(q.val)[1:threshold]])
+                                },
+                                mc.cores = 4)
+  
+  DESeq2.eFDR.GeneName.test <- mclapply(1:length(var.pool.add),
+                                        function(i) {
+                                          q.val <- DESeq2.eFDR.test[[i]]
+                                          return(rownames(cts.test)[order(q.val)[1:threshold]])
+                                        },
+                                        mc.cores = 4)
+  
+  names(res.test) = names(DESeq2.eFDR.test) = names(DESeq2.eFDR.test2) = names(DESeq2.eFDR.GeneName.test) = var.pool.add
+  
+  save(cts.train, cts.test, coldata.train, coldata.test, var.pool, var.pool.add, 
+       res.train, DESeq2.eFDR.train, DESeq2.eFDR.train2, DESeq2.eFDR.GeneName.train, 
+       res.test, DESeq2.eFDR.test, DESeq2.eFDR.test2, DESeq2.eFDR.GeneName.test, 
+       file = sprintf("../ApplicationData/derived/RandomSeed/Top%s/DESeq2MultiInt%s.RData", threshold, seed.num))
+}
+```
+
+
+# Run and save modeling results
+```{r}
+threshold.i <- 5000
+seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+for (seed.i in seed.vec) {
+  dat.expr.train <- readRDS(file = sprintf("../ApplicationData/derived/RandomSeed/dat.expr.train%s.RDS", seed.i))
+  dat.expr.test <- readRDS(file = sprintf("../ApplicationData/derived/RandomSeed/dat.expr.test%s.RDS", seed.i))
+  dat.pheno.train <- readRDS(file = sprintf("../ApplicationData/derived/RandomSeed/dat.pheno.train%s.RDS", seed.i))
+  dat.pheno.test <- readRDS(file = sprintf("../ApplicationData/derived/RandomSeed/dat.pheno.test%s.RDS", seed.i))
+  multiInt_TMM_top(seed.num = seed.i, threshold = threshold.i)
+}
+```
+
+
+# Create functions to generate data for making boxplots of number of cDEGs and rate of cDEGs, respectively
+```{r}
+##------Number of cDEGs------
+boxplot_data <- function (threshold = 1000, random.seed = 8809678) {
+  data.table(threshold=rep(threshold,5), 
+             random.seed=random.seed,
+             method=c("BMAseq","DESeq2","edgeR","eBayes","voom.limma"),
+             variable=rep(c("BMI","AGE","SEX","WBC","BMIxSEX"),each=5),
+             num.cDEGs=c(
+               intersect(names(BMAseq.eFDR.Main.train$BMI[1:threshold]), names(BMAseq.eFDR.Main.test$BMI[1:threshold])) |> length(),
+               intersect(DESeq2.eFDR.GeneName.train$BMI[1:threshold], DESeq2.eFDR.GeneName.test$BMI[1:threshold]) |> length(),
+               intersect(edgeR.eFDR.GeneName.train$BMI[1:threshold], edgeR.eFDR.GeneName.test$BMI[1:threshold]) |> length(),
+               intersect(names(eBayes.eFDR.train2$BMI[1:threshold]), names(eBayes.eFDR.test2$BMI[1:threshold])) |> length(),
+               intersect(names(voom.eFDR.train2$BMI[1:threshold]), names(voom.eFDR.test2$BMI[1:threshold])) |> length(),
+               
+               intersect(names(BMAseq.eFDR.Main.train$AGE[1:threshold]), names(BMAseq.eFDR.Main.test$AGE[1:threshold])) |> length(),
+               intersect(DESeq2.eFDR.GeneName.train$AGE[1:threshold], DESeq2.eFDR.GeneName.test$AGE[1:threshold]) |> length(),
+               intersect(edgeR.eFDR.GeneName.train$AGE[1:threshold], edgeR.eFDR.GeneName.test$AGE[1:threshold]) |> length(),
+               intersect(names(eBayes.eFDR.train2$AGE[1:threshold]), names(eBayes.eFDR.test2$AGE[1:threshold])) |> length(),
+               intersect(names(voom.eFDR.train2$AGE[1:threshold]), names(voom.eFDR.test2$AGE[1:threshold])) |> length(),
+               
+               intersect(names(BMAseq.eFDR.Main.train$SEX[1:threshold]), names(BMAseq.eFDR.Main.test$SEX[1:threshold])) |> length(),
+               intersect(DESeq2.eFDR.GeneName.train$SEX[1:threshold], DESeq2.eFDR.GeneName.test$SEX[1:threshold]) |> length(),
+               intersect(edgeR.eFDR.GeneName.train$SEX[1:threshold], edgeR.eFDR.GeneName.test$SEX[1:threshold]) |> length(),
+               intersect(names(eBayes.eFDR.train2$SEX[1:threshold]), names(eBayes.eFDR.test2$SEX[1:threshold])) |> length(),
+               intersect(names(voom.eFDR.train2$SEX[1:threshold]), names(voom.eFDR.test2$SEX[1:threshold])) |> length(),
+               
+               intersect(names(BMAseq.eFDR.Main.train$MHABNWBC[1:threshold]), names(BMAseq.eFDR.Main.test$MHABNWBC[1:threshold])) |> length(),
+               intersect(DESeq2.eFDR.GeneName.train$MHABNWBC[1:threshold], DESeq2.eFDR.GeneName.test$MHABNWBC[1:threshold]) |> length(),
+               intersect(edgeR.eFDR.GeneName.train$MHABNWBC[1:threshold], edgeR.eFDR.GeneName.test$MHABNWBC[1:threshold]) |> length(),
+               intersect(names(eBayes.eFDR.train2$MHABNWBC[1:threshold]), names(eBayes.eFDR.test2$MHABNWBC[1:threshold])) |> length(),
+               intersect(names(voom.eFDR.train2$MHABNWBC[1:threshold]), names(voom.eFDR.test2$MHABNWBC[1:threshold])) |> length(),
+               
+               intersect(names(BMAseq.eFDR.Interaction.train$BMI[1:threshold]), names(BMAseq.eFDR.Interaction.test$BMI[1:threshold])) |> length(),
+               intersect(DESeq2.eFDR.GeneName.train$BMIxSEX[1:threshold], DESeq2.eFDR.GeneName.test$BMIxSEX[1:threshold]) |> length(),
+               intersect(edgeR.eFDR.GeneName.train$BMIxSEX[1:threshold], edgeR.eFDR.GeneName.test$BMIxSEX[1:threshold]) |> length(),
+               intersect(names(eBayes.eFDR.train2$BMIxSEX[1:threshold]), names(eBayes.eFDR.test2$BMIxSEX[1:threshold])) |> length(),
+               intersect(names(voom.eFDR.train2$BMIxSEX[1:threshold]), names(voom.eFDR.test2$BMIxSEX[1:threshold])) |> length()))
+}
+
+
+##------Rate of cDEGs------
+boxplot_data2 <- function (threshold = 1000, random.seed = 8809678) {
+  data.table(threshold=rep(threshold,5), 
+             random.seed=random.seed,
+             method=c("BMAseq","DESeq2","edgeR","eBayes","voom.limma"),
+             variable=rep(c("BMI","AGE","SEX","WBC","BMIxSEX"),each=5),
+             rate.cDEGs=c(
+               intersect(names(BMAseq.eFDR.Main.train$BMI[1:threshold]), names(BMAseq.eFDR.Main.test$BMI[1:threshold])) |> length() / threshold,
+               intersect(DESeq2.eFDR.GeneName.train$BMI[1:threshold], DESeq2.eFDR.GeneName.test$BMI[1:threshold]) |> length() / threshold,
+               intersect(edgeR.eFDR.GeneName.train$BMI[1:threshold], edgeR.eFDR.GeneName.test$BMI[1:threshold]) |> length() / threshold,
+               intersect(names(eBayes.eFDR.train2$BMI[1:threshold]), names(eBayes.eFDR.test2$BMI[1:threshold])) |> length() / threshold,
+               intersect(names(voom.eFDR.train2$BMI[1:threshold]), names(voom.eFDR.test2$BMI[1:threshold])) |> length() / threshold,
+               
+               intersect(names(BMAseq.eFDR.Main.train$AGE[1:threshold]), names(BMAseq.eFDR.Main.test$AGE[1:threshold])) |> length() / threshold,
+               intersect(DESeq2.eFDR.GeneName.train$AGE[1:threshold], DESeq2.eFDR.GeneName.test$AGE[1:threshold]) |> length() / threshold,
+               intersect(edgeR.eFDR.GeneName.train$AGE[1:threshold], edgeR.eFDR.GeneName.test$AGE[1:threshold]) |> length() / threshold,
+               intersect(names(eBayes.eFDR.train2$AGE[1:threshold]), names(eBayes.eFDR.test2$AGE[1:threshold])) |> length() / threshold,
+               intersect(names(voom.eFDR.train2$AGE[1:threshold]), names(voom.eFDR.test2$AGE[1:threshold])) |> length() / threshold,
+               
+               intersect(names(BMAseq.eFDR.Main.train$SEX[1:threshold]), names(BMAseq.eFDR.Main.test$SEX[1:threshold])) |> length() / threshold,
+               intersect(DESeq2.eFDR.GeneName.train$SEX[1:threshold], DESeq2.eFDR.GeneName.test$SEX[1:threshold]) |> length() / threshold,
+               intersect(edgeR.eFDR.GeneName.train$SEX[1:threshold], edgeR.eFDR.GeneName.test$SEX[1:threshold]) |> length() / threshold,
+               intersect(names(eBayes.eFDR.train2$SEX[1:threshold]), names(eBayes.eFDR.test2$SEX[1:threshold])) |> length() / threshold,
+               intersect(names(voom.eFDR.train2$SEX[1:threshold]), names(voom.eFDR.test2$SEX[1:threshold])) |> length() / threshold,
+               
+               intersect(names(BMAseq.eFDR.Main.train$MHABNWBC[1:threshold]), names(BMAseq.eFDR.Main.test$MHABNWBC[1:threshold])) |> length() / threshold,
+               intersect(DESeq2.eFDR.GeneName.train$MHABNWBC[1:threshold], DESeq2.eFDR.GeneName.test$MHABNWBC[1:threshold]) |> length() / threshold,
+               intersect(edgeR.eFDR.GeneName.train$MHABNWBC[1:threshold], edgeR.eFDR.GeneName.test$MHABNWBC[1:threshold]) |> length() / threshold,
+               intersect(names(eBayes.eFDR.train2$MHABNWBC[1:threshold]), names(eBayes.eFDR.test2$MHABNWBC[1:threshold])) |> length() / threshold,
+               intersect(names(voom.eFDR.train2$MHABNWBC[1:threshold]), names(voom.eFDR.test2$MHABNWBC[1:threshold])) |> length() / threshold,
+               
+               intersect(names(BMAseq.eFDR.Interaction.train$BMI[1:threshold]), names(BMAseq.eFDR.Interaction.test$BMI[1:threshold])) |> length() / threshold,
+               intersect(DESeq2.eFDR.GeneName.train$BMIxSEX[1:threshold], DESeq2.eFDR.GeneName.test$BMIxSEX[1:threshold]) |> length() / threshold,
+               intersect(edgeR.eFDR.GeneName.train$BMIxSEX[1:threshold], edgeR.eFDR.GeneName.test$BMIxSEX[1:threshold]) |> length() / threshold,
+               intersect(names(eBayes.eFDR.train2$BMIxSEX[1:threshold]), names(eBayes.eFDR.test2$BMIxSEX[1:threshold])) |> length() / threshold,
+               intersect(names(voom.eFDR.train2$BMIxSEX[1:threshold]), names(voom.eFDR.test2$BMIxSEX[1:threshold])) |> length() / threshold))
+}
+```
+
+
+# Organize data for boxplotting
+```{r}
+##------Number of cDEGs------
+threshold.vec <- seq(1000, 5000, 1000)
+seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+boxplot.data.new <- NULL
+for (threshold.i in threshold.vec) {
+  for (seed.i in seed.vec) {
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/BMAseqMultiInt%s.RData", seed.i))
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/DESeq2MultiInt%s.RData", seed.i))
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/edgeRMultiInt%s.RData", seed.i))
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/eBayesMultiInt%s.RData", seed.i))
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/VoomLimmaMultiInt%s.RData", seed.i))
+    boxplot.data.new <- rbind(boxplot.data.new, boxplot_data(threshold.i, seed.i))
+  }
+}
+
+
+##------Rate of cDEGs------
+threshold.vec <- seq(1000, 5000, 1000)
+seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+boxplot.data.new2 <- NULL
+for (threshold.i in threshold.vec) {
+  for (seed.i in seed.vec) {
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/BMAseqMultiInt%s.RData", seed.i))
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/DESeq2MultiInt%s.RData", seed.i))
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/edgeRMultiInt%s.RData", seed.i))
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/eBayesMultiInt%s.RData", seed.i))
+    load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/VoomLimmaMultiInt%s.RData", seed.i))
+    boxplot.data.new2 <- rbind(boxplot.data.new2, boxplot_data2(threshold.i, seed.i))
+  }
+}
+```
+
+
+# Make and save boxplots
+```{r}
+##------Number of cDEGs------
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+var.vec <- c("BMI", "AGE", "SEX", "WBC", "BMIxSEX")
+
+for (var.i in var.vec) {
+  g <- boxplot.data.new[variable==var.i] |>
+    ggplot(aes(y = num.cDEGs, x = method, group = method, fill = method)) + 
+    geom_boxplot() + 
+    stat_summary(fun = median, geom = "line", aes(group = 1), color = "#0073C2FF") +  
+    facet_wrap(vars(threshold)) + 
+    labs(y = "Number of common differentially expressed genes", x = "Method") + 
+    theme_bw() + 
+    theme(legend.position = "none",
+          axis.text.x = element_text(size = 9, angle = 90, hjust = 1, color = "black", vjust = 0.5))
+    ggsave(filename = sprintf("../ApplicationResult/Multi_Interaction/RandomSeed/numcDEGs/Boxplot/%s_%s.png", date.analysis, var.i),
+           plot = g, device = "png", width = 9, height = 6, units = "in")
+}
+
+
+##------Rate of cDEGs------
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+var.vec <- c("BMI", "AGE", "SEX", "WBC", "BMIxSEX")
+
+for (var.i in var.vec) {
+  g <- boxplot.data.new2[variable==var.i] |>
+    ggplot(aes(y = rate.cDEGs, x = method, group = method, fill = method)) + 
+    geom_boxplot() + 
+    stat_summary(fun = median, geom = "line", aes(group = 1), color = "#0073C2FF") +  
+    facet_wrap(vars(threshold)) + 
+    labs(y = "Rate of common differentially expressed genes", x = "Method") + 
+    theme_bw() + 
+    theme(legend.position = "none",
+          axis.text.x = element_text(size = 9, angle = 90, hjust = 1, color = "black", vjust = 0.5))
+    ggsave(filename = sprintf("../ApplicationResult/Multi_Interaction/RandomSeed/ratecDEGs/Boxplot/%s_%s.png", date.analysis, var.i),
+           plot = g, device = "png", width = 9, height = 6, units = "in")
+}
+```
+
+
+# Estimate the duplicate rate of a common differentially expressed gene associated with a variable
+The duplicate rate of a common differentially expressed gene associated with a variable is the occurrences of this common differentially expressed gene associated with a variable, which is identified by a particular model (e.g., multivariable BMAseq with interaction terms), among 10 random seed trials, divided by 10, within the particular ranking threshold (e.g., top 2000)
+```{r}
+cDEGs = cDEGs.list = NULL
+threshold.vec <- seq(1000, 5000, 1000)
+seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+
+duplicate_rate_cDEGs_per_variable <- function(var.name = "BMI", method.name = "BMAseq") {
+  for (threshold.i in threshold.vec) {
+    for (seed.i in seed.vec) {
+      if (method.name == "BMAseq" & var.name != "BMIxSEX") {
+        load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
+        cDEGs <- c(intersect(names(get(sprintf("%s.eFDR.Main.train", method.name))[[var.name]][1:threshold.i]), 
+                             names(get(sprintf("%s.eFDR.Main.test", method.name))[[var.name]][1:threshold.i])))
+        } else if (method.name == "BMAseq" & var.name == "BMIxSEX") {
+        load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
+        var.name2 <- "BMI"
+        cDEGs <- c(intersect(names(get(sprintf("%s.eFDR.Interaction.train", method.name))[[var.name2]][1:threshold.i]), 
+                             names(get(sprintf("%s.eFDR.Interaction.test", method.name))[[var.name2]][1:threshold.i])))
+      } else if (method.name %in% c("DESeq2", "edgeR")) {
+        load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
+        cDEGs <- c(intersect(get(sprintf("%s.eFDR.GeneName.train", method.name))[[var.name]][1:threshold.i], 
+                             get(sprintf("%s.eFDR.GeneName.test", method.name))[[var.name]][1:threshold.i]))
+      } else if (method.name == "VoomLimma") {
+        load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
+        method.name2 <- "voom"
+        cDEGs <- c(intersect(names(get(sprintf("%s.eFDR.train2", method.name2))[[var.name]][1:threshold.i]), 
+                             names(get(sprintf("%s.eFDR.test2", method.name2))[[var.name]][1:threshold.i])))
+      } else {
+        load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/%sMultiInt%s.RData", method.name, seed.i))
+        cDEGs <- c(intersect(names(get(sprintf("%s.eFDR.train2", method.name))[[var.name]][1:threshold.i]), 
+                             names(get(sprintf("%s.eFDR.test2", method.name))[[var.name]][1:threshold.i])))
+      }
+      cDEGs.list <- append(cDEGs.list, list(cDEGs))
+    }
+    cDEGs.unique <- unique(unlist(cDEGs.list))
+    
+    # Create a matrix that shows the occurrence of each unique gene among the 10 random seed trials
+    cDEGs.matrix <- matrix(0, nrow = length(cDEGs.unique), ncol = 10)
+    rownames(cDEGs.matrix) <- cDEGs.unique
+    colnames(cDEGs.matrix) <- seed.vec   
+    for (i in 1:10) {
+      cDEGs.i.seed <- cDEGs.list[[i]]
+      for (j in 1:length(cDEGs.unique)) {
+        if (cDEGs.unique[j] %in% cDEGs.i.seed) {
+          cDEGs.matrix[j, i] <- 1
+        }
+      }
+    }
+    Sum <- apply(cDEGs.matrix, 1, sum)
+    Percent <- Sum/10
+    cDEGs.matrix <- cbind(cDEGs.matrix, Sum, Percent) # Add two new columns to the matrix
+    saveRDS(cDEGs.matrix, sprintf("../ApplicationData/derived/RandomSeed/DuplicatedRateMatrix/%sMultiInt%s_%s.RDS", method.name, var.name, threshold.i))
+    
+    print(paste("Complete the duplicated rate matrix of cDEGs associated with", var.name, "identified by", method.name, "among 10 random seeds for the threshold", threshold.i))
+    cDEGs = cDEGs.list =  NULL
+  }
+}
+
+mapply(duplicate_rate_cDEGs_per_variable,
+       rep(c("BMI", "AGE","SEX","MHABNWBC","BMIxSEX"), each = 5), 
+       rep(c("BMAseq", "DESeq2", "edgeR", "eBayes", "VoomLimma"), times = 5))
+```
+
+
+# Prepare and organize the data for boxplots
+```{r}
+boxplot_duplicate_rate_data <- function (var.name = NULL, method.name = NULL, threshold = NULL) {
+  load.data <- readRDS(sprintf("../ApplicationData/derived/RandomSeed/DuplicatedRateMatrix/%sMultiInt%s_%s.RDS", method.name, var.name, threshold))
+  temp.data <- data.table(threshold=threshold, 
+                          method=method.name,
+                          variable=var.name,
+                          cDEGs.duplicate.rate.median=median(load.data[,12]),
+                          cDEGs.duplicate.rate.mean=mean(load.data[,12]))
+  return(temp.data)
+}
+
+organized_duplicate_rate_data <- mapply(boxplot_duplicate_rate_data,
+                                        var.name = rep(c("BMI", "AGE","SEX", "MHABNWBC", "BMIxSEX"), each = 25), 
+                                        method.name = rep(rep(c("BMAseq", "DESeq2", "edgeR", "eBayes", "VoomLimma"), each = 5), times = 5),
+                                        threshold = rep(rep(seq(1000, 5000, 1000), times = 5), times = 5)) |> t()
+rownames(organized_duplicate_rate_data) <- NULL
+organized_duplicate_rate_data <- apply(organized_duplicate_rate_data, 2, unlist)
+organized_duplicate_rate_data <- as.data.table(organized_duplicate_rate_data)
+```
+
+
+# Make and save boxplots
+```{r}
+organized_duplicate_rate_data[,variable:=factor(variable,levels=c("BMI", "AGE","SEX", "MHABNWBC", "BMIxSEX"))]
+organized_duplicate_rate_data[,cDEGs.duplicate.rate.median:=as.numeric(cDEGs.duplicate.rate.median)]
+organized_duplicate_rate_data[,cDEGs.duplicate.rate.mean:=as.numeric(cDEGs.duplicate.rate.mean)]
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+g1 <- organized_duplicate_rate_data |>
+  ggplot(mapping = aes(y = cDEGs.duplicate.rate.median, x = method, group = method)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(aes(color = method)) + 
+  facet_wrap(vars(variable)) + 
+  scale_y_continuous(labels = scales::label_number(accuracy = 0.01),
+                     breaks = seq(0, 1, 0.1)) + 
+  labs(y = "Median duplicate rate of cDEGs", x = "Method") + 
+  theme_bw() + 
+  theme(legend.position = "none",
+        axis.text.x = element_text(size = 9, angle = 90, hjust = 1, color = "black", vjust = 0.5))
+ggsave(filename = sprintf("../ApplicationResult/Multi_Interaction/RandomSeed/DuplicatedRateMatrix/Boxplot/%s_median.png", date.analysis),
+       plot = g1, device = "png", width = 9, height = 6, units = "in")
+
+g2 <- organized_duplicate_rate_data |>
+  ggplot(mapping = aes(y = cDEGs.duplicate.rate.mean, x = method, group = method)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(aes(color = method)) + 
+  facet_wrap(vars(variable)) + 
+  scale_y_continuous(labels = scales::label_number(accuracy = 0.01),
+                     breaks = seq(0, 1, 0.1)) + 
+  labs(y = "Mean duplicate rate of cDEGs", x = "Method") + 
+  theme_bw() + 
+  theme(legend.position = "none",
+        axis.text.x = element_text(size = 9, angle = 90, hjust = 1, color = "black", vjust = 0.5))
+ggsave(filename = sprintf("../ApplicationResult/Multi_Interaction/RandomSeed/DuplicatedRateMatrix/Boxplot/%s_mean.png", date.analysis),
+       plot = g2, device = "png", width = 9, height = 6, units = "in")
+```
