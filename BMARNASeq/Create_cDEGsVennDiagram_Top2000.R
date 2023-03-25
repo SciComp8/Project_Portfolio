@@ -6,8 +6,8 @@ var.vec <- c("BMI", "AGE","SEX", "MHABNWBC", "BMIxSEX")
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 make_vennplot <-function(var.name = NULL, threshold = NULL) {
   if (var.name == "BMIxSEX") {
-    var.name <- "BMI"
-    BMAseq.cDEGs <- intersect(names(BMAseq.eFDR.Interaction.train[[var.name]][1:threshold]), names(BMAseq.eFDR.Interaction.test[[var.name]][1:threshold]))
+    var.name2 <- "BMI"
+    BMAseq.cDEGs <- intersect(names(BMAseq.eFDR.Interaction.train[[var.name2]][1:threshold]), names(BMAseq.eFDR.Interaction.test[[var.name2]][1:threshold]))
   } else {
     BMAseq.cDEGs <- intersect(names(BMAseq.eFDR.Main.train[[var.name]][1:threshold]), names(BMAseq.eFDR.Main.test[[var.name]][1:threshold]))
   }
