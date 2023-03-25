@@ -16,11 +16,8 @@ This is a compiled list of my programming work affiliated with collaborative and
 The goal of this project is to evaluate the performance  of our novel `BMAseq` and other three existing computational biology approaches: `DESeq2`, `edgeR`, `voom + limma + eBayes`, and `voom + limma` on identifying differentially expressed genes in the setting of univariable, multivaribles, and multivaribles coupled with interaction terms. All subjects are randomly divided into 50% training set and 50% test set. Each method of BMAseq,  voom + limma, edgeR, and DESeq2 is applied to construct the univariate, multivariate, multivariate with interaction models for the six phenotypes: BMI, AGE, SEX, MHABNWBC, MHARTHTS, and MHCVD. The approach-specific Venn diagram panel is plotted to intuitively reveal the absolute number and relative proportion of common differentially expressed genes (cDEGs) associated with each variable between the training and test set. The distribution of cDEGs associated with each variable is compared across five approaches.
 
 - [AnalysisPipeline.Rmd](BMARNASeq/AnalysisPipeline.Rmd)
-- [UniBMA_voom_limma_edgeR_DESeq2.Rmd](BMARNASeq/UniBMA_voom_limma_edgeR_DESeq2.Rmd)
 - [UniBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](BMARNASeq/UniBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
-- [MultiBMA_voom_limma_edgeR_DESeq2.Rmd](BMARNASeq/MultiBMA_voom_limma_edgeR_DESeq2.Rmd)
 - [MultiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](BMARNASeq/MultiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
-- [Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd](BMARNASeq/Interaction_multiBMA_voom_limma_edgeR_DESeq2.Rmd)
 - [Interaction_multiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](BMARNASeq/Interaction_multiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
 - [GenerateCheck_TrainingTestData.Rmd](BMARNASeq/GenerateCheck_TrainingTestData.Rmd)
   
