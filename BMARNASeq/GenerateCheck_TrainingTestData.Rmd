@@ -1548,7 +1548,7 @@ ggsave(filename = paste0("../ApplicationResult/Multi_Interaction/RandomSeed/TMM_
 ```
 
 
-# Venn digram
+# Venn diagram
 ## Seed: 2390 
 ```{r}
 load("../ApplicationData/derived/RandomSeed/BMAseqMultiInt2390.RData")
