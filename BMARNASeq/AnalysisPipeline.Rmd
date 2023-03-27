@@ -43,22 +43,36 @@ dat.expr.new <- dat.expr[apply(dat.expr, 1, function(x) mad(x) > 0.8), ] # We ha
 
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
 for (seed.i in seed.vec) {
+  
+  # Divide the gene expression data and phenotype data into the 50% training set and 50% test set 
   test.ind <- sample(1:nrow(dat.pheno), ceiling(0.5*nrow(dat.pheno)))
   dat.pheno.train <- dat.pheno[-test.ind, ]
   dat.pheno.test <- dat.pheno[test.ind, ]
   dat.expr.train <- dat.expr.new[, rownames(dat.pheno.train)]
   dat.expr.test <- dat.expr.new[, rownames(dat.pheno.test)]
-    
+  
+  # Check if the gene expression data matches the phenotype data  
   print(paste0("The column names of training gene expression data", ifelse(all(colnames(dat.expr.train) == rownames(dat.pheno.train)), " MATCH ", "NOT MATCH"), "the row names of training phenotype data."))
   print(paste0("The column names of test gene expression data", ifelse(all(colnames(dat.expr.test) == rownames(dat.pheno.test)), " MATCH ", "NOT MATCH"), "the row names of test phenotype data."))
   
+  # Make the table one of patient characteristics per random seed trial
+  dat.pheno.train$group <- "Training"
+  dat.pheno.test$group <- "Test"
+  dat.pheno.all <- rbind(dat.pheno.train, dat.pheno.test)
+  tab1 <- tbl_summary(data = dat.pheno.all,
+                      by = "group") %>% 
+    add_p() %>% 
+    as_gt() %>%
+    gt::gtsave(filename = paste0("../ApplicationResult/Multi/RandomSeed/TMM_Top2000/", date.analysis, "_", "Table1", "_", seed.num, ".rtf"))
+  
+  # Save gene expression and phenotype data
   saveRDS(dat.expr.train, 
           file = sprintf("../ApplicationData/derived/RandomSeed/dat.expr.train%s.RDS", seed.i))
-  saveRDS(dat.expr.train, 
+  saveRDS(dat.expr.test, 
           file = sprintf("../ApplicationData/derived/RandomSeed/dat.expr.test%s.RDS", seed.i))
-  saveRDS(dat.expr.train, 
+  saveRDS(dat.pheno.train, 
           file = sprintf("../ApplicationData/derived/RandomSeed/dat.pheno.train%s.RDS", seed.i))
-  saveRDS(dat.expr.train, 
+  saveRDS(dat.pheno.test, 
           file = sprintf("../ApplicationData/derived/RandomSeed/dat.pheno.test%s.RDS", seed.i))
 }
 ```
