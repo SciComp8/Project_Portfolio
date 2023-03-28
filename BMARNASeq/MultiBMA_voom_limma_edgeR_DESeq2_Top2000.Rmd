@@ -244,6 +244,7 @@ multi_ana_noTMM_top <- function(seed.num = 999) {
                                            var.pool = vars.pool, 
                                            interact = FALSE, 
                                            cut.FDR = 0.05)
+                                           
   eFDR.Main.2000.train <- mclapply(1:length(vars.pool),
                                    function(i) rownames(output.multi.train.s2$eFDR.Main)[order(output.multi.train.s2$eFDR.Main[, i])[1:2000]],
                                    mc.cores = 4)
