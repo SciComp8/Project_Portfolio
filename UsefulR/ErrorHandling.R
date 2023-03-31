@@ -1,4 +1,6 @@
 # More info: https://www.r-bloggers.com/2020/10/basic-error-handing-in-r-with-trycatch/
+# https://statisticsglobe.com/using-trycatch-function-to-handle-errors-and-warnings-in-r
+
 # Stop 
 method <- "VoomLimma"
  if (!(method %in% c("BMAseq", "DESeq2", "edgeR"))){
