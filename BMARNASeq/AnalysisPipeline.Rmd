@@ -2,7 +2,7 @@
 title: "Reproducibilities of multivariable BMAseq and other single-model approaches with interaction terms"
 author: "Anni Liu"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
-output: rmarkdown::html_vignette
+output: rmarkdown::html_vignette 
 ---
 
 ```{r,echo=FALSE}
