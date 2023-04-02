@@ -5,6 +5,10 @@
 #   Test Package:              'Cmd + Shift + T'
 # Ref: https://cran.r-project.org/web/packages/xfun/vignettes/xfun.html
 
+# Install the self-made library
+# devtools::install("/Library/Frameworks/R.framework/Versions/4.2/Resources/library/knitautomator")
+
+
 knit_filename <- function(input, ...) {
   out_dir <- "../report/";
   temp <- sub(".*\\d_", "", xfun::sans_ext(input));
