@@ -3,14 +3,15 @@
 #   Install Package:           'Cmd + Shift + B'
 #   Check Package:             'Cmd + Shift + E'
 #   Test Package:              'Cmd + Shift + T'
+# Ref: https://cran.r-project.org/web/packages/xfun/vignettes/xfun.html
 
 knit_filename <- function(input, ...) {
   out_dir <- "../report/";
-  temp <- sub(".*\\d_", "", xfun::sans_ext(input)); # Newly add
-  temp <- sub("_.*", "", temp); # Newly add
-  out_project <- paste0("_", temp, "_"); # Newly add
-  out_author <- "ALiu_XKZ";
-  if (grepl("ex", xfun::sans_ext(input)) == T) { # Newly add
+  temp <- sub(".*\\d_", "", xfun::sans_ext(input));
+  temp <- sub("_.*", "", temp); 
+  out_project <- paste0("_", temp, "_"); 
+  out_author <- "ALiu";
+  if (grepl("ex", xfun::sans_ext(input)) == T) {
     out_v <- "_V1";
   } else {
     out_v <- "_V2";
