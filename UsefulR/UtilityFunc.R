@@ -1,6 +1,16 @@
 # Deletes the file(s) or directories 
 unlink("~/Downloads/Lab7_GWAS/lab7_cache", recursive = T)
 
+# Construct the path
+file.path("","p1","p2","p3", "filename")
+[1] "/p1/p2/p3/filename"
+
+# Extract the components from a path
+dirname(file.path("","p1","p2","p3", "filename"))
+[1] "/p1/p2/p3"
+basename(file.path("","p1","p2","p3", "filename"))
+[1] "filename"
+
 # Read the file
 read.delim(file, sep = ",")
 
