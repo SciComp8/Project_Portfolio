@@ -681,6 +681,7 @@ boxplot_data2 <- function (threshold = 1000, random.seed = 8809678) {
 }
 ```
 
+
 ## Organize data for boxplotting
 ```{r not.include.BMAseq}
 ##------Number of cDEGs------
@@ -1027,7 +1028,7 @@ for (seed.i in seed.vec) {
 names(unique.cDEGs.list) <- seed.vec
 
 file.name <- "../ApplicationResult/Uni/RandomSeed/TMM_Top2000/Vennplot/uniq_cDEGs_BMI_BMAseq_all_seeds.txt"
-write.table(unlist(unique.cDEGs) |> unique(), file = file.name, quote = F, col.names = F)
+write.table(unlist(unique.cDEGs.list) |> unique(), file = file.name, quote = F, col.names = F)
 ```
 
 
@@ -1707,11 +1708,11 @@ extract_unique_cDEGs_per_seed <-function(var.name = NULL, threshold = NULL) {
 }
 
 for (seed.i in seed.vec) {
-  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/BMAseqMulti%s.RData", seed.i))
-  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/DESeq2Multi%s.RData", seed.i))
-  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/edgeRMulti%s.RData", seed.i))
-  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/eBayesMulti%s.RData", seed.i))
-  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/VoomLimmaMulti%s.RData", seed.i))
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiModel/BMAseqMulti%s.RData", seed.i))
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiModel/DESeq2Multi%s.RData", seed.i))
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiModel/edgeRMulti%s.RData", seed.i))
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiModel/eBayesMulti%s.RData", seed.i))
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiModel/VoomLimmaMulti%s.RData", seed.i))
   unique.cDEGs <- extract_unique_cDEGs_per_seed(var.name = "BMI", threshold = 2000)
   unique.cDEGs.list <- append(unique.cDEGs.list, list(unique.cDEGs))
   write(sprintf("\nThe following gene IDs are unique gene IDs associated with the main effect of %s identified by BMAseq under the seed %s and threshold %s", var.name, seed.i, threshold), file = file.name, append = T)
@@ -1720,7 +1721,7 @@ for (seed.i in seed.vec) {
 names(unique.cDEGs.list) <- seed.vec
 
 file.name <- "../ApplicationResult/Multi/RandomSeed/TMM_Top2000/Vennplot/uniq_cDEGs_BMI_BMAseq_all_seeds.txt"
-write.table(unlist(unique.cDEGs) |> unique(), file = file.name, quote = F, col.names = F)
+write.table(unlist(unique.cDEGs.list) |> unique(), file = file.name, quote = F, col.names = F)
 ```
 
 
@@ -2395,4 +2396,36 @@ for (seed.i in seed.vec) {
     make_vennplot(var.name = var.i, threshold = 2000)
   }
 }
+```
+
+
+## Extract unique BMIxSEX - related cDEGs identified by BMAseq per seed and all unique cDEGs identified by BMAseq across 10 seeds
+```{r}
+file.name <- "../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Vennplot/uniq_cDEGs_BMIxSEX_BMAseq_per_seed.txt"
+unique.cDEGs.list <- NULL
+extract_unique_cDEGs_per_seed <-function(var.name = NULL, var.name.BMA = NULL, threshold = NULL) {
+  BMAseq.cDEGs <- intersect(names(BMAseq.eFDR.Interaction.train[[var.name.BMA]][1:threshold]), names(BMAseq.eFDR.Interaction.test[[var.name.BMA]][1:threshold]))
+  DESeq2.cDEGs <- intersect(DESeq2.eFDR.GeneName.train[[var.name]][1:threshold], DESeq2.eFDR.GeneName.test[[var.name]][1:threshold])
+  edgeR.cDEGs <- intersect(edgeR.eFDR.GeneName.train[[var.name]][1:threshold], edgeR.eFDR.GeneName.test[[var.name]][1:threshold])
+  eBayes.cDEGs <- intersect(names(eBayes.eFDR.train2[[var.name]][1:threshold]), names(eBayes.eFDR.test2[[var.name]][1:threshold]))
+  voom.limma.cDEGs <- intersect(names(voom.eFDR.train2[[var.name]][1:threshold]), names(voom.eFDR.test2[[var.name]][1:threshold]))
+  unique.cDEGs <- setdiff(BMAseq.cDEGs, union(DESeq2.cDEGs, edgeR.cDEGs) |> union(eBayes.cDEGs) |> union(voom.limma.cDEGs))
+  return(unique.cDEGs)
+}
+
+for (seed.i in seed.vec) {
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiIntModel/BMAseqMultiInt%s.RData", seed.i))
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiIntModel/DESeq2MultiInt%s.RData", seed.i))
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiIntModel/edgeRMultiInt%s.RData", seed.i))
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiIntModel/eBayesMultiInt%s.RData", seed.i))
+  load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiIntModel/VoomLimmaMultiInt%s.RData", seed.i))
+  unique.cDEGs <- extract_unique_cDEGs_per_seed(var.name = "BMIxSEX", var.name.BMA = "BMI", threshold = 2000)
+  unique.cDEGs.list <- append(unique.cDEGs.list, list(unique.cDEGs))
+  write(sprintf("\nThe following gene IDs are unique gene IDs associated with the interaction effect of %s identified by BMAseq under the seed %s and threshold %s", var.name, seed.i, threshold), file = file.name, append = T)
+  write.table(unique.cDEGs, file = file.name, quote = F, col.names = F, append = T)
+}
+names(unique.cDEGs.list) <- seed.vec
+
+file.name <- "../ApplicationResult/Multi_Interaction/RandomSeed/TMM_Top2000/Vennplot/uniq_cDEGs_BMIxSEX_BMAseq_all_seeds.txt"
+write.table(unlist(unique.cDEGs.list) |> unique(), file = file.name, quote = F, col.names = F)
 ```
