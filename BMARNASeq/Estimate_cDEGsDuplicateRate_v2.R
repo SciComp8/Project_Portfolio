@@ -1,3 +1,7 @@
+# Update on Estimate_cDEGsDuplicateRate_v1.R: 
+# To make the function `duplicate_rate_cDEGs_per_variable()` compatible with all modeling scenariors (univariable, multivariable, and interaction across all approaches),
+# an argument named `model.type` is added.
+
 cDEGs = cDEGs.list = NULL
 threshold.vec <- seq(1000, 5000, 1000)
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
