@@ -4,7 +4,7 @@ This is a compiled list of my programming work affiliated with collaborative and
 
 ## Table of contents
 
-* [Bayesian model averaging for bulk RNA-Seq data](#Bayesian-model-averaging-for-bulk-RNA-Seq-count-data)
+* [Bayesian model averaging for bulk RNA-Seq count data](#Bayesian-model-averaging-for-bulk-RNA-Seq-count-data)
 * [Differential expression analysis pipeline for single cell data](#Differential-expression-analysis-pipeline-for-single-cell-data)
 * [Bayesian integrative clustering for multi-omics data](#Bayesian-integrative-clustering-for-multi-omics-data)
 * [Lipidomics and transcriptomics analysis](#Lipidomics-and-transcriptomics-analysis)
