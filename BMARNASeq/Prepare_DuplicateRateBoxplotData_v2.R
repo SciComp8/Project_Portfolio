@@ -13,7 +13,7 @@ boxplot_duplicate_rate_data <- function (var.name = NULL, method.name = NULL, mo
 }
 
 organized_duplicate_rate_data <- mapply(boxplot_duplicate_rate_data,
-                                        var.name = rep(c("BMI", "AGE","SEX", "MHABNWBC", "BMIxSEX"), each = 25), 
+                                        var.name = rep(c("BMI", "AGE", "SEX", "MHABNWBC", "BMIxSEX"), each = 25), 
                                         method.name = rep(rep(c("BMAseq", "DESeq2", "edgeR", "eBayes", "VoomLimma"), each = 5), times = 5),
                                         threshold = rep(rep(seq(1000, 5000, 1000), times = 5), times = 5)) |> t()
 rownames(organized_duplicate_rate_data) <- NULL
