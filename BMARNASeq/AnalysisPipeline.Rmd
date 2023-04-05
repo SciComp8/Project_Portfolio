@@ -100,20 +100,20 @@ BMAseq.multi.postprob.norm <- function(dat.expr.counts, dat.pheno, var.pool, max
     n.gene <- nrow(dat.expr.counts)
 
 
-    # estimate voom weights
+    # Estimate voom weights
     y0 <- voom(counts = dat.expr.counts, 
-               lib.size = colSums(dat.expr.counts)*calcNormFactors(dat.expr.counts)) # ALiu: Use TMM normalization factor
+               lib.size = colSums(dat.expr.counts)*calcNormFactors(dat.expr.counts))
     input.dat.expr <- y0$E
     input.weights <- y0$weights
 
 
-    # build model space
+    # Build model space
     result.modelspace <- Modelspace(dat.pheno, var.pool, max.nvar, interaction = interaction)
     input.model.space <- result.modelspace$model.space
     input.dat.pheno <- result.modelspace$dat.pheno.new
 
 
-    # calculate Bayes factor
+    # Calculate Bayes factor
     out.bf <- vapply(1:length(input.model.space), function(i) {
         print(paste0(i, ". ", input.model.space[i]))
         design <- model.matrix(formula(input.model.space[i]), data = input.dat.pheno)
@@ -122,7 +122,7 @@ BMAseq.multi.postprob.norm <- function(dat.expr.counts, dat.pheno, var.pool, max
     }, FUN.VALUE = as.double(1:n.gene))
 
 
-    # obtain prior model probability
+    # Obtain prior model probability
     bf.max <- t(apply(out.bf, 1, function(x) ifelse(x == max(x) & x > cut.BF, 1, 0)))
     prior.modelprob <- apply(bf.max, 2, sum)/n.gene
     pm.est <- prior.modelprob
@@ -137,7 +137,7 @@ BMAseq.multi.postprob.norm <- function(dat.expr.counts, dat.pheno, var.pool, max
     prior.modelprob <- c(1 - sum(pm.prior0), pm.prior0)
 
 
-    # calculate posterior model probability
+    # Calculate posterior model probability
     post.modelprob <- t(apply(out.bf, 1, function(x) x * prior.modelprob/sum(x * prior.modelprob)))
     rownames(post.modelprob) <- rownames(dat.expr.counts)
     colnames(post.modelprob) <- input.model.space
