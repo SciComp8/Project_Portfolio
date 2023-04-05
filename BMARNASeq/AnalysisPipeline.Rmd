@@ -18,7 +18,6 @@ knitr::opts_chunk$set(
 )
 ```
 
-We evaluate the capacities of multivariable BMAseq and other single-model approaches including DESeq2, edgeR, voom+limma+eBayes, and voom+limma with interaction terms on inferring the replicable differentially expressed genes, that is the common differentially expressed genes (cDEGs) between the training and test sets.
 
 # Attach libraries and functions
 ```{r}
