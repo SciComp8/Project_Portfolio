@@ -22,7 +22,7 @@ Accurately identifying differentially expressed genes(DEGs) can offer reliable i
 - [GenerateCheck_TrainingTestData.Rmd](BMARNASeq/GenerateCheck_TrainingTestData.Rmd)
   
 ## **Differential expression analysis pipeline for single cell data**
-The bioinformatics pipeline using the next-generation single cell data from the mouse B lymphocytes is developed to streamline the fundamental process to detect differentially expressed genes in single cell RNA-seq data. This includes the initial trimming of reads from raw FASTQ files using `Trim Galore`, quantifying the abundance of transcripts using `kallisto`, and performing the differential gene expression analysis using `DESeq2`. The pipeline is designed to be efficient in the command-line interface, enabling researchers to analyze and interpret large datasets of single cell gene expression data with the desirable speed, accuracy, and reproducibility.
+The bioinformatics pipeline using the next-generation single cell data from the mouse B lymphocytes is developed to streamline the fundamental procedures to detect differentially expressed genes in single cell RNA-seq data. This includes the initial trimming of reads from raw FASTQ files using `Trim Galore`, quantifying the abundance of transcripts using `kallisto`, and performing the differential gene expression analysis using `DESeq2`. The pipeline is designed to be efficient in the command-line interface, enabling researchers to analyze and interpret large datasets of single cell gene expression data with the desirable speed, accuracy, and reproducibility.
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
 
 ## **Bayesian integrative clustering for multi-omics data**
