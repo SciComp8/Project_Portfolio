@@ -26,7 +26,7 @@ The bioinformatics pipeline developed for the next-generation single cell data f
   - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
 
 ## **Bayesian integrative clustering for multi-omics data**
-This project characterizes the shared patterns underlying the transcriptomic and lipidomic profiles in women at high risk or diagnosed with breast cancers and explores the relationships between these shared patterns and clinical and biological phenotypes. A novel Bayesian latent variable approach which jointly models the non-tumorous breast tissue transcriptomic expression levels and plasma lipidomic expression levels is constructed and further tuned with key parameters to identify clinically and biologically relevant clusters co-driven by transcriptomic and lipidomic features.
+This project characterizes the shared patterns underlying the transcriptomic and lipidomic profiles in women at high risk or diagnosed with breast cancers and explores the relationships between these shared patterns and clinical and biological phenotypes. A novel Bayesian latent variable approach which jointly models the non-tumorous breast tissue transcriptomic expression levels and plasma lipidomic expression levels is constructed and further tuned with key parameters to identify clinically and biologically relevant clusters co-driven by transcriptomic and lipidomic features, hidden by the traditional principal component analysis workflow.
   - [BayesClustering.Rmd](BayesClustering.Rmd)
  
 ## **Lipidomics and transcriptomics analysis**
