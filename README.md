@@ -16,9 +16,6 @@ This is a compiled list of my programming work affiliated with collaborative and
 Accurately identifying differentially expressed genes(DEGs) can offer reliable insights into biological processes underlying specific conditions, and further aid in developing diagnostic biomarkers and targeted therapeutics. The goal of this project is to evaluate the performance of our novel `BMAseq` and other existing single-model approaches: `DESeq2`, `edgeR`, `voom + limma + eBayes`, and `voom + limma` on inferring replicable DEGs in the setting of univariable, multivaribles, and multivaribles with interaction terms. The RNA-seq count and phenotypic data from GTEx are randomly divided into 50% training set and 50% test set. Each approach is used to build the univariate, multivariate, multivariate with interaction models for each phenotype. The approach-specific Venn diagram panel and boxplot panel are plotted to intuitively reveal the number and rate of replicable DEGs associated with each phenotype between the training and test set. 
 
 - [AnalysisPipeline.Rmd](BMARNASeq/AnalysisPipeline.Rmd)
-- [UniBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](BMARNASeq/UniBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
-- [MultiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](BMARNASeq/MultiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
-- [Interaction_multiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd](BMARNASeq/Interaction_multiBMA_voom_limma_edgeR_DESeq2_Top2000.Rmd)
 - [GenerateCheck_TrainingTestData.Rmd](BMARNASeq/GenerateCheck_TrainingTestData.Rmd)
   
 ## **Differential expression analysis pipeline for single cell data**
