@@ -1,5 +1,5 @@
 ---
-title: "Assessment of multivariable BMAseq and other single-model approaches with interaction terms on inferring replicable differentially expressed genes"
+title: "Assessment of BMAseq and other single-model approaches on inferring replicable differentially expressed genes"
 author: "Anni Liu"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output: rmarkdown::html_vignette
