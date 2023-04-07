@@ -20,8 +20,9 @@ Accurately identifying differentially expressed genes(DEGs) can offer reliable i
   
 ## **Differential expression analysis pipeline for single cell data**
 The bioinformatics pipeline using the next-generation single cell data from the mouse B lymphocytes is developed to streamline the fundamental procedures of differentially expressed genes detection in single cell RNA-seq data. This includes the initial trimming of reads from raw FASTQ files using `Trim Galore`, quantifying the abundance of transcripts using `kallisto`, and performing the differential gene expression analysis using `DESeq2`. The pipeline is designed to be efficient in the command-line interface, enabling researchers to analyze and interpret large datasets of single cell gene expression data with the desirable speed, accuracy, and reproducibility.
-  - [NGS_DEPipeline.Rmd](NGS_DEPipeline.Rmd)
-  - [NGS_TrimCount.sh](NGS_TrimCount.sh)
+  - [NGS_DEPipeline.Rmd](NGSBcell/NGS_DEPipeline.Rmd)
+  - [NGS_TrimCount.sh](NGSBcell/NGS_TrimCount.sh)
+  - [NGS_DEReport.Rmd](NGSBcell/NGS_DEReport.Rmd)
 
 ## **Bayesian integrative clustering for multi-omics data**
 This project characterizes the shared patterns underlying the transcriptomic and lipidomic profiles in women at high risk or diagnosed with breast cancers and explores the relationships between these shared patterns and clinical and biological phenotypes. A novel Bayesian latent variable approach which jointly models the non-tumorous breast tissue transcriptomic expression levels and plasma lipidomic expression levels is constructed and further tuned with key parameters to identify clinically and biologically relevant clusters co-driven by transcriptomic and lipidomic features. These clusters and features are hidden by the traditional principal component analysis workflow.
