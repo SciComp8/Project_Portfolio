@@ -50,4 +50,4 @@ done
 
 # Perform differential gene expression analysis using DESeq2
 cd $DESeq2_dir
-Rscript -e $sample_list $condition_list $condition_times 'library(rmarkdown); library(rmdformats); rmarkdown::render(input = "DEReport.Rmd", output_format = "all", output_file = "Final Report")'
+Rscript -e $sample_list $condition_list $condition_times 'library(rmarkdown); library(rmdformats); rmarkdown::render(input = "NGS_DEReport.Rmd", output_format = "all", output_file = "Final Report")'
