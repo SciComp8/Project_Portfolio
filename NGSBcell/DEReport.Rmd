@@ -1,0 +1,128 @@
+---
+title: "Differential Expression Analysis Report"
+author: "Anni Liu"
+output: 
+  rmdformats::downcute:
+  downcute_theme: "chaos"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+
+
+library(optparse)
+
+# Define a list of options using `make_option()`
+option_list <- list(
+  make_option(c("-s", "--sample"), type="character", default=NULL,
+              help="Sample list"),
+  make_option(c("-c", "--condition"), type="character", default=NULL,
+              help="Condition list"),
+  make_option(c("-t", "--times"), type="integer", default=NULL,
+              help="Condition times")
+)
+
+# Create an `OptionParser` object and pass in the option list 
+opt_parser = OptionParser(option_list = option_list)
+
+# Use `parse_args()` to parse the command-line arguments
+opt = parse_args(opt_parser)
+
+# Extract the option values
+sample_name <- opt$sample
+condition_name <- opt$condition
+condition_times <- opt$times
+# print(sample_name)
+# print(condition_name)
+# print(condition_times)
+
+library(tidyverse)
+library(tximport)
+
+# Set the file path
+dir <- c("/Users/anniliu/Desktop/DE_pipeline")
+files <- file.path(dir, "kallisto_results", sample_name, "abundance.tsv")
+names(files) <- sample_name # Assign individual names to individual tsv file path
+
+# Import tx2 gene file for mice
+library(readr)
+tx2gene_mice <- read.table("/Users/anniliu/Desktop/DE_pipeline/mus_musculus/transcripts_to_genes.txt",
+                           header = FALSE) %>%
+  select(-V3) # Select away gene names
+head(tx2gene_mice) # Take a peek at the first 6 records of the file
+
+# Generate the count matrix for each sample
+txi.kallisto.tsv <- tximport(files, 
+                             type = "kallisto", 
+                             tx2gene = tx2gene_mice, 
+                             ignoreAfterBar = TRUE) # Split the rownames at the first bar “|”, and only includes the first “ENST” identifier.
+
+# Look at the structure of count data
+cts <- txi.kallisto.tsv$counts
+str(cts)
+
+# Look at the number of sequence fragments that are assigned to each gene
+head(cts) %>% # Take a peek at the first 6 records of gene expression in raw counts
+  knitr::kable()
+
+# Create a data frame of sample information
+coldata <- data.frame(condition = condition_name, type = rep("single-read"))
+rownames(coldata) <- sample_name
+coldata %>%
+  knitr::kable()
+
+# Factorize two variables
+coldata$condition <- factor(coldata$condition)
+coldata$type <- factor(coldata$type)
+
+# Construct DESeqDataSetFromMatrix
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(countData = round(cts),
+                              colData = coldata,
+                              design = ~ condition)
+dds
+
+# Pre-filtering least variable genes
+keep <- rowSums(counts(dds)) >= 10
+dds <- dds[keep,]
+head(dds)
+
+# Perform differential expression analysis
+dds <- DESeq(dds)
+
+# Extract the pairwise combination of 2 conditions
+pair_condition <- combn(unique(condition_name), 2, simplify = FALSE)
+pair_number <- length(pair_condition)
+res <- list(length = pair_number)
+
+# Return a result table with base mean, log2 fold changes, p values and adjusted p values for each pairwise comparison of 2 conditions
+for (i in 1:pair_number){
+  contrast <- c("condition", pair_condition[[i]])
+  # print(contrast)
+  res[i] <- list(results(dds, contrast = contrast))
+}
+print(res)
+
+# Batch volcano plot
+plot_array <- list()
+for (i in 1:pair_number) {
+  res_new <- res[[i]] %>%
+    data.frame() %>%
+    rownames_to_column(var = "ensgene") %>%
+    mutate(threshold = padj < 0.5)
+  plot_array[[i]] <- ggplot(res_new) +
+    geom_point(mapping = aes(x = log2FoldChange,
+                             y = -log10(padj),
+                             color = threshold)) +
+    labs(
+      title = paste0(pair_condition[[i]][1], " vs ", pair_condition[[i]][2]),
+      x = "log2 fold change",
+      y = "-log10 adjusted p-value"
+    ) +
+    xlim(-10, 10) + 
+    scale_color_manual(values = c("black", "#CFB53B")) +
+    theme_bw() +
+    guides(color = "none")
+}
+library(gridExtra)
+do.call("grid.arrange", c(plot_array, ncol = 3))
+
+# Perform principal component analysis
+plotPCA(rlog(dds), intgroup = "condition")
