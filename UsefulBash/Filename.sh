@@ -8,5 +8,5 @@ echo $r1 $r2
 # Remove files with specific shared base filenames
 for i in `ls | grep .fastq`
 do
-basename=$(echo $i| sed 's/\50K_2_bowtie2//g')
+basename=$(echo $i | sed 's/\50K_2_bowtie2//g')
 rm $basename.sam
