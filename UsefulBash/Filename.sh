@@ -17,7 +17,16 @@ done
 filename="SRR8990876_1.fastq.gz"
 echo $filename | awk -F"." 'BEGIN{OFS=""} {print $1}' 
 # Output: SRR8990876_1
-
 filename="SRR8990876_1.fastq.gz"
 echo $filename | awk -F"." -v OFS="" '{print $1}'
 # Output: SRR8990876_1
+
+
+# Output variables into files with specific filenames
+filename=$(echo $(basename barcodes1 .tsv.gz))
+for i in `echo $var1`
+do
+  echo $var1 $var2 $var3 $i >>$filename.txt 
+done
+
+
