@@ -35,3 +35,7 @@ gzip $filename.fastq
 gunzip $filename.fastq.gz
 
 
+# Create a backup copy of the file with the specified filename
+fastq=$1 # Store the first argument passed to the program as variable fastq
+cp $fastq rna_copy.fastq
+
