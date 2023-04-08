@@ -14,19 +14,24 @@ do
 done
 
 # Extract the specific fields in the string text and concatenate the output with no separator in between
-filename="SRR8990876_1.fastq.gz"
-echo $filename | awk -F"." 'BEGIN{OFS=""} {print $1}' 
-# Output: SRR8990876_1
-filename="SRR8990876_1.fastq.gz"
-echo $filename | awk -F"." -v OFS="" '{print $1}'
-# Output: SRR8990876_1
+filename="SRR8990876_1.paired.fastq.gz"
+echo $filename | awk -F"." 'BEGIN{OFS="_"} {print $1,$2}'
+# Output: SRR8990876_1_paired
+echo $filename | awk -F"." -v OFS="_" '{print $1,$2}'
+# Output: SRR8990876_1_paired
 
 
-# Output variables into files with specific filenames
+# Output variables into a file with the specific filename
 filename=$(echo $(basename barcodes1 .tsv.gz))
 for i in `echo $var1`
 do
   echo $var1 $var2 $var3 $i >>$filename.txt 
 done
+
+
+# Compress/decompress a file with the specific filename
+filename=$(echo $(basename SRR8990876_1.paired .fastq.gz))
+gzip $filename.fastq
+gunzip $filename.fastq.gz
 
 
