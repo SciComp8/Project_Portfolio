@@ -17,3 +17,7 @@ done
 filename="SRR8990876_1.fastq.gz"
 echo $filename | awk -F"." 'BEGIN{OFS=""} {print $1}' 
 # Output: SRR8990876_1
+
+filename="SRR8990876_1.fastq.gz"
+echo $filename | awk -F"." -v OFS="" '{print $1}'
+# Output: SRR8990876_1
