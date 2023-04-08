@@ -12,3 +12,8 @@ do
   basename=$(echo $i | sed 's/\50K_2_bowtie2//g')
   rm $basename.sam
 done
+
+# Extract the specific fields in the string text and concatenate the output with no separator in between
+filename="SRR8990876_1.fastq.gz"
+echo $filename | awk -F"." 'BEGIN{OFS=""} {print $1}' 
+# Output: SRR8990876_1
