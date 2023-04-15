@@ -32,3 +32,5 @@ table(SxRT = dat.work$SxRT, Recur = dat.work$Recur, useNA = "ifany")
   
 dat.work$SxRT <- droplevels(dat.work$SxRT)
 table(dat.work$SxRT, useNA = "ifany")
+# LumpectomyRTYes  LumpectomyRTNo            <NA> 
+#             490             141             155 
