@@ -15,7 +15,7 @@ uni_coxph <- function(surv.time, surv.event) {
                       return(list(res.i))
                     }
                   },
-                mc.cores = 4L)
+                mc.cores = 10)
   names(out) <- vars.ana
   return(out)
 }
