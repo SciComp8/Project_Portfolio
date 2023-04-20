@@ -656,7 +656,7 @@ vars.all <- c(
   "New_breast_cancer_2"
 )
 
-# Create an indicator [0, 1] for all categorical variables 
+# Use 0 or 1 to indicate if the variable is continuous or categorical
 vars.cat <- rep(1, length(vars.all))
 vars.cat[vars.all %in% c("Age_Dx", "Follow_up_time.days", "Tumor_Size.mm")] <- 0
 ```
