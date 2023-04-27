@@ -1,0 +1,1018 @@
+---
+title: "MDC Asian Patient Project - Update"
+author: "Anni Liu"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+knit: knitautomator::knit_filename
+output:
+  word_document:
+    fig_height: 4.5
+    fig_width: 4.5
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  options(scipen = 999, digits = 4),
+  cache = TRUE,
+  error = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  tidy.opts = list(width.cutoff = 60),
+  tidy = TRUE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+
+# Data preparations
+
+Notice that the value of column E (`Race Code`) for the patient with ID WCM1260 is changed from `NHW` into `NHB`. The value of column F (`Race 2`) for the patient with ID NYPQ641 is changed from `Non-Asian` into `Southeast Asian`. 
+
+```{r include=FALSE}
+## Load libraries
+easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst")
+```
+
+```{r eval=FALSE, include=FALSE}
+## Load WCM 2019-2022 data
+wcm_data <- read_xlsx("../data/raw/MDC Asian Patients_4_11_Stats_deidentified.xlsx", 
+                      sheet = "WCM 2019-2022", 
+                      range = c("A1:T2307"), 
+                      col_names = TRUE) %>% 
+  select(-c("Date of Diagnosis", "Year")) %>%
+  rename("StudyID" = "Patient ID",
+         "RaceEthnicity.1" = "Race/Ethnicity (if mixed, circle more than one)", 
+         "RaceEthnicity.2" = "Race Code",
+         "Race.Asian" = "Race Asian", 
+         "Insure.type" = "Type of insurance",
+         "Age.Dx" = "Age at Diagnosis",
+         "MMGSD" = "Mammo Screen-Detected",
+         "MMGO" = "Mammo-Occult",
+         "MRISD" = "MRI Screen-Detected",
+         "MMGD" = "Mammographic Density",
+         "T.stage" = "Clinical T Stage",
+         "N.stage" = "Clinical N Stage",
+         "Clinic.stage" = "Clinical Stage",
+         "ER" = "ER Status",
+         "PR" = "PR Status",
+         "HER2" = "HER2 Status") %>%
+  mutate("Hospital" = "WCM")
+
+## Load Queens 19-22 data
+nypq_data <- read_xlsx("../data/raw/MDC Asian Patients_4_11_Stats_deidentified.xlsx", 
+                       sheet = "Queens 2019-2022", 
+                       range = c("A1:T1163"), 
+                       col_names = TRUE) %>% 
+  select(-c("Month", "Year")) %>%
+  rename("StudyID" = "ID",
+         "RaceEthnicity.1" = "Race/Ethnicity", 
+         "RaceEthnicity.2" = "Race Code",
+         "Race.Asian" = "Race 2", 
+         "Insure.type" = "Type of Insurance",
+         "Age.Dx" = "Age at Diagnosis",
+         "MMGSD" = "Mammo Screen-Detected",
+         "MMGO" = "Mammmo-Occult",
+         "MRISD" = "MRI Screen-Detected",
+         "MMGD" = "Mammographic Density",
+         "T.stage" = "Clinical T Stage",
+         "N.stage" = "Clinical N Stage",
+         "Clinic.stage" = "Clinical Stage",
+         "ER" = "ER Status",
+         "PR" = "PR Status",
+         "HER2" = "HER2 Status") %>%
+  mutate("Hospital" = "NYPQ")
+
+## Merge two data
+data_full <- rbind(wcm_data, nypq_data)
+
+## Recode variables
+##------RaceEthnicity.1------
+# table(data_full$RaceEthnicity.1, useNA = "always")
+data_full$RaceEthnicity.1 <- gsub("Nhw|NHw", "NHW", 
+                                  gsub("Asian/Indian/ Pakistani", "Asian/Indian/Pakistani",
+                                       gsub("Afghan$", "Afghani",
+                                            data_full$RaceEthnicity.1)))
+
+##------RaceEthnicity.2------
+# Fix the value in `RaceEthnicity.2` of one subject (row 279; WCM1260)
+idx <- which(data_full$RaceEthnicity.1 == "NHB" & data_full$RaceEthnicity.2 %in% c("NHW"))
+data_full[idx, c("RaceEthnicity.2")] <- "NHB"
+data_full$RaceEthnicity.2 <- gsub("As", "AS",
+                                  gsub("HiS|His|^HB", "HIS", data_full$RaceEthnicity.2)) |> factor(levels = c("AS", "HIS", "NHB", "NHW", "OTH"), 
+                                                                                               labels = c("Asian", "Hispanic", "Non-hispanic black", "Non-hispanic white", "Other"))
+
+##------Race.Asian------
+# Fix the value in `Race.Asian` of one subject (row 2941; NYPQ641)
+table(data_full$Race.Asian, data_full$RaceEthnicity.2)
+idx <- with(data_full, which(Race.Asian == "Non-Asian" & RaceEthnicity.2 == "Asian"))
+data_full[idx, c("StudyID", "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian")] 
+data_full[idx, c("StudyID", "Race.Asian")] <- "Southeast Asian"
+data_full$Race.Asian <- factor(data_full$Race.Asian)
+
+##------Language------
+data_full$Language <- gsub("Unknown", NA, data_full$Language)
+
+##------BMI------
+data_full$BMI <- ifelse(data_full$BMI %in% c("?", "*", "Unknown"), NA, as.numeric(data_full$BMI))
+
+##------Insure.type------
+data_full$Insure.type <- with(data_full, case_when(
+  Insure.type %in% c("Medcaid", "Medicad", "medicaid") ~ "Medicaid", 
+  Insure.type == "medicare" ~ "Medicare",
+  Insure.type %in% c("private", "PrIvate", "privAte", "PrIvate", "PRIVATE") ~ "Private",
+  Insure.type == "Unknown" ~ NA,
+  TRUE ~ Insure.type))
+
+data_full$Insure.type <- factor(
+  data_full$Insure.type, 
+  levels = c("Medicaid", "Medicare", "Private", "Self Pay", "None"),
+  ordered = TRUE)
+
+##------MMGSD------
+data_full$MMGSD <- gsub("Unknown", NA, 
+                        gsub("y.*|Y.*", "Yes",
+                             gsub("^n", "N", data_full$MMGSD))) %>% 
+  factor(levels = c("Yes", "No"))
+
+##------MMGO------
+data_full <- data_full %>% 
+  mutate(MMGO = case_when(MMGO %in% c("no", "NO") ~ "No", 
+                          MMGO %in% c("Unknown", "N/A") ~ as.character(NA),
+                          TRUE ~ MMGO))
+data_full$MMGO <- with(data_full, 
+                       factor(MMGO, 
+                       levels = c("Yes", "No", NA)))
+
+##------MRISD------
+data_full <- data_full %>% 
+  mutate(MRISD = case_when(MRISD %in% c("no", "NO") ~ "No", 
+                           MRISD == "Unknown" ~ as.character(NA),
+                           TRUE ~ MRISD))
+data_full$MRISD <- factor(data_full$MRISD,
+                          levels = c("Yes", "No"))
+
+##------MMGD------
+data_full$MMGD <- gsub("^Almost.*", "Almost entirely fatty", 
+                       gsub("^Hetero.*", "Heterogenously dense",
+                            gsub("^Extreme.*", "Extremely dense",
+                                 gsub("Unknown", NA, data_full$MMGD))))
+data_full$MMGD <- factor(data_full$MMGD, 
+                         levels = c("Almost entirely fatty", "Scattered areas of fibrogladular density", "Heterogenously dense", "Extremely dense"))
+
+##------Clinic.stage------
+data_full$Clinic.stage <- gsub("Unknown", NA, data_full$Clinic.stage)
+data_full$Clinic.stage <- factor(data_full$Clinic.stage, levels = c("0", "I", "II", "III"))
+
+##------T.stage------
+data_full$T.stage <- with(data_full, case_when(
+  T.stage %in% c("NA", "Unknown") ~ as.character(NA), 
+  T.stage %in% c("rcT4c", "T4", "T4a", "T4b", "T4c", "T4d") ~ "T4",
+  T.stage %in% c("rcTx", "Tx") ~ "TX",
+  T.stage %in% c("T1c", "T1C", "T1mi", "T1mic", "T1", "T1a", "Tia", "T1b") ~ "T1",
+  T.stage %in% c("Recurrence pathologic stage T2N3a", "T2") ~ "T2",
+  T.stage %in% c("T1A", "T1B") ~ "T1",
+  T.stage %in% c("Tis", "TIs", "Pagets") ~ "Tis",
+  TRUE ~ T.stage))
+
+data_full$T.stage <- factor(data_full$T.stage, levels = c("TX", "T0", "Tis", "T1", "T2", "T3", "T4"))
+
+##------T.stage.2------
+data_full$T.stage.2 <- stri_replace_all_regex(
+  data_full$T.stage,
+  pattern = c("TX", "T0|Tis|T1|T2", "T3|T4"),
+  replacement = c("TX", "T0/Tis/T1/T2", "T3/T4"),
+  vectorize = FALSE) %>%
+  factor(levels = c("TX", "T0/Tis/T1/T2", "T3/T4"))
+
+##------T.stage.3------
+data_full$T.stage.3 <- stri_replace_all_regex(
+  data_full$T.stage,
+  pattern = c("TX|T0", "Tis", "T1|T2", "T3|T4"),
+  replacement = c("TX/T0", "Tis", "T1/T2", "T3/T4"),
+  vectorize = FALSE) %>%
+  factor(levels = c("TX/T0", "Tis", "T1/T2", "T3/T4"))
+
+##------N.stage------
+data_full$N.stage <- with(data_full, case_when(
+  N.stage %in% c("n0") ~ "N0",
+  N.stage %in% c("1a", "N1", "N1a", "N1mic") ~ "N1",
+  N.stage %in% c("N2", "N2a", "N2b") ~ "N2",
+  N.stage %in% c("N3", "N3a", "N3b", "N3c") ~ "N3",
+  N.stage %in% c("NA", "n/a", "Unknown") ~ as.character(NA),
+  N.stage %in% c("Nx") ~ "NX",
+  TRUE ~ N.stage))
+data_full$N.stage <- factor(data_full$N.stage, 
+                             levels = c("NX", "N0", "N1", "N2", "N3"))
+
+##------N.stage.2------
+data_full$N.stage.2 <- stri_replace_all_regex(
+  data_full$N.stage,
+  pattern = c("NX", "N0", "N1|N2|N3"),
+  replacement = c("NX", "N0", "N1/N2/N3"),
+  vectorize = FALSE) %>%
+  factor(levels = c("NX", "N0", "N1/N2/N3"))
+
+##------ER------
+data_full$ER <- with(data_full, case_when(
+  ER %in% c("NA", "n/a", "N/A", "Unknown", "unknown") ~ as.character(NA),
+  ER %in% c("POSITIVE", "positive") ~ "Positive",
+  ER == "negative" ~ "Negative",
+  TRUE ~ ER))
+data_full$ER <- factor(data_full$ER,
+                       levels = c("Positive", "Negative"))
+
+##------PR------
+data_full$PR <- with(data_full, case_when(
+  PR %in% c("NA", "n/a", "N/A", "Unknown", "unknown") ~ as.character(NA),
+  PR %in% c("POSITIVE", "positive") ~ "Positive",
+  PR %in% c("negative", "NEGATIVE") ~ "Negative",
+  TRUE ~ PR))
+data_full$PR <- factor(data_full$PR,
+                       levels = c("Positive", "Negative"))
+
+##------HER2------
+data_full$HER2 <- with(data_full, case_when(
+  HER2 %in% c("NA", "n/a", "N/A", "Unknown", "unknown") ~ as.character(NA),
+  HER2 %in% c("POSITIVE", "positive") ~ "Positive",
+  HER2 %in% c("negative", "NEGATIVE") ~ "Negative",
+  TRUE ~ HER2))
+data_full$HER2 <- factor(data_full$HER2,
+                         levels = c("Positive", "Negative"))
+
+##------Hospital------
+data_full$Hospital <- factor(data_full$Hospital,
+                             levels = c("NYPQ", "WCM"),
+                             ordered = TRUE)
+
+##------Subtype------
+data_full$Subtype <- with(data_full, case_when(
+    (ER == "Positive" | PR == "Positive") & HER2 == "Negative" ~ "HR+, HER2-",
+    HER2 == "Positive" ~ "HER2+",
+    ER == "Negative" & PR == "Negative" & HER2 == "Negative" ~ "Triple negative",
+    TRUE ~ as.character(NA))) 
+data_full$Subtype <- with(data_full, 
+                          factor(Subtype, 
+                          levels = c("HR+, HER2-", "HER2+", "Triple negative")))
+```
+
+```{r save_cleaned_data, eval=FALSE, include=FALSE}
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+write_fst(data_full, 
+          path = paste0("../data/derived/", date.analysis, "_dat_MDCAsian.RData"), 
+          compress = 50, uniform_encoding = T)
+
+write.csv(data_full, 
+          file = paste0("../data/derived/", date.analysis, "_dat_MDCAsian.csv"), 
+          row.names = F)
+```
+
+```{r load_cleaned_data, include=FALSE}
+data_full <- read_fst(path = "../data/derived/2023Apr24_dat_MDCAsian.RData")
+# class(dat.work) # data.frame
+```
+
+
+## Check if Race/Ethnicity is coded consistently between the columns D and E
+```{r echo=FALSE}
+table(ColumnD = data_full$RaceEthnicity.1, ColumnE = data_full$RaceEthnicity.2, useNA = "ifany") |> knitr::kable()
+```
+
+
+## Check if Race/Ethnicity is coded consistently between the columns E and F
+```{r echo=FALSE}
+table(ColumnD = data_full$RaceEthnicity.1, ColumnF = data_full$Race.Asian, useNA = "ifany") |> knitr::kable()
+
+table(ColumnE = data_full$RaceEthnicity.2, ColumnF = data_full$Race.Asian, useNA = "ifany") |> knitr::kable()
+```
+
+
+Question:
+* Should the patient of Arabic (ID: `r data_full$StudyID[which(data_full$RaceEthnicity.1 == "Arabic" & data_full$Race.Asian %in% c("South Asian"))]`) coded as `Western Asian` or `Asian Other` in the column F? 
+
+# Summary tables
+## Compare patient characteristics between two hospitals
+```{r echo=FALSE, warning=FALSE}
+## Table one of all patients
+table_one <- tbl_summary(data = data_full %>% 
+                           select(c("Age.Dx",
+                                    "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian",
+                                    "Language",
+                                    "BMI", 
+                                    "Insure.type", 
+                                    "MMGSD", "MMGO", "MRISD", "MMGD",
+                                    "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                    "ER", "PR", "HER2", "Subtype",
+                                    "Hospital")), 
+                         by = "Hospital",
+                         label = list(Age.Dx ~ "Age at Diagnosis",
+                                      RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                      RaceEthnicity.2 ~ "Race/Ethnicity 2, n (%)",
+                                      Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                      Language ~ "Patient Language, n (%)",
+                                      BMI ~ "Body Mass Index",
+                                      Insure.type ~ "Type of Insurance, n (%)", 
+                                      MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                      MMGO ~ "Mammo-Occult, n (%)",
+                                      MRISD ~ "MRI Screen-Detected, n (%)",
+                                      MMGD ~ "Mammographic Density, n (%)", 
+                                      T.stage ~ "Clinical T Stage, n (%)",
+                                      T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                      T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                      N.stage ~ "Clinical N Stage, n (%)",
+                                      N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                      Clinic.stage ~ "Clinical Stage, n (%)",
+                                      ER ~ "Estrogen Receptor, n (%)",
+                                      PR ~ "Progesterone Receptor, n (%)",
+                                      HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                      Subtype ~ "Tumor Subtype, n (%)"),
+                         type = all_continuous() ~ "continuous2",
+                         statistic = list(all_continuous() ~ c("{median} ({min}, {max})",
+                                                               "{mean}+/-{sd}")),
+                         missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% # Remove unnecessary footnotes
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 1. Patient characteristics between two hospitals (NYPQ vs WCM).") 
+table_one
+```
+
+## Compare Asian patient characteristics between two hospitals
+
+```{r echo=FALSE}
+## Table two of Asian patients
+table_two_asian <- tbl_summary(data = data_full %>% 
+                                 filter(RaceEthnicity.2 == "Asian") %>% 
+                                 select(c("Age.Dx",
+                                          "RaceEthnicity.1", "Race.Asian",
+                                          "Language",
+                                          "BMI", 
+                                          "Insure.type", 
+                                          "MMGSD", "MMGO", "MRISD", "MMGD",
+                                          "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                          "ER", "PR", "HER2", "Subtype",
+                                          "Hospital")), 
+                                 by = "Hospital",
+                                 label = list(Age.Dx ~ "Age at Diagnosis",
+                                              RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                              Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                              Language ~ "Patient Language, n (%)",
+                                              BMI ~ "Body Mass Index",
+                                              Insure.type ~ "Type of Insurance, n (%)", 
+                                              MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                              MMGO ~ "Mammo-Occult, n (%)",
+                                              MRISD ~ "MRI Screen-Detected, n (%)",
+                                              MMGD ~ "Mammographic Density, n (%)", 
+                                              T.stage ~ "Clinical T Stage, n (%)",
+                                              T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                              T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                              N.stage ~ "Clinical N Stage, n (%)",
+                                              N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                              Clinic.stage ~ "Clinical Stage, n (%)",
+                                              ER ~ "Estrogen Receptor, n (%)",
+                                              PR ~ "Progesterone Receptor, n (%)",
+                                              HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                              Subtype ~ "Tumor Subtype, n (%)"),
+                               type = all_continuous() ~ "continuous2",
+                               statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                               missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 2. Asian patient characteristics between two hospitals (NYPQ vs WCM).") 
+table_two_asian
+```
+
+## Compare Chinese patient characteristics between two hospitals
+```{r echo=FALSE}
+## Table three of Chinese patients
+table_three_chinese <- tbl_summary(data = data_full %>% 
+                                     filter(RaceEthnicity.1 == "Chinese") %>% 
+                                     select(c("Age.Dx",
+                                              "Language",
+                                              "BMI", 
+                                              "Insure.type", 
+                                              "MMGSD", "MMGO", "MRISD", "MMGD",
+                                              "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                              "ER", "PR", "HER2", "Subtype",
+                                              "Hospital")), 
+                                   by = "Hospital",
+                                   label = list(Age.Dx ~ "Age at Diagnosis",
+                                                Language ~ "Patient Language, n (%)",
+                                                BMI ~ "Body Mass Index",
+                                                Insure.type ~ "Type of Insurance, n (%)", 
+                                                MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                                MMGO ~ "Mammo-Occult, n (%)",
+                                                MRISD ~ "MRI Screen-Detected, n (%)",
+                                                MMGD ~ "Mammographic Density, n (%)", 
+                                                T.stage ~ "Clinical T Stage, n (%)",
+                                                T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                                T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                                N.stage ~ "Clinical N Stage, n (%)",
+                                                N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                                Clinic.stage ~ "Clinical Stage, n (%)",
+                                                ER ~ "Estrogen Receptor, n (%)",
+                                                PR ~ "Progesterone Receptor, n (%)",
+                                                HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                                Subtype ~ "Tumor Subtype, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})",
+                                                               "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 3. Chinese patient characteristics between two hospitals (NYPQ vs WCM).") 
+table_three_chinese
+```
+
+## Compare patient characteristics across race and hospital site (NYPQ Asian vs NYPQ Non-Asian vs WCM Asian vs WCM Non-Asian)
+
+```{r echo=FALSE}
+## Create a new variable to record the combined category of Race.2 and Hospital
+# data_full <- data_full %>%
+#   mutate(RaceSite.1 = case_when(
+#     Race.2 == "Asian" & Hospital == "Queens" ~ "Asian Queens",
+#     Race.2 == "Asian" & Hospital == "Cornell" ~ "Asian Cornell",
+#     Race.2 == "Non-Asian" & Hospital == "Queens" ~ "Non-Asian Queens",
+#     Race.2 == "Non-Asian" & Hospital == "Cornell" ~ "Non-Asian Cornell"))
+
+## Another fast way
+data_full$Race.2 <- with(data_full, ifelse(RaceEthnicity.2 == "Asian", "Asian", "Non-Aisan"))
+data_full$RaceSite.1 <- with(data_full, paste0(Hospital, ":", Race.2))
+data_full$RaceSite.1 <- factor(data_full$RaceSite.1, 
+                               levels = c("NYPQ:Asian", "NYPQ:Non-Aisan", "WCM:Asian", "WCM:Non-Aisan"),
+                               ordered = TRUE)
+
+## Table four
+table_four <- tbl_summary(data = data_full %>% 
+                            select(c("Age.Dx",
+                                     "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian",
+                                     "Language",
+                                     "BMI", 
+                                     "Insure.type", 
+                                     "MMGSD", "MMGO", "MRISD", "MMGD",
+                                     "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                     "ER", "PR", "HER2", "Subtype",
+                                     "RaceSite.1")), 
+                             by = "RaceSite.1",
+                             label = list(Age.Dx ~ "Age at Diagnosis",
+                                          RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                          RaceEthnicity.2 ~ "Race/Ethnicity 2, n (%)",
+                                          Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                          Language ~ "Patient Language, n (%)",
+                                          BMI ~ "Body Mass Index",
+                                          Insure.type ~ "Type of Insurance, n (%)", 
+                                          MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                          MMGO ~ "Mammo-Occult, n (%)",
+                                          MRISD ~ "MRI Screen-Detected, n (%)",
+                                          MMGD ~ "Mammographic Density, n (%)", 
+                                          T.stage ~ "Clinical T Stage, n (%)",
+                                          T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                          T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                          N.stage ~ "Clinical N Stage, n (%)",
+                                          N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                          Clinic.stage ~ "Clinical Stage, n (%)",
+                                          ER ~ "Estrogen Receptor, n (%)",
+                                          PR ~ "Progesterone Receptor, n (%)",
+                                          HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                          Subtype ~ "Tumor Subtype, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 4. Patient characteristics across race and hospital site (NYPQ Asian vs NYPQ Non-Asian vs WCM Asian vs WCM Non-Asian).") 
+table_four
+```
+
+
+## Compare patient characteristics across race and hospital site (NYPQ East-Asian vs NYPQ Non-East-Asian vs WCM East-Asian vs WCM Non-East-Asian)
+
+```{r echo=FALSE}
+data_full$Race.3 <- with(data_full, ifelse(Race.Asian == "East Asian", "East-Asian", "Non-East-Asian"))
+data_full$RaceSite.2 <- with(data_full, paste0(Hospital, ":", Race.3)) 
+# table(data_full$RaceSite.2, useNA = "always")
+data_full$RaceSite.2 <- factor(data_full$RaceSite.2,
+                               levels = c("NYPQ:East-Asian", "NYPQ:Non-East-Asian", "WCM:East-Asian", "WCM:Non-East-Asian"),
+                               ordered = TRUE)
+
+## Table five
+table_five <- tbl_summary(data = data_full %>% 
+                            select(c("Age.Dx",
+                                     "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian",
+                                     "Language",
+                                     "BMI", 
+                                     "Insure.type", 
+                                     "MMGSD", "MMGO", "MRISD", "MMGD",
+                                     "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                     "ER", "PR", "HER2", "Subtype",
+                                     "RaceSite.2")), 
+                                   by = "RaceSite.2",
+                                   label = list(Age.Dx ~ "Age at Diagnosis",
+                                                RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                                RaceEthnicity.2 ~ "Race/Ethnicity 2, n (%)",
+                                                Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                                Language ~ "Patient Language, n (%)",
+                                                BMI ~ "Body Mass Index",
+                                                Insure.type ~ "Type of Insurance, n (%)", 
+                                                MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                                MMGO ~ "Mammo-Occult, n (%)",
+                                                MRISD ~ "MRI Screen-Detected, n (%)",
+                                                MMGD ~ "Mammographic Density, n (%)", 
+                                                T.stage ~ "Clinical T Stage, n (%)",
+                                                T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                                T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                                N.stage ~ "Clinical N Stage, n (%)",
+                                                N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                                Clinic.stage ~ "Clinical Stage, n (%)",
+                                                ER ~ "Estrogen Receptor, n (%)",
+                                                PR ~ "Progesterone Receptor, n (%)",
+                                                HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                                Subtype ~ "Tumor Subtype, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 5. Patient characteristics across race and hospital site (NYPQ East-Asian vs NYPQ Non-East-Asian vs WCM East-Asian vs WCM Non-East-Asian).") 
+table_five
+```
+
+## Compare the node-negative breast cancers between Non-Chinese patients at WCM and Chinese patients at WCM
+
+```{r include=FALSE}
+data_full$Race.4 <- with(data_full, ifelse(RaceEthnicity.1 != "Chinese", "Non-Chinese", RaceEthnicity.1))
+data_full$RaceSite.3 <- with(data_full, paste0(Hospital, ":", Race.4)) 
+data_full$RaceSite.3 <- factor(data_full$RaceSite.3,
+                               levels = c("NYPQ:Chinese", "NYPQ:Non-Chinese", "WCM:Chinese", "WCM:Non-Chinese"),
+                               ordered = TRUE)
+
+
+## Create two categorical variables
+data_full$CornelC <- with(data_full, 
+                          case_when(RaceSite.3 == "WCM:Chinese" ~ "Chinese patients at WCM", 
+                                    RaceSite.3 == "WCM:Non-Chinese" ~ "Non-Chinese patients at WCM",
+                                    TRUE ~ as.character(NA))) %>%
+  factor()
+data_full$N.stage.3 <- with(data_full, ifelse(N.stage.2 == "N0", "N0 = Yes", "N0 = No")) %>%
+  factor(levels = c("N0 = Yes", "N0 = No"))
+
+out.CornelC <- BTKR::fsmry2.by.grp(y = data_full %>% filter(!is.na(CornelC)) %>% dplyr::select("CornelC"),
+                                   grp = data_full %>% filter(!is.na(CornelC)) %>% dplyr::select("N.stage.3"),
+                                   cmp.method = "chisq")
+```
+
+```{r echo=FALSE, results="asis"}
+knitr::kable(out.CornelC)
+```
+
+## Compare the node-negative breast cancers between Non-Chinese patients at NYPQ and Chinese patients at NYPQ
+
+```{r include=FALSE}
+data_full$QueenC <- with(data_full, 
+                         case_when(RaceSite.3 == "NYPQ:Chinese" ~ "Chinese patients at NYPQ", 
+                                   RaceSite.3 == "NYPQ:Non-Chinese" ~ "Non-Chinese patients at NYPQ",
+                                   TRUE ~ as.character(NA))) %>%
+  factor()
+
+out.QueenC <- BTKR::fsmry2.by.grp(y = data_full %>% filter(!is.na(QueenC)) %>% dplyr::select("QueenC"),
+                                  grp = data_full %>% filter(!is.na(QueenC)) %>% dplyr::select("N.stage.3"), 
+                                  cmp.method = "chisq")
+```
+
+```{r echo=FALSE, results="asis"}
+knitr::kable(out.QueenC)
+```
+
+## Compare patient characteristics across race and hospital site (NYPQ Chinese vs NYPQ Non-Chinese vs WCM Chinese vs WCM Non-Chinese)
+
+```{r echo=FALSE}
+## Create a new variable to record the combined category of RaceEthnicity.2 and Hospital
+# data_full$Race.4 <- with(data_full, ifelse(RaceEthnicity.1 != "Chinese", "Non-Chinese", RaceEthnicity.1))
+# data_full$RaceSite.3 <- with(data_full, paste0(Hospital, ":", Race.4)) 
+# data_full$RaceSite.3 <- gsub("Cornell:NA", NA, data_full$RaceSite.3) %>%
+#     factor(levels = c("Queens:Chinese", "Queens:Non-Chinese", "Cornell:Chinese", "Cornell:Non-Chinese"),
+#          ordered = TRUE)
+# table(data_full$RaceSite.3, useNA = "always")
+
+## Table six
+table_six <- tbl_summary(data = data_full %>% 
+                           dplyr::select(c("Age.Dx",
+                                           "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian",
+                                           "Language",
+                                           "BMI", 
+                                           "Insure.type", 
+                                           "MMGSD", "MMGO", "MRISD", "MMGD",
+                                           "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                           "ER", "PR", "HER2", "Subtype",
+                                           "RaceSite.3")), 
+                           by = "RaceSite.3",
+                           label = list(Age.Dx ~ "Age at Diagnosis",
+                                        RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                        RaceEthnicity.2 ~ "Race/Ethnicity 2, n (%)",
+                                        Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                        Language ~ "Patient Language, n (%)",
+                                        BMI ~ "Body Mass Index",
+                                        Insure.type ~ "Type of Insurance, n (%)", 
+                                        MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                        MMGO ~ "Mammo-Occult, n (%)",
+                                        MRISD ~ "MRI Screen-Detected, n (%)",
+                                        MMGD ~ "Mammographic Density, n (%)", 
+                                        T.stage ~ "Clinical T Stage, n (%)",
+                                        T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                        T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                        N.stage ~ "Clinical N Stage, n (%)",
+                                        N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                        Clinic.stage ~ "Clinical Stage, n (%)",
+                                        ER ~ "Estrogen Receptor, n (%)",
+                                        PR ~ "Progesterone Receptor, n (%)",
+                                        HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                        Subtype ~ "Tumor Subtype, n (%)"),
+                            type = all_continuous() ~ "continuous2",
+                            statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                            missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 6. Patient characteristics across race and hospital site (NYPQ Chinese vs NYPQ Non-Chinese vs WCM Chinese vs WCM Non-Chinese).") 
+table_six
+```
+
+
+## Compare Non-Chinese Asian patient characteristics between two hospitals
+
+```{r echo=FALSE}
+## Table seven
+table_seven <- tbl_summary(data = data_full %>% 
+                             filter(RaceEthnicity.1 != "Chinese" & Race.2 == "Asian") %>%
+                             dplyr::select(c("Age.Dx",
+                                             "RaceEthnicity.1", "Race.Asian",
+                                             "Language",
+                                             "BMI", 
+                                             "Insure.type", 
+                                             "MMGSD", "MMGO", "MRISD", "MMGD",
+                                             "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                             "ER", "PR", "HER2", "Subtype",
+                                             "Hospital")), 
+                                   by = "Hospital",
+                                   label = list(Age.Dx ~ "Age at Diagnosis",
+                                                RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                                Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                                Language ~ "Patient Language, n (%)",
+                                                BMI ~ "Body Mass Index",
+                                                Insure.type ~ "Type of Insurance, n (%)", 
+                                                MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                                MMGO ~ "Mammo-Occult, n (%)",
+                                                MRISD ~ "MRI Screen-Detected, n (%)",
+                                                MMGD ~ "Mammographic Density, n (%)", 
+                                                T.stage ~ "Clinical T Stage, n (%)",
+                                                T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                                T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                                N.stage ~ "Clinical N Stage, n (%)",
+                                                N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                                Clinic.stage ~ "Clinical Stage, n (%)",
+                                                ER ~ "Estrogen Receptor, n (%)",
+                                                PR ~ "Progesterone Receptor, n (%)",
+                                                HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                                Subtype ~ "Tumor Subtype, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 7. Non-Chinese Asian patient characteristics between two hospitals (NYPQ vs WCM).") 
+table_seven
+```
+
+
+## Compare patient characteristics between Chinese and Non-Chinese
+```{r echo=FALSE}
+## Table eight
+table_eight <- tbl_summary(data = data_full %>%
+                             dplyr::select(c("Age.Dx",
+                                             "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian",
+                                             "Language",
+                                             "Hospital",
+                                             "BMI", 
+                                             "Insure.type", 
+                                             "MMGSD", "MMGO", "MRISD", "MMGD",
+                                             "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                             "ER", "PR", "HER2", "Subtype",
+                                             "Race.4")), 
+                                   by = "Race.4",
+                         label = list(Age.Dx ~ "Age at Diagnosis",
+                                      RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                      RaceEthnicity.2 ~ "Race/Ethnicity 2, n (%)",
+                                      Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                      Language ~ "Patient Language, n (%)",
+                                      Hospital ~ "Hospital Site, n (%)",
+                                      BMI ~ "Body Mass Index",
+                                      Insure.type ~ "Type of Insurance, n (%)", 
+                                      MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                      MMGO ~ "Mammo-Occult, n (%)",
+                                      MRISD ~ "MRI Screen-Detected, n (%)",
+                                      MMGD ~ "Mammographic Density, n (%)", 
+                                      T.stage ~ "Clinical T Stage, n (%)",
+                                      T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                      T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                      N.stage ~ "Clinical N Stage, n (%)",
+                                      N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                      Clinic.stage ~ "Clinical Stage, n (%)",
+                                      ER ~ "Estrogen Receptor, n (%)",
+                                      PR ~ "Progesterone Receptor, n (%)",
+                                      HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                      Subtype ~ "Tumor Subtype, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 8. Patient characteristics between Chinese and Non-Chinese.") 
+table_eight
+```
+
+## Compare East-Asian patient characteristics between two hospitals
+```{r echo=FALSE}
+table_nine <- tbl_summary(data = data_full %>%
+                            filter(Race.Asian == "East Asian") %>%
+                            dplyr::select(c("Age.Dx",
+                                            "RaceEthnicity.1",
+                                            "Language",
+                                            "BMI", 
+                                            "Insure.type", 
+                                            "MMGSD", "MMGO", "MRISD", "MMGD",
+                                            "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                            "ER", "PR", "HER2", "Subtype",
+                                            "Hospital")), 
+                                   by = "Hospital",
+                                   label = list(Age.Dx ~ "Age at Diagnosis",
+                                                RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                                Language ~ "Patient Language, n (%)",
+                                                BMI ~ "Body Mass Index",
+                                                Insure.type ~ "Type of Insurance, n (%)", 
+                                                MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                                MMGO ~ "Mammo-Occult, n (%)",
+                                                MRISD ~ "MRI Screen-Detected, n (%)",
+                                                MMGD ~ "Mammographic Density, n (%)", 
+                                                T.stage ~ "Clinical T Stage, n (%)",
+                                                T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                                T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                                N.stage ~ "Clinical N Stage, n (%)",
+                                                N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                                Clinic.stage ~ "Clinical Stage, n (%)",
+                                                ER ~ "Estrogen Receptor, n (%)",
+                                                PR ~ "Progesterone Receptor, n (%)",
+                                                HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                                Subtype ~ "Tumor Subtype, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 9. East-Asian patient characteristics between NYPQ and WCM.") 
+table_nine
+```
+
+
+## Compare Chinese and Non-Chinese patient characteristics at WCM
+
+```{r echo=FALSE}
+table_ten <- tbl_summary(data = data_full %>%
+                           filter(Hospital == "WCM") %>%
+                           dplyr::select(c("Age.Dx",
+                                           "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian",
+                                           "Language",
+                                           "BMI", 
+                                           "Insure.type", 
+                                           "MMGSD", "MMGO", "MRISD", "MMGD",
+                                           "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                           "ER", "PR", "HER2", "Subtype",
+                                           "Race.4")), 
+                                   by = "Race.4",
+                                   label = list(Age.Dx ~ "Age at Diagnosis",
+                                                RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                                RaceEthnicity.2 ~ "Race/Ethnicity 2, n (%)",
+                                                Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                                Language ~ "Patient Language, n (%)",
+                                                BMI ~ "Body Mass Index",
+                                                Insure.type ~ "Type of Insurance, n (%)", 
+                                                MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                                MMGO ~ "Mammo-Occult, n (%)",
+                                                MRISD ~ "MRI Screen-Detected, n (%)",
+                                                MMGD ~ "Mammographic Density, n (%)", 
+                                                T.stage ~ "Clinical T Stage, n (%)",
+                                                T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                                T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                                N.stage ~ "Clinical N Stage, n (%)",
+                                                N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                                Clinic.stage ~ "Clinical Stage, n (%)",
+                                                ER ~ "Estrogen Receptor, n (%)",
+                                                PR ~ "Progesterone Receptor, n (%)",
+                                                HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                                Subtype ~ "Tumor Subtype, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 10. Chinese and Non-Chinese patient characteristics at WCM.") 
+table_ten
+```
+
+
+## Compare Chinese and Non-Chinese patient characteristics at NYPQ
+
+```{r echo=FALSE}
+table_eleven <- tbl_summary(data = data_full %>%
+                              filter(Hospital == "NYPQ") %>%
+                              dplyr::select(c("Age.Dx",
+                                              "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian",
+                                              "Language",
+                                              "BMI", 
+                                              "Insure.type", 
+                                              "MMGSD", "MMGO", "MRISD", "MMGD",
+                                              "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                              "ER", "PR", "HER2", "Subtype",
+                                              "Race.4")), 
+                                     by = "Race.4",
+                                     label = list(Age.Dx ~ "Age at Diagnosis",
+                                                  RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                                  RaceEthnicity.2 ~ "Race/Ethnicity 2, n (%)",
+                                                  Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                                  Language ~ "Patient Language, n (%)",
+                                                  BMI ~ "Body Mass Index",
+                                                  Insure.type ~ "Type of Insurance, n (%)", 
+                                                  MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                                  MMGO ~ "Mammo-Occult, n (%)",
+                                                  MRISD ~ "MRI Screen-Detected, n (%)",
+                                                  MMGD ~ "Mammographic Density, n (%)", 
+                                                  T.stage ~ "Clinical T Stage, n (%)",
+                                                  T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                                  T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                                  N.stage ~ "Clinical N Stage, n (%)",
+                                                  N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                                  Clinic.stage ~ "Clinical Stage, n (%)",
+                                                  ER ~ "Estrogen Receptor, n (%)",
+                                                  PR ~ "Progesterone Receptor, n (%)",
+                                                  HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                                  Subtype ~ "Tumor Subtype, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 11. Chinese and Non-Chinese patient characteristics at NYPQ.") 
+table_eleven
+```
+
+## Compare Non-Chinese patient characteristics between two hospitals
+
+```{r echo=FALSE}
+table_twelve <- tbl_summary(data = data_full %>%
+                              filter(Race.4 == "Non-Chinese") %>%
+                              dplyr::select(c("Age.Dx",
+                                              "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian",
+                                              "Language",
+                                              "BMI", 
+                                              "Insure.type", 
+                                              "MMGSD", "MMGO", "MRISD", "MMGD",
+                                              "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Clinic.stage",
+                                              "ER", "PR", "HER2", "Subtype",
+                                              "Hospital")), 
+                                   by = "Hospital",
+                                   label = list(Age.Dx ~ "Age at Diagnosis",
+                                                RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                                RaceEthnicity.2 ~ "Race/Ethnicity 2, n (%)",
+                                                Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                                Language ~ "Patient Language, n (%)",
+                                                BMI ~ "Body Mass Index",
+                                                Insure.type ~ "Type of Insurance, n (%)", 
+                                                MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                                MMGO ~ "Mammo-Occult, n (%)",
+                                                MRISD ~ "MRI Screen-Detected, n (%)",
+                                                MMGD ~ "Mammographic Density, n (%)", 
+                                                T.stage ~ "Clinical T Stage, n (%)",
+                                                T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                                T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                                N.stage ~ "Clinical N Stage, n (%)",
+                                                N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                                Clinic.stage ~ "Clinical Stage, n (%)",
+                                                ER ~ "Estrogen Receptor, n (%)",
+                                                PR ~ "Progesterone Receptor, n (%)",
+                                                HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                                Subtype ~ "Tumor Subtype, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 12. Non-Chinese patient characteristics between two hospital sites (NYPQ vs WCM).") 
+table_twelve
+```
