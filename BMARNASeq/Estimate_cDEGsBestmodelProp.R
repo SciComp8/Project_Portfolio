@@ -9,6 +9,19 @@ prop.bestunimodel <- sum(cDEG.bestmodel[, 3] == "~1+BMI") / num.cDEG.bestmodel
 prop.bestmultimodel <- 1 - prop.bestunimodel - sum(cDEG.bestmodel[, 3] == "~1") / num.cDEG.bestmodel
 prop.dt <- data.table(threshold = 2000, seed = 120, variable = "BMI", num.cDEG.bestmodel = num.cDEG.bestmodel, prop.bestunimodel = prop.bestunimodel, prop.bestmultimodel = prop.bestmultimodel)
 
+
+# Alternative approach: 
+temp <- rbind(output.multi.train.s2[["DEG.bestmodel.Main"]][["BMI"]], output.multi.test.s2[["DEG.bestmodel.Main"]][["BMI"]]) |> unique()
+cDEG.all <- intersect(BMAseq.eFDR.Main.train$BMI[1:2000] |> names(), BMAseq.eFDR.Main.test$BMI[1:2000] |> names()) 
+cDEG.bestmodel <- temp[temp[, 2] %in% cDEG.all, 3]
+cDEG.bestmodel.split <- strsplit(cDEG.bestmodel, split = "+", fixed = T)
+cDEG.bestmodel.split <- lapply(cDEG.bestmodel.split, function(x) x[-1])
+var.num <- unlist(lapply(cDEG.bestmodel.split, function(x) length(x)))
+prop.bestunimodel <- table(var.num)[names(table(var.num)) == 1] / sum(table(var.num)) 
+prop.bestmultimodel <- 1 - table(var.num)[names(table(var.num)) %in% c(0, 1)] / sum(table(var.num)) 
+
+                         
+# Put everything together
 calc_prop_bestmodel <- function (threshold = NULL, seed = NULL, var.name = NULL) {
   temp <- rbind(output.multi.train.s2[["DEG.bestmodel.Main"]][[var.name]], output.multi.test.s2[["DEG.bestmodel.Main"]][[var.name]])
   cDEG.all <- intersect(BMAseq.eFDR.Main.train[[var.name]][1:threshold] |> names(), BMAseq.eFDR.Main.test[[var.name]][1:threshold] |> names())
