@@ -1,4 +1,4 @@
-# One case
+## The first part
 # Load data from one seed
 load("../ApplicationData/derived/RandomSeed/Top5000/MultiModel/BMAseqMulti120FDR1.RData") 
 
@@ -53,7 +53,7 @@ BMAseq.bestmodel.list <- readRDS("../ApplicationResult/Multi/RandomSeed/BestMode
 
 
 
-# Generalizable case
+## The second part
 cDEGs = cDEGs.list = bestmodel.list = NULL
 var.vec <- c("BMI", "AGE", "SEX", "MHABNWBC")
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
