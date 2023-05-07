@@ -1,4 +1,4 @@
-## The first part
+## The first part - build a BMAseq best model list per variable per random seed per ranking threshold
 # Load data from one seed
 load("../ApplicationData/derived/RandomSeed/Top5000/MultiModel/BMAseqMulti120FDR1.RData") 
 
@@ -53,7 +53,7 @@ BMAseq.bestmodel.list <- readRDS("../ApplicationResult/Multi/RandomSeed/BestMode
 
 
 
-## The second part
+## The second part - assign each BMAseq best model to each cDEG per variable per random seed per ranking threshold
 cDEGs = cDEGs.list = bestmodel.list = NULL
 var.vec <- c("BMI", "AGE", "SEX", "MHABNWBC")
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
