@@ -94,8 +94,7 @@ most_fr_bestmodel_cDEG_per_var <- function(var.name = "BMI") {
     cDEG.bestmodel.matrix <- matrix(0, nrow = length(cDEG.unique), ncol = 20)
     rownames(cDEG.bestmodel.matrix) <- cDEG.unique
     colnames(cDEG.bestmodel.matrix) <- paste(c("bestmodel.train", "bestmodel.test"), rep(seed.vec, each = 2))  
-    for (i in 1:10) { # Loop through seep
-      # cDEG.per.seed <- cDEG.list[[i]]
+    for (i in 1:10) { # Loop through seed
       seed.val <- seed.vec[i]
       temp.cDEG.bestmodel <- cDEG.bestmodel.list[[sprintf("%s+%s+%s", var.name, threshold.i, seed.val)]]
       temp.noncDEG.bestmodel <- noncDEG.bestmodel.list[[sprintf("%s+%s+%s", var.name, threshold.i, seed.val)]]
