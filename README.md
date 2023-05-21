@@ -47,3 +47,4 @@ The goal of this lipidomics and transcriptomics analysis is to test the hypothes
 **MDC Asian project** - This project aims to delve deeper into breast cancer patterns by analyzing various factors such as disease frequency, clinical T and N stages, tumor subtype, and the demographics of the communities served by two hospitals. By examining both aggregated and disaggregated racial/ethnic and community demographic data, we identify the disparities in breast cancer diagnosis and treatment. 
 - [MDCAsian_v1.Rmd](MDCAsian/MDCAsian_v1.Rmd)
 - [MDCAsian_v2.Rmd](MDCAsian/MDCAsian_v2.Rmd)
+- [MDCAsian_PredictiveModeling.Rmd](MDCAsian/MDCAsian_PredictiveModeling.Rmd)
