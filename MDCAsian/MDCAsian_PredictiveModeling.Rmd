@@ -1,0 +1,910 @@
+---
+title: "MDC Asian Patient Project - Predictive Modeling"
+author: "Anni Liu"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+knit: knitautomator::knit_filename
+output:
+  word_document:
+    fig_caption: no
+    fig_height: 4
+    fig_width: 4
+    highlight: null
+    toc: yes
+    reference_docx: MDCAsian_manuscript_style_V0.docx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  options(scipen = 999, digits = 4),
+  cache = TRUE,
+  error = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  tidy.opts = list(width.cutoff = 60),
+  tidy = TRUE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+
+```{r include=FALSE}
+## Attach libraries and functions
+easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "MASS") |> suppressPackageStartupMessages()
+"%_%" <- function(m, n) paste0(m, "_", n)
+"%0%" <- function(m, n) paste0(m, n)
+"%+%" <- function(m) paste0(m, collapse = "+")
+```
+
+# Data preparation
+```{r load_data, include=FALSE}
+data.full <- read_fst(path = "../data/derived/2023May14_dat_MDCAsian.RData")
+
+# Remove records with missing values in response and/or predictors
+response <- "Early.stage"
+predictors <- c("Age.Dx", "Race.Asian", "RaceEthnicity.4", "Hospital.2", "BMI", "Insure.type", "MMGSD", "MMGO", "MRISD", "MMGD.2", "ER", "Subtype")
+data.work <- na.omit(data.full[c("StudyID", response, predictors)])
+```
+
+
+## Compare early stage and non-early stage patient characteristics
+```{r echo=FALSE}
+table_fourteen <- tbl_summary(data = data.full[data.full$StudyID %in% data.work$StudyID, ] %>% 
+                                dplyr::select(c("Age.Dx",
+                                                "RaceEthnicity.1", "RaceEthnicity.2", "Race.Asian", "RaceEthnicity.4", "RaceSite",
+                                                "Language",
+                                                "Hospital",
+                                                "BMI", 
+                                                "Insure.type", 
+                                                "MMGSD", "MMGO", "MRISD", "MMGD",
+                                                "T.stage", "T.stage.2", "T.stage.3", "N.stage", "N.stage.2", "Early.stage",
+                                                "ER", "PR", "HER2", "Subtype", "Subtype.2")), 
+                                   by = "Early.stage",
+                                   label = list(Age.Dx ~ "Age at Diagnosis",
+                                                RaceEthnicity.1 ~ "Race/Ethnicity 1, n (%)",
+                                                RaceEthnicity.2 ~ "Race/Ethnicity 2, n (%)",
+                                                Race.Asian ~ "Race/Ethnicity 3, n (%)",
+                                                RaceEthnicity.4 ~ "Race/Ethnicity 4, n (%)",
+                                                RaceSite ~ "Race Site, n (%)",
+                                                Language ~ "Patient Language, n (%)",
+                                                BMI ~ "Body Mass Index",
+                                                Insure.type ~ "Type of Insurance, n (%)", 
+                                                MMGSD ~ "Mammo Screen-Detected, n (%)",
+                                                MMGO ~ "Mammo-Occult, n (%)",
+                                                MRISD ~ "MRI Screen-Detected, n (%)",
+                                                MMGD ~ "Mammographic Density, n (%)", 
+                                                T.stage ~ "Clinical T Stage, n (%)",
+                                                T.stage.2 ~ "Clinical T Stage 2, n (%)",
+                                                T.stage.3 ~ "Clinical T Stage 3, n (%)",
+                                                N.stage ~ "Clinical N Stage, n (%)",
+                                                N.stage.2 ~ "Clinical N Stage 2, n (%)",
+                                                Early.stage ~ "Early Stage, n (%)",
+                                                ER ~ "Estrogen Receptor, n (%)",
+                                                PR ~ "Progesterone Receptor, n (%)",
+                                                HER2 ~ "Human Epidermal Growth Factor Receptor 2, n (%)",
+                                                Subtype ~ "Tumor Subtype, n (%)",
+                                                Subtype.2 ~ "Tumor Subtype 2, n (%)"),
+                                   type = all_continuous() ~ "continuous2",
+                                   statistic = list(all_continuous() ~ c("{median} ({min}, {max})", "{mean}+/-{sd}")),
+                                   missing_text = "Missing, n") %>%
+   modify_table_body(
+    dplyr::mutate,
+    label = case_when(label == "Median (Range)" ~ "Median (range)",
+                      label == "Mean+/-SD" ~ "Mean+/-sd",
+                      TRUE ~ label)) %>%
+  modify_footnote(update = everything() ~ NA) %>% 
+  bold_labels() %>%
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE, B = 5000)) %>%
+  as_flex_table() %>%
+  bold(bold = TRUE, part = "header") %>%
+  set_caption(caption = "Table 14. Patient characteristics between early stage and non-early stage after removal of the records with missing values in response and/or predictors.") 
+table_fourteen
+```
+
+
+# Multivariable analysis on breast cancer stage at presentation
+```{r include=FALSE}
+covariates <- predictors[-which(predictors %in% c("RaceEthnicity.4", "Subtype"))] 
+```
+## Covariate setting 1 - `r "%+%"(covariates)`
+```{r include=FALSE, warning=FALSE}
+# Run multivariate logistic models using Early.stage, Age.Dx, Race.Asian, Hospital.2, BMI, Insure.type, MMGSD, MMGO, MRISD, MMGD.2, ER
+glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), data = data.work, family = binomial)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit)), 
+                           lower.limit = exp(confint(glm.fit))[, 1], 
+                           upper.limit = exp(confint(glm.fit))[, 2], 
+                           p.value = summary(glm.fit)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "East Asian (vs Non-Asian)",
+                         "South Asian (vs Non-Asian)", 
+                         "Southeast Asian (vs Non-Asian)",
+                         "Asian Other (vs Non-Asian)",
+                         "NYPQ (vs WCM)",
+                         "BMI",
+                         "Medicaid (vs Private)",
+                         "Medicare (vs Private)",
+                         "Self Pay (vs Private)",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "Mammo-Occult Yes (vs Mammo-Occult No)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "ER Negative (vs ER Positive)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+## Backward stepwise selection for covariate setting 1 
+```{r include=FALSE, warning=FALSE}
+glm.fit.back <- glm.fit |> stepAIC(direction = "backward", trace = FALSE)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit.back)), 
+                           lower.limit = exp(confint(glm.fit.back))[, 1], 
+                           upper.limit = exp(confint(glm.fit.back))[, 2], 
+                           p.value = summary(glm.fit.back)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "BMI",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "ER Negative (vs ER Positive)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                            align = "lcccc")
+```
+
+
+```{r include=FALSE}
+covariates <- c(predictors[-which(predictors %in% c("RaceEthnicity.4", "Subtype"))], "Race.Asian*Hospital.2") 
+```
+## Covariate setting 2 - `r "%+%"(covariates)`
+```{r eval=FALSE, include=FALSE}
+# Check if there exist the interaction between Hospital and Race.Asian
+ggplot(data = data.work, 
+       mapping = aes(x = Early.stage, group = Race.Asian, fill = Race.Asian)) +
+  geom_bar(position = "dodge") + 
+  facet_wrap(~Hospital.2) + 
+  labs(x = "Clinical stage status",
+       y = "Frequency",
+       fill = "Race") + 
+  theme_bw()
+```
+
+
+```{r include=FALSE, warning=FALSE}
+# Run multivariate logistic models using Early.stage, Age.Dx, Race.Asian, Hospital.2, Race.Asian*Hospital.2, BMI, Insure.type, MMGSD, MMGO, MRISD, MMGD.2, ER
+glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), data = data.work, family = binomial)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit)), 
+                           lower.limit = exp(confint(glm.fit))[, 1], 
+                           upper.limit = exp(confint(glm.fit))[, 2], 
+                           p.value = summary(glm.fit)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "East Asian (vs Non-Asian)",
+                         "South Asian (vs Non-Asian)", 
+                         "Southeast Asian (vs Non-Asian)",
+                         "Asian Other (vs Non-Asian)",
+                         "NYPQ (vs WCM)",
+                         "BMI",
+                         "Medicaid (vs Private)",
+                         "Medicare (vs Private)",
+                         "Self Pay (vs Private)",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "Mammo-Occult Yes (vs Mammo-Occult No)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "ER Negative (vs ER Positive)",
+                         "East Asian × NYPQ",
+                         "South Asian × NYPQ",
+                         "Southeast Asian × NYPQ",
+                         "Asian Other × NYPQ"
+                         )
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+## Backward stepwise selection for covariate setting 2
+```{r include=FALSE, warning=FALSE}
+glm.fit.back <- glm.fit |> stepAIC(direction = "backward", trace = FALSE)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit.back)), 
+                           lower.limit = exp(confint(glm.fit.back))[, 1], 
+                           upper.limit = exp(confint(glm.fit.back))[, 2], 
+                           p.value = summary(glm.fit.back)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "BMI",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "ER Negative (vs ER Positive)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+```{r include=FALSE}
+covariates <- c(predictors[-which(predictors %in% c("Race.Asian", "Subtype"))]) 
+```
+## Covariate setting 3 - `r "%+%"(covariates)`
+```{r include=FALSE, warning=FALSE}
+# Run multivariate logistic models using Early.stage, Age.Dx, RaceEthnicity.4, Hospital.2, BMI, Insure.type, MMGSD, MMGO, MRISD, MMGD.2, ER 
+
+glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), data = data.work, family = binomial)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit)), 
+                           lower.limit = exp(confint(glm.fit))[, 1], 
+                           upper.limit = exp(confint(glm.fit))[, 2], 
+                           p.value = summary(glm.fit)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "East Asian (vs Non-Hispanic White)",
+                         "South Asian (vs Non-Hispanic White)", 
+                         "Southeast Asian (vs Non-Hispanic White)",
+                         "Asian Other (vs Non-Hispanic White)",
+                         "Non-Hispanic Black (vs Non-Hispanic White)", 
+                         "Hispanic (vs Non-Hispanic White)",
+                         "Other (vs Non-Hispanic White)",
+                         "NYPQ (vs WCM)",
+                         "BMI",
+                         "Medicaid (vs Private)",
+                         "Medicare (vs Private)",
+                         "Self Pay (vs Private)",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "Mammo-Occult Yes (vs Mammo-Occult No)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "ER Negative (vs ER Positive)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+## Backward stepwise selection for covariate setting 3
+```{r include=FALSE, warning=FALSE}
+glm.fit.back <- glm.fit |> stepAIC(direction = "backward", trace = FALSE)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit.back)), 
+                           lower.limit = exp(confint(glm.fit.back))[, 1], 
+                           upper.limit = exp(confint(glm.fit.back))[, 2], 
+                           p.value = summary(glm.fit.back)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "BMI",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "ER Negative (vs ER Positive)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+```{r include=FALSE}
+covariates <- c(predictors[-which(predictors %in% c("Race.Asian", "Subtype"))], "RaceEthnicity.4*Hospital.2") 
+```
+## Covariate setting 4 - `r "%+%"(covariates)`
+```{r eval=FALSE, include=FALSE}
+# Check if there exist the interaction between Hospital and RaceEthnicity.4
+ggplot(data = data.work, 
+       mapping = aes(x = Early.stage, group = RaceEthnicity.4, fill = RaceEthnicity.4)) +
+  geom_bar(position = "dodge") + 
+  facet_wrap(~Hospital.2) + 
+  labs(x = "Clinical stage status",
+       y = "Frequency",
+       fill = "Race") + 
+  theme_bw()
+```
+
+
+```{r include=FALSE, warning=FALSE}
+# Run multivariate logistic models using Early.stage, Age.Dx, RaceEthnicity.4, Hospital.2, RaceEthnicity.4*Hospital.2, BMI, Insure.type, MMGSD, MMGO, MRISD, MMGD.2, ER
+
+glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), data = data.work, family = binomial)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit)), 
+                           lower.limit = exp(confint(glm.fit))[, 1], 
+                           upper.limit = exp(confint(glm.fit))[, 2], 
+                           p.value = summary(glm.fit)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "East Asian (vs Non-Hispanic White)",
+                         "South Asian (vs Non-Hispanic White)", 
+                         "Southeast Asian (vs Non-Hispanic White)",
+                         "Asian Other (vs Non-Hispanic White)",
+                         "Non-Hispanic Black (vs Non-Hispanic White)", 
+                         "Hispanic (vs Non-Hispanic White)",
+                         "Other (vs Non-Hispanic White)",
+                         "NYPQ (vs WCM)",
+                         "BMI",
+                         "Medicaid (vs Private)",
+                         "Medicare (vs Private)",
+                         "Self Pay (vs Private)",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "Mammo-Occult Yes (vs Mammo-Occult No)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "ER Negative (vs ER Positive)",
+                         "East Asian × NYPQ",
+                         "South Asian × NYPQ",
+                         "Southeast Asian × NYPQ",
+                         "Asian Other × NYPQ",
+                         "Non-Hispanic Black × NYPQ",
+                         "Hispanic × NYPQ",
+                         "Other × NYPQ"
+                         )
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+## Backward stepwise selection for covariate setting 4
+```{r include=FALSE, warning=FALSE}
+glm.fit.back <- glm.fit |> stepAIC(direction = "backward", trace = FALSE)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit.back)), 
+                           lower.limit = exp(confint(glm.fit.back))[, 1], 
+                           upper.limit = exp(confint(glm.fit.back))[, 2], 
+                           p.value = summary(glm.fit.back)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "BMI",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "ER Negative (vs ER Positive)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+```{r include=FALSE}
+covariates <- c(predictors[-which(predictors %in% c("RaceEthnicity.4", "ER"))]) 
+```
+## Covariate setting 5 - `r "%+%"(covariates)`
+```{r include=FALSE, warning=FALSE}
+# Run multivariate logistic models using Early.stage, Age.Dx, Race.Asian, Hospital.2, BMI, Insure.type, MMGSD, MMGO, MRISD, MMGD.2, Subtype
+
+glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), data = data.work, family = binomial)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit)), 
+                           lower.limit = exp(confint(glm.fit))[, 1], 
+                           upper.limit = exp(confint(glm.fit))[, 2], 
+                           p.value = summary(glm.fit)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "East Asian (vs Non-Asian)",
+                         "South Asian (vs Non-Asian)", 
+                         "Southeast Asian (vs Non-Asian)",
+                         "Asian Other (vs Non-Asian)",
+                         "NYPQ (vs WCM)",
+                         "BMI",
+                         "Medicaid (vs Private)",
+                         "Medicare (vs Private)",
+                         "Self Pay (vs Private)",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "Mammo-Occult Yes (vs Mammo-Occult No)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "HER2+ (vs HR+, HER2-)",
+                         "Triple negative (vs HR+, HER2-)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+## Backward stepwise selection for covariate setting 5
+```{r include=FALSE, warning=FALSE}
+glm.fit.back <- glm.fit |> stepAIC(direction = "backward", trace = FALSE)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit.back)), 
+                           lower.limit = exp(confint(glm.fit.back))[, 1], 
+                           upper.limit = exp(confint(glm.fit.back))[, 2], 
+                           p.value = summary(glm.fit.back)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "BMI",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "HER2+ (vs HR+, HER2-)",
+                         "Triple negative (vs HR+, HER2-)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+```{r include=FALSE}
+covariates <- c(predictors[-which(predictors %in% c("RaceEthnicity.4", "ER"))], "Race.Asian*Hospital.2") 
+```
+## Covariate setting 6 - `r "%+%"(covariates)`
+```{r include=FALSE, warning=FALSE}
+# Run multivariate logistic models using Early.stage, Age.Dx, Race.Asian, Hospital.2, Race.Asian*Hospital.2, BMI, Insure.type, MMGSD, MMGO, MRISD, MMGD.2, Subtype
+
+glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), data = data.work, family = binomial)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit)), 
+                           lower.limit = exp(confint(glm.fit))[, 1], 
+                           upper.limit = exp(confint(glm.fit))[, 2], 
+                           p.value = summary(glm.fit)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "East Asian (vs Non-Asian)",
+                         "South Asian (vs Non-Asian)", 
+                         "Southeast Asian (vs Non-Asian)",
+                         "Asian Other (vs Non-Asian)",
+                         "NYPQ (vs WCM)",
+                         "BMI",
+                         "Medicaid (vs Private)",
+                         "Medicare (vs Private)",
+                         "Self Pay (vs Private)",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "Mammo-Occult Yes (vs Mammo-Occult No)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "HER2+ (vs HR+, HER2-)",
+                         "Triple negative (vs HR+, HER2-)",
+                         "East Asian × NYPQ",
+                         "South Asian × NYPQ",
+                         "Southeast Asian × NYPQ",
+                         "Asian Other × NYPQ"
+                         )
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+## Backward stepwise selection for covariate setting 6
+```{r include=FALSE, warning=FALSE}
+glm.fit.back <- glm.fit |> stepAIC(direction = "backward", trace = FALSE)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit.back)), 
+                           lower.limit = exp(confint(glm.fit.back))[, 1], 
+                           upper.limit = exp(confint(glm.fit.back))[, 2], 
+                           p.value = summary(glm.fit.back)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "BMI",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "HER2+ (vs HR+, HER2-)",
+                         "Triple negative (vs HR+, HER2-)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+```{r include=FALSE}
+covariates <- c(predictors[-which(predictors %in% c("Race.Asian", "ER"))]) 
+```
+## Covariate setting 7 - `r "%+%"(covariates)`
+```{r include=FALSE, warning=FALSE}
+# Run multivariate logistic models using Early.stage, Age.Dx, RaceEthnicity.4, Hospital.2, BMI, Insure.type, MMGSD, MMGO, MRISD, MMGD.2, Subtype 
+
+glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), data = data.work, family = binomial)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit)), 
+                           lower.limit = exp(confint(glm.fit))[, 1], 
+                           upper.limit = exp(confint(glm.fit))[, 2], 
+                           p.value = summary(glm.fit)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "East Asian (vs Non-Hispanic White)",
+                         "South Asian (vs Non-Hispanic White)", 
+                         "Southeast Asian (vs Non-Hispanic White)",
+                         "Asian Other (vs Non-Hispanic White)",
+                         "Non-Hispanic Black (vs Non-Hispanic White)", 
+                         "Hispanic (vs Non-Hispanic White)",
+                         "Other (vs Non-Hispanic White)",
+                         "NYPQ (vs WCM)",
+                         "BMI",
+                         "Medicaid (vs Private)",
+                         "Medicare (vs Private)",
+                         "Self Pay (vs Private)",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "Mammo-Occult Yes (vs Mammo-Occult No)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "HER2+ (vs HR+, HER2-)",
+                         "Triple negative (vs HR+, HER2-)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+## Backward stepwise selection for covariate setting 7
+```{r include=FALSE, warning=FALSE}
+glm.fit.back <- glm.fit |> stepAIC(direction = "backward", trace = FALSE)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit.back)), 
+                           lower.limit = exp(confint(glm.fit.back))[, 1], 
+                           upper.limit = exp(confint(glm.fit.back))[, 2], 
+                           p.value = summary(glm.fit.back)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "BMI",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "HER2+ (vs HR+, HER2-)",
+                         "Triple negative (vs HR+, HER2-)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+```{r include=FALSE}
+covariates <- c(predictors[-which(predictors %in% c("Race.Asian", "ER"))], "RaceEthnicity.4*Hospital.2") 
+```
+## Covariate setting 8 - `r "%+%"(covariates)`
+```{r include=FALSE, warning=FALSE}
+# Run multivariate logistic models using Early.stage, Age.Dx, RaceEthnicity.4, Hospital.2, RaceEthnicity.4*Hospital.2, BMI, Insure.type, MMGSD, MMGO, MRISD, MMGD.2, Subtype
+
+glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), data = data.work, family = binomial)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit)), 
+                           lower.limit = exp(confint(glm.fit))[, 1], 
+                           upper.limit = exp(confint(glm.fit))[, 2], 
+                           p.value = summary(glm.fit)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "East Asian (vs Non-Hispanic White)",
+                         "South Asian (vs Non-Hispanic White)", 
+                         "Southeast Asian (vs Non-Hispanic White)",
+                         "Asian Other (vs Non-Hispanic White)",
+                         "Non-Hispanic Black (vs Non-Hispanic White)", 
+                         "Hispanic (vs Non-Hispanic White)",
+                         "Other (vs Non-Hispanic White)",
+                         "NYPQ (vs WCM)",
+                         "BMI",
+                         "Medicaid (vs Private)",
+                         "Medicare (vs Private)",
+                         "Self Pay (vs Private)",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "Mammo-Occult Yes (vs Mammo-Occult No)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "HER2+ (vs HR+, HER2-)",
+                         "Triple negative (vs HR+, HER2-)",
+                         "East Asian × NYPQ",
+                         "South Asian × NYPQ",
+                         "Southeast Asian × NYPQ",
+                         "Asian Other × NYPQ",
+                         "Non-Hispanic Black × NYPQ",
+                         "Hispanic × NYPQ",
+                         "Other × NYPQ"
+                         )
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
+
+## Backward stepwise selection for covariate setting 8
+```{r include=FALSE, warning=FALSE}
+glm.fit.back <- glm.fit |> stepAIC(direction = "backward", trace = FALSE)
+
+# Output odds ratio and its 95% CI
+result.multi <- data.frame(OR = exp(coef(glm.fit.back)), 
+                           lower.limit = exp(confint(glm.fit.back))[, 1], 
+                           upper.limit = exp(confint(glm.fit.back))[, 2], 
+                           p.value = summary(glm.fit.back)$coef[, 4]) 
+
+# Format the output
+## Change the row names
+rownames(result.multi) <- NULL
+## Add a new column
+result.multi$object <- c("Intercept", 
+                         "Age at Diagnosis", 
+                         "BMI",
+                         "Mammo Screen-Detected No (vs Mammo Screen-Detected Yes)",
+                         "MRI Screen-Detected Yes (vs MRI Screen-Detected No)",
+                         "Almost entirely fatty (vs Heterogenously dense)",
+                         "Scattered areas of fibrogladular density (vs Heterogenously dense)",
+                         "Extremely dense (vs Heterogenously dense)",
+                         "HER2+ (vs HR+, HER2-)",
+                         "Triple negative (vs HR+, HER2-)")
+
+result.fit <- result.multi %>%
+  dplyr::select(object, everything()) %>%
+  mutate(across(.cols = c(OR, lower.limit, upper.limit), .fns = round, 2)) %>% 
+  mutate(p.value = round(p.value, 3)) %>% 
+  mutate(p.value = ifelse(p.value < 0.001, "< 0.001", p.value)) %>%
+  filter(object != "Intercept")
+```
+
+
+```{r echo=FALSE, results='asis'}
+result.fit |> knitr::kable(col.names = c("Covariate", "Adjusted Odds Ratio", "95% CI Lower Limit", "95% CI Upper Limit", "P-value"), # Add column names
+                           align = "lcccc")
+```
+
