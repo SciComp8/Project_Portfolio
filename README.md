@@ -18,7 +18,7 @@ This is a compiled list of my programming work affiliated with collaborative and
 - [MachineLearningPipeline.py](TNBC/MachineLearningPipeline.py)
 - [TNBC_StatisticalPlan.md](TNBC/TNBC_StatisticalPlan.md)
 
-**MDC Asian project** - This project aims to delve deeper into breast cancer patterns by analyzing various factors such as disease frequency, clinical T and N stages, tumor subtype, and the demographics of the communities served by two hospitals. By examining both aggregated and disaggregated racial/ethnic and community demographic data, we identify the disparities in breast cancer diagnosis and treatment. 
+**MDC Asian project** - This project delves deeper into breast cancer patterns by analyzing various factors such as disease frequency, clinical T and N stages, tumor subtype, and the demographics of the communities served by two hospitals. By examining both aggregated and disaggregated racial/ethnic and community demographic data, we aim to identify the disparities in breast cancer diagnosis and treatment. 
 - [MDCAsian_v1.Rmd](MDCAsian/MDCAsian_v1.Rmd)
 - [MDCAsian_v2.Rmd](MDCAsian/MDCAsian_v2.Rmd)
 - [MDCAsian_PredictiveModeling.Rmd](MDCAsian/MDCAsian_PredictiveModeling.Rmd)
