@@ -11,19 +11,19 @@ This is a compiled list of my programming work affiliated with collaborative and
 * [Lipidomics and transcriptomics analysis](#Lipidomics-and-transcriptomics-analysis)
 
 ## **Statistical analysis for breast cancer surgery clinical data**
-**TNBC project** - In this project, we evaluate the incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. The incidence rates of local recurrence and new primary breast cancer are estimated using the Kaplan-Meier approach. The cumulative incidence rates of local recurrence and new primary breast cancer with ER, PR, HER2 marker values are estimated using the cumulative incidence function, which accounts for the positive marker and the negative marker as competing risks. A by-product of this project is a pipeline that predicts the subsequent breast cancer event in 5 years using the machine learning approaches (e.g., random forest).
+**Triple negative breast cancer** - In this project, we evaluate the incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. The incidence rates of local recurrence and new primary breast cancer are estimated using the Kaplan-Meier approach. The cumulative incidence rates of local recurrence and new primary breast cancer with ER, PR, HER2 marker values are estimated using the cumulative incidence function, which accounts for the positive marker and the negative marker as competing risks. A by-product of this project is a pipeline that predicts the subsequent breast cancer event in 5 years using the machine learning approaches (e.g., random forest).
 
 - [TNBC_v1.Rmd](TNBC/TNBC_v1.Rmd)
 - [TNBC_v2.Rmd](TNBC/TNBC_v2.Rmd)
 - [MachineLearningPipeline.py](TNBC/MachineLearningPipeline.py)
 - [TNBC_StatisticalPlan.md](TNBC/TNBC_StatisticalPlan.md)
 
-**MDC Asian project** - This project delves deeper into breast cancer patterns by analyzing various factors such as demographics of the communities, insurance type, mammographic density, T and N stages, and tumor subtype in two hospitals. By examining both aggregated and disaggregated racial/ethnic and hospital site data, we are interested in identifying the disparities in breast cancer diagnosis and treatment.
+**MDC Asian** - This project delves deeper into breast cancer patterns by analyzing various factors such as demographics of the communities, insurance type, mammographic density, T and N stages, and tumor subtype in two hospitals. By examining both aggregated and disaggregated racial/ethnic and hospital site data, we are interested in identifying the disparities in breast cancer diagnosis and treatment.
 - [MDCAsian_v1.Rmd](MDCAsian/MDCAsian_v1.Rmd)
 - [MDCAsian_v2.Rmd](MDCAsian/MDCAsian_v2.Rmd)
 - [MDCAsian_PredictiveModeling.Rmd](MDCAsian/MDCAsian_PredictiveModeling.Rmd)
 
-**Micrometastatic axillary nodal disease project** - In this project, most analytical work centers on the descriptive analysis, for example, estimate the number of patients undergoing completion axillary lymph node dissection (ALND), number of cases with additional positive nodes if completion ALND, and frequency of axillary recurrence stratified by whether ALND was performed and by whether radiation was delivered. The univariate survival analysis using the Cox-proportional hazards model is performed to interrogate the factors associated with the recurrence-free survival. Specially, recurrence-free survival time is defined as a composite endpoint which combines the time to recurrence, time to death, and time to last follow-up into a univariate time to the first event or censoring. 
+**Micrometastatic axillary nodal disease** - In this project, most analytical work centers on the descriptive analysis, for example, estimate the number of patients undergoing completion axillary lymph node dissection (ALND), number of cases with additional positive nodes if completion ALND, and frequency of axillary recurrence stratified by whether ALND was performed and by whether radiation was delivered. The univariate survival analysis using the Cox-proportional hazards model is performed to interrogate the factors associated with the recurrence-free survival. Specially, recurrence-free survival time is defined as a composite endpoint which combines the time to recurrence, time to death, and time to last follow-up into a univariate time to the first event or censoring. 
 
 - [Micromets.Rmd](Micromets.Rmd)
 
