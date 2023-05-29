@@ -1,0 +1,571 @@
+---
+title: "Microcalcification Project"
+author: "Anni Liu"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+knit: knitautomator::knit_filename
+output:
+  word_document:
+    fig_caption: no
+    fig_height: 4
+    fig_width: 4
+    highlight: null
+    toc: yes
+    reference_docx: manuscript_style_V0.docx
+  html_document: default
+params:
+  date.analysis: !r format(Sys.Date(), "%Y%B%D")
+  plot.fig: TRUE
+  results.folder: FALSE
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r shorcut, include=FALSE}
+#################################################################
+##                  RStudio keyboard shortcut                  ##
+#################################################################
+# Cursor at the beginning of a command line: Ctrl+A
+# Cursor at the end of a command line: Ctrl+E
+# Clear all the code from your console: Ctrl+L
+# Create a pipe operator %>%: Ctrl+Shift+M (Windows) or Cmd+Shift+M (Mac)
+# Create an assignment operator <-: Alt+- (Windows) or Option+-(Mac) 
+# Knit a document (knitr): Ctrl+Shift+K (Windows) or Cmd+Shift+K (Mac)
+# Comment or uncomment current selection: Ctrl+Shift+C (Windows) or Cmd+Shift+C (Mac)
+```
+
+
+```{r attach_lib_func, include=FALSE}
+##################################################################
+##                Attach libraries and functions                ##
+##################################################################
+# devtools::install("/Library/Frameworks/R.framework/Versions/4.2/Resources/library/BTKR")
+easypackages::libraries("BTKR", "multcomp", "readxl", "tidyverse", "fst") |> suppressPackageStartupMessages()
+"%_%" <- function(m, n) paste0(m, "_", n)
+"%0%" <- function(m, n) paste0(m, n)
+```
+
+
+```{r global_options, include=FALSE}
+#################################################################
+##                          Automator                          ##
+#################################################################
+if (params$plot.fig) {
+  dir.fig <- "../report/figs" %_% params$date.analysis %0% "/"
+  # Need "/", otherwise, the images are saved directly under the report folder
+  
+  if (!dir.exists(dir.fig)) { 
+    # If the figure directory does not exist, make a new directory under the folder report named with the date passed from the params$date.analysis in YAML
+    dir.create(dir.fig) 
+  }
+  
+  knitr::opts_chunk$set( # Setting parameters when figures are plotted
+    fig.width = 4, fig.height = 4, 
+    fig.path = dir.fig, dev = "png", dpi = 300,
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+} else { # Setting parameters when figures are not plotted
+  knitr::opts_chunk$set(
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+}
+
+if (params$results.folder) { # Suitable when the results need to be stored outside the MS word report
+  dir.result <- "../report/results" %_% params$date.analysis
+  
+  if (!dir.exists(dir.result)) {
+    # If the directory does not exist, make a new directory under the folder report named with the date passed from the params$date.analysis in YAML 
+    
+    dir.create(dir.result)
+  }
+}
+```
+
+
+# Data preparation
+```{r, eval=FALSE}
+# Clean data
+dat.full <- readxl::read_xlsx(
+  "../data/raw/Coded Microcalcs v6 offline.xlsx",
+  sheet = "Coded",
+  range = c("A1:AC122"),
+  col_types = c(
+    rep("numeric", 14),
+    rep("date", 3),
+    rep("numeric", 6),
+    "text", # X21: Dorexcision: 3/23/2022; 4/13/22; 5/4/22
+    rep("numeric", 2), 
+    "date",
+    "numeric",
+    "text"
+  ),
+  col_names = TRUE,
+  na = c("Unknown", "unknown", "N/A", "n/a")
+) %>%
+  rename(
+    "StudyID" = "Record ID",
+    "Insure.type" = "Insurance",
+    "Age.Dx" = "Age_Diagnosis",
+    "MMGSD" = "Mammo_Screen",
+    "T.stage" = "cT",
+    "N.stage" = "cN",
+    "ER" = "ER status",
+    "PR" = "PR status",
+    "HER2" = "HER2 status",
+    "PLM.plan" = "PLM_planned",
+    "Tumor.type" = "Tumor Type",
+    "Date.surg" = "DOS",
+    "Date.PLM" = "DOPLM",
+    "Date.rad" = "DORad",
+    "Initial.margin" = "Intitial_margins",
+    "Time.PLM.day" = "time to PLM (days)",
+    "Timing.CTX" = "Timing_Chemotherapy",
+    "PLM.calcs" = "PLM_calcs",
+    "Time.rad.day" = "time to radiation (days)",
+    "Reexcision" = "Re-exicion performed?",
+    "Date.reex" = "Dorexcision",
+    "Pathology.reex" = "Re-ex_path",
+    "Surv.micalc" = "Surveillance_microcalcs",
+    "Date.surv" = "Surveillance_date",
+    "Time.surv.day" = "Time_to_Surveillance",
+    "Comment" = "comments"
+  ) %>%
+  mutate(
+    Race.2 = ifelse(Race == 5, NA, Race),
+    Race.2 =
+      factor(
+        Race.2,
+        levels = c(0, 1, 2, 3, 4),
+        labels = c(
+          "Asian",
+          "Non-hispanic black",
+          "Non-hispanic white",
+          "Hispanic",
+          "Other"
+        ),
+        ordered = TRUE
+      )
+  ) %>%
+  mutate(Insure.type.2 = factor(
+    Insure.type,
+    levels = c(0, 1),
+    labels = c("Private", "Medicare"),
+    ordered = TRUE
+  )) %>%
+  mutate(MMGSD.2 = factor(
+    MMGSD,
+    levels = c(0, 1),
+    labels = c("No", "Yes"),
+    ordered = TRUE
+  )) %>%
+  mutate(T.stage.2 = factor(
+    T.stage,
+    levels = c(0, 1, 2, 3, 4, 5),
+    labels = c("Tis", "T1a", "T1b", "T1c", "Tmic", "T2"),
+    ordered = TRUE
+  )) %>%
+  mutate(N.stage.2 = factor(
+    N.stage,
+    levels = c(0, 1, 2),
+    labels = c("N0", "N1", "N2"),
+    ordered = TRUE
+  )) %>%
+  mutate(
+    ER.2 = ifelse(ER == 2, NA, ER),
+    ER.2 = factor(
+      ER.2,
+      levels = c(0, 1),
+      labels = c("Negative", "Positive"),
+      ordered = TRUE
+    )
+  ) %>%
+  mutate(
+    PR.2 = ifelse(PR == 2, NA, PR),
+    PR.2 = factor(
+      PR.2,
+      levels = c(0, 1),
+      labels = c("Negative", "Positive"),
+      ordered = TRUE
+    )
+  )  %>%
+  mutate(
+    HER2.2 = ifelse(HER2 == 2, NA, HER2),
+    HER2.2 = factor(
+      HER2.2,
+      levels = c(0, 1),
+      labels = c("Negative", "Positive"),
+      ordered = TRUE
+    )
+  ) %>%
+  mutate(
+    PLM.2 = ifelse(PLM == 2, NA, PLM),
+    PLM.2 = factor(
+      PLM.2,
+      levels = c(0, 1),
+      labels = c("No", "Yes"),
+      ordered = TRUE
+    )
+  ) %>%
+  mutate(
+    PLM.plan.2 = ifelse(PLM.plan == 2, NA, PLM.plan),
+    PLM.plan.2 = factor(
+      PLM.plan.2,
+      levels = c(0, 1),
+      labels = c("No", "Yes"),
+      ordered = TRUE
+    )
+  ) %>%
+  mutate(
+    Tumor.type.2 = factor(
+    Tumor.type,
+    levels = c(0, 1, 2, 3, 4, 5, 6, 7),
+    labels = c(
+      "DCIS",
+      "LCIS",
+      "IDC",
+      "ILC",
+      "IDC/DCIS",
+      "ILC/DCIS",
+      "Metaplastic carcinoma/DCIS",
+      "Adenoid cystic carcinoma"
+    ),
+    ordered = TRUE
+  )) %>%
+  mutate(
+    Initial.margin.2 = factor(
+    Initial.margin,
+    levels = c(0, 1, 2, 3, 4),
+    labels = c(
+      "Negative",
+      "Positive",
+      "Close",
+      "NegativeCarcinomaCloseDCIS",
+      "NegativeCarcinomaPositiveDCIS"
+    ),
+    ordered = TRUE
+  )) %>%
+  mutate(
+    Initial.margin.3 = ifelse(Initial.margin.2 == "Negative", "Negative", "Positive/close"),
+    Initial.margin.3 = factor(Initial.margin.3, 
+                              levels = c("Negative", "Positive/close"),
+                              ordered = TRUE)
+  ) %>% 
+  mutate(
+    PLM.calcs.2 = ifelse(PLM.calcs == 2, NA, PLM.calcs),
+    PLM.calcs.2 = factor(
+      PLM.calcs.2,
+      levels = c(0, 1),
+      labels = c("No", "Yes"),
+      ordered = TRUE
+    )
+  ) %>%
+  mutate(
+    Reexcision.2 = factor(
+    Reexcision,
+    levels = c(0, 1, 2),
+    labels = c("No", "Yes", "Mastectomy"),
+    ordered = TRUE
+  )) %>% 
+  mutate(
+    Surv.micalc.2 = ifelse(Surv.micalc == 2, NA, Surv.micalc),
+    Surv.micalc.2 = factor(Surv.micalc.2,
+                           levels = c(0, 1),
+                           labels = c("No", "Yes"))
+  ) %>% 
+  mutate(
+    Pathology.reex.2 = factor(
+    Pathology.reex,
+    levels = c(0, 1, 2),
+    labels = c("Negative", "DCIS", "Carcinoma"),
+    ordered = TRUE
+  )) %>% 
+  mutate(
+    Pathology.reex.3 = ifelse(Pathology.reex.2 == "Negative", "Negative", "DCIS/Carcinoma"),
+    Pathology.reex.3 = factor(Pathology.reex.3, 
+                              levels = c("Negative", "DCIS/Carcinoma"))
+  ) %>%
+  mutate(
+    Timing.CTX.2 = ifelse(Timing.CTX == 3, NA, Timing.CTX),
+    Timing.CTX.2 = factor(Timing.CTX.2, 
+                          levels = c(0, 1, 2), 
+                          labels = c("No chemo", "Before radiation", "After radiation"),
+                          ordered = T)
+  ) %>% 
+  mutate(
+    Time.PLM.day.2 = as.numeric(as.Date(Date.PLM) - as.Date(Date.surg))
+  ) %>%
+  mutate(
+    Time.rad.day.2 = as.numeric(as.Date(Date.rad) - as.Date(Date.surg))
+  ) %>%
+  mutate(
+    Time.surv.day.2 = as.numeric(as.Date(Date.surv) - as.Date(Date.surg))
+  ) %>% 
+  data.frame()
+
+##------Check PLM and PLM.calcs of the records 57, 69, and 121------
+dat.full[c(57, 69, 121), c("PLM.2", "PLM.calcs.2")]
+
+##------Check the structure and distribution of factor/character variables------
+all.fac <- sapply(names(dat.full)[sapply(dat.full, is.factor)], function(x) with(dat.full, table(get(x), useNA = "ifany")))  
+# View(all.fac)
+
+all.fac.lev <- sapply(names(all.fac), function(x) with(dat.full, levels(get(x))))  
+# View(all.fac.lev)
+
+all.char <- sapply(names(dat.full)[sapply(dat.full, is.character)], function(x) with(dat.full, table(get(x), useNA = "ifany")))  
+# View(all.char)
+```
+
+
+```{r save_cleaned_data, eval=FALSE}
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+write_fst(dat.full, path = paste0("../data/derived/", date.analysis, "_dat_microcalcs.RData"), compress = 50, uniform_encoding = TRUE)
+write.csv(dat.full, paste0("../data/derived/", date.analysis, "_dat_microcalcs.csv"), row.names = F)
+```
+
+
+```{r save_load_processed_data}
+dat.full <- read_fst(path = "../data/derived/2023May17_dat_microcalcs.RData")
+```
+
+
+```{r eval=FALSE, include=FALSE}
+# VERIFY time from lumpectomy to PLM
+idx <- with(dat.full, which(Time.PLM.day != Time.PLM.day.2))
+dat.full[idx, c("Time.PLM.day", "Time.PLM.day.2")]
+## Check if the missing is consistent
+with(dat.full, setdiff(which(is.na(Time.PLM.day)), which(is.na(Time.PLM.day.2)))) 
+
+
+# VERIFY time from lumpectomy to radiation,
+idx <- with(dat.full, which(Time.rad.day != Time.rad.day.2))
+dat.full[idx, c("Time.rad.day", "Time.rad.day.2")]
+## Check if the missing is consistent
+idx <- with(dat.full, setdiff(which(is.na(Time.rad.day)), which(is.na(Time.rad.day.2))))
+dat.full[idx, c("Time.rad.day", "Time.rad.day.2")]
+
+
+# VERIFY time from lumpectomy to surveillance
+idx <- with(dat.full, which(Time.surv.day != Time.surv.day.2))
+dat.full[idx, c("Time.surv.day", "Time.surv.day.2")]
+## Check if the missing is consistent
+with(dat.full, setdiff(which(is.na(Time.surv.day)), which(is.na(Time.surv.day.2))))
+```
+Notice that the `time to PLM (days)` of the column T in subjects (IDs: `r with(dat.full, which(Time.PLM.day != Time.PLM.day.2))`) should be changed into 28 and 34. The `time to radiation (days)` of the column V in subjects (IDs: `r c(with(dat.full, which(Time.rad.day != Time.rad.day.2)), with(dat.full, setdiff(which(is.na(Time.rad.day)), which(is.na(Time.rad.day.2)))))`) should be changed into 44, 40, 76, 42, 48, 36. The `time to surveillance (days)` of the column AB in subjects (IDs: `r with(dat.full, which(Time.surv.day != Time.surv.day.2))`) should be changed into 251, 270, 1461, 335, 203, 298.
+
+
+```{r set_variables}
+dat.work <- dat.full
+vars.all <- c(
+  "Race.2",
+  "BMI",
+  "Insure.type.2",
+  "Age.Dx",
+  "MMGSD.2",
+  "T.stage.2",
+  "N.stage.2",
+  "ER.2",
+  "PR.2",
+  "HER2.2",
+  "PLM.2",
+  "PLM.plan.2",
+  "Tumor.type.2",
+  "Initial.margin.2",
+  "Initial.margin.3",
+  "PLM.calcs.2",
+  "Reexcision.2", 
+  "Pathology.reex.2",
+  "Pathology.reex.3",
+  "Surv.micalc.2",
+  "Timing.CTX.2",
+  "Time.PLM.day.2",
+  "Time.rad.day.2",
+  "Time.surv.day.2"
+)
+
+# Use 0 or 1 to indicate if the variable is continuous or categorical
+vars.cat <- rep(1, length(vars.all))
+vars.cat[vars.all %in% c("BMI", "Age.Dx", "Time.PLM.2", "Timing.CTX", "Time.PLM.day.2", "Time.rad.day.2", "Time.surv.day.2")] <- 0
+```
+
+
+# Methods of summary tables
+The association between a categorical variable and a grouping variable (e.g., initial lumpectomy margins) is examined using the Fisher’s exact test. Difference in the value of a continuous variable among patients of different groups was examined using the Wilcoxon rank sum test (for two groups comparison) or Kruskal Wallis rank sum test (for more than two groups comparison). Notice that the p-value for the Wilcoxon rank sum test or Kruskal Wallis rank sum test is aligned with the median (IQR) summaries in a summary table. For variable with missing values, the difference in the proportion of missingness across different groups is also examined using the Fisher's exact test. All p values are two-sided. All statistical analyses are performed in R Version 4.2.3 (R Foundation for Statistical Computing, Vienna, Austria). The R packages "BTKR", "multcomp", "readxl", "tidyverse", and "fst" are used in this study. 
+
+
+# Summary of results
+Q1: What is the frequency of post-lumpectomy mammograms (PLM) being completed among lumpectomy patients?
+
+* 71 (59%, n = 121) lumpectomy patients complete the PLM (Table 1).
+
+Q2: What is the time to performance of these PLM relative to initiation of breast radiation? Exclude patients who received chemotherapy before radiation?
+
+* The minimum, the first quantile, median, mean (standard deviation, s.d.), the third quantile, and maximum of the time to performance of these PLM (in days) from the date of surgery in patients who do not receive chemotherapy before radiation are: `r dat.work.2 <- dat.work[which(dat.work$Timing.CTX.2 != "Before radiation"), ]; a <- summary(dat.work.2$Time.PLM.day.2) |> round(2); b <- sd(dat.work.2$Time.PLM.day.2, na.rm = T) |> round(2); paste(c(a[1:3], paste0(a[4], " (", b, ")"), a[5:6]), "days")` (Table 2). 
+
+* The minimum, the first quantile, median, mean (s.d.), the third quantile, and maximum of the time to initiation of breast radiation (in days) from the date of surgery in patients who complete PLM but do not receive chemotherapy before radiation are: `r a <- summary(dat.work.2[which(dat.work.2$PLM.2 == "Yes"), ]$Time.rad.day.2) |> round(2); b <- sd(dat.work.2[which(dat.work.2$PLM.2 == "Yes"), ]$Time.rad.day.2, na.rm = T) |> round(2); paste(c(a[1:3], paste0(a[4], " (", b, ")"), a[5:6]), "days")` (Table 2). 
+
+* Among patients who do not receive chemotherapy before radiation, the minimum, the first quantile, median, mean (s.d.), the third quantile, and maximum of the time to initiation of breast radiation (in days) from the date of surgery in patients who complete PLM and show the residual microcalcifications are: `r a <- summary(dat.work.2[which(dat.work.2$PLM.2 == "Yes" & dat.work.2$PLM.calcs.2 == "Yes"), ]$Time.rad.day.2) |> round(2); b <- sd(dat.work.2[which(dat.work.2$PLM.2 == "Yes" & dat.work.2$PLM.calcs.2 == "Yes"), ]$Time.rad.day.2, na.rm = T) |> round(2); paste(c(a[1:3], paste0(a[4], " (", b, ")"), a[5:6]), "days")`. The minimum, the first quantile, median, mean (s.d.), the third quantile, and maximum of the time to initiation of breast radiation (in days) from the date of surgery in patients who complete PLM but DO NOT show the residual microcalcifications are: `r a <- summary(dat.work.2[which(dat.work.2$PLM.2 == "Yes" & dat.work.2$PLM.calcs.2 == "No"), ]$Time.rad.day.2) |> round(2); b <- sd(dat.work.2[which(dat.work.2$PLM.2 == "Yes" & dat.work.2$PLM.calcs.2 == "No"), ]$Time.rad.day.2, na.rm = T) |> round(2); paste(c(a[1:3], paste0(a[4], " (", b, ")"), a[5:6]), "days")`. There is a statistically significant association between the time to initiation of breast radiation and the status of residual microcalcifications (p-value < 0.001) (Table 8). 
+
+Q3: What is the frequency of the PLM revealing residual microcalcifications (stratified by whether initial lumpectomy margins were negative, close or positive)?
+
+* Of 71 patients who complete PLM, 8 (17.78%, n = 45) of 45 patients with negative initial margins show the residual microcalcifications, compared to patients of other four patient groups: 5 (55.56%, n = 9) of 9 patients with positive initial margins, 3 (42.86%, n = 7) of 7 patients with close initial margins, 1 (25%, n = 4) of 4 patients with negative for carcinoma but close for DCIS initial margins, and 4 (66.67%, n = 6) of 6 patients with negative for carcinoma but positive for DCIS initial margins. There are statistically significant differences in the occurrence of residual microcalcifications among different types of initial margins (p-value = 0.020) (Table 3). 
+* When the initial lumpectomy margins are re-categorized as `Negative` and `Positive/close`, 8 (17.78%, n = 45) of 45 patients with negative initial margins show the residual microcalcifications, and 13 (50%, n = 26) of 26 patients with positive/close initial margins show the residual microcalcifications. This difference is statistically significant (p-value = 0.007) (Table 4).
+
+
+Q4: What is the frequency of re-excision being performed if residual microcalcifications were identified?
+
+* Of 21 patients with residual microcalcifications, 20 have re-excision information where 19 (95%, n = 20) patients receive the re-excision (Table 5).
+
+Q5: What is the frequency of additional cancer being detected in re-excision surgery performed to resect residual microcalcifications (stratified by whether initial lumpectomy margins were negative, close or positive)?
+
+* In terms of the additional carcinoma being detected in re-excision surgery performed to resect residual microcalcifications, 2 (40%, n = 5) of 5 patients with positive initial lumpectomy margins show the additional carcinoma. No patient with all other types of initial margins shows the additional carcinoma (Tables 6 and 7).
+* In terms of the additional DCIS being detected in re-excision surgery performed to resect residual microcalcifications, 2 (28.57%, n = 7) of 7 patients with negative initial margins, 2 (66.67%, n = 3) of 3 patients with close initial margins, 1 (20%, n = 5) of 5 patients with positive initial margins, 1 (100%, n = 1) of 1 patient with negative for carcinoma but close for DCIS initial margins, and 1 (33.33%, n = 3) of 3 patients with negative for carcinoma but positive for DCIS initial margins show the additional DCIS. These differences are not statistically significant (p-value = 0.414) (Table 6). When the initial lumpectomy margins are re-categorized as `Negative` and `Positive/close`, 2 (28.57%, n = 7) of 7 patients with negative initial margins and 5 (41.67%, n = 12) of 12 patients with positive/close initial margins show the additional DCIS. Similarly, these differences are not statistically significant (p-value = 0.512) (Table 7).
+* When DCIS and carcinoma are combined into one group of additional cancer, 2 (28.57%, n = 7) of 7 patients with negative initial margins, 2 (66.67%, n = 3) of 3 patients with close initial margins, 3 (60%, n = 5) of 5 patients with positive initial margins, 1 (100%, n = 1) of 1 patient with negative for carcinoma but close for DCIS initial margins, and 1 (33.33%, n = 3) of 3 patients with negative for carcinoma but positive for DCIS initial margins show the additional cancer. These differences are not statistically significant (p-value = 0.659) (Table 6). When the initial lumpectomy margins are re-categorized as `Negative` and `Positive/close`, 2 (28.57%, n = 7) of 7 patients with negative initial margins and 7 (58.33%, n = 12) of 12 patients with positive/close initial margins show the additional cancer. Similarly, these differences are not statistically significant (p-value = 0.350) (Table 7).
+
+
+Q6: What is the overall frequency of microcalcifications on surveillance imaging? 
+
+* Of 121 patients, 86 patients have information about microcalcifications on surveillance imaging where 4 (4.65%, n = 86) patients have the surveillance imaging with microcalcifications (Table 1).
+
+Q7: What is the median time to surveillance?
+
+* The median time to surveillance from the date of surgery is `r median(dat.work$Time.surv.day.2, na.rm = T)` days (Table 1).
+
+
+
+## Patients characteristics for all patients in the dataset
+```{r, results="hide"}
+out <- fsmry.dmgrph(
+  dat = dat.work,
+  vars = vars.all,
+  vars.cat = vars.cat,
+  by = NULL)
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Patients characteristics by PLM for patients who do not receive chemotherapy before radiation
+```{r, results="hide"}
+dat.work.2 <- dat.work[which(dat.work$Timing.CTX.2 != "Before radiation"), ]
+vars.cat.rm <- which(vars.all %in% c("PLM.2"))
+out <- fsmry.dmgrph(
+  dat = dat.work.2,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "PLM.2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Patients characteristics by initial lumpectomy margins (`Initial.margin.2`) for patients with completed PLM
+```{r, results="hide"}
+dat.work.3 <- dat.work[which(dat.work$PLM.2 == "Yes"), ]
+vars.cat.rm <- which(vars.all %in% c("PLM.2", "Initial.margin.2", "Initial.margin.3"))
+out <- fsmry.dmgrph(
+  dat = dat.work.3,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "Initial.margin.2")
+# Notice: Initial.margin.2 cannot contain the values that have the space; otherwise it will give the error message: "Error in wilcox.test.default(y1, y2, exact = F) : not enough (non-missing) 'x' observations"
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Patients characteristics by initial lumpectomy margins (`Initial.margin.3`) for patients with completed PLM
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("PLM.2", "Initial.margin.2", "Initial.margin.3"))
+out <- fsmry.dmgrph(
+  dat = dat.work.3,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "Initial.margin.3")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Patients characteristics by residual microcalcification (`PLM.calcs.2`) for patients with completed PLM
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("PLM.2", "PLM.calcs.2"))
+out <- fsmry.dmgrph(
+  dat = dat.work.3,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "PLM.calcs.2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Patients characteristics by initial lumpectomy margins (`Initial.margin.2`) for patients in re-excision surgery performed to resect residual microcalcifications
+```{r, results="hide"}
+dat.work.4 <- dat.work[which(dat.work$PLM.calcs.2 == "Yes" & dat.work$Reexcision.2 == "Yes"), ]
+
+vars.cat.rm <- which(vars.all %in% c("Initial.margin.2", "Initial.margin.3", "Reexcision.2", "PLM.calcs.2", "PLM.2"))
+out <- fsmry.dmgrph(
+  dat = dat.work.4,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "Initial.margin.2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Patients characteristics by initial lumpectomy margins (`Initial.margin.3`) for patients in re-excision surgery performed to resect residual microcalcifications
+```{r, results="hide"}
+dat.work.4 <- dat.work[which(dat.work$PLM.calcs.2 == "Yes" & dat.work$Reexcision.2 == "Yes"), ]
+
+vars.cat.rm <- which(vars.all %in% c("Initial.margin.2", "Initial.margin.3", "Reexcision.2", "PLM.calcs.2", "PLM.2"))
+out <- fsmry.dmgrph(
+  dat = dat.work.4,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "Initial.margin.3")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Addition: patients characteristics by residual microcalcification (`PLM.calcs.2`) for patients who complete PLM but do not receive chemotherapy before radiation
+```{r, results="hide"}
+dat.work.5 <- dat.work[which(dat.work$Timing.CTX.2 != "Before radiation" & dat.work$PLM.2 == "Yes"), ]
+vars.cat.rm <- which(vars.all %in% c("PLM.2", "PLM.calcs.2"))
+out <- fsmry.dmgrph(
+  dat = dat.work.5,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "PLM.calcs.2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+# Session Info
+```{r}
+sessionInfo()
+```
+
