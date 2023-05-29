@@ -27,7 +27,7 @@ This is a compiled list of my programming work affiliated with collaborative and
 
 - [Micromets.Rmd](Micromets.Rmd)
 
-### Note: The coding work related to other clinical projects can be found [HERE](https://github.com/anniliu7/Projectcoding/tree/main/Otherclinicalproject)*
+#### Note: The coding work related to other clinical projects can be found [HERE](https://github.com/anniliu7/Projectcoding/tree/main/Otherclinicalproject)
 
 ## **Bayesian model averaging for RNA-Seq count data**
 Accurately identifying differentially expressed genes(DEGs) can offer reliable insights into biological processes underlying specific conditions, and further aid in developing diagnostic biomarkers and targeted therapeutics. The goal of this project is to evaluate the performance of our novel `BMAseq` and other existing single-model approaches: `DESeq2`, `edgeR`, and `limma` on inferring replicable DEGs in the setting of univariable, multivaribles, and multivaribles with interaction terms. The RNA-seq count and phenotypic data from GTEx are randomly divided into 50% training set and 50% test set. The performance of each approach is assessed in the univariate, multivariate, multivariate with interaction settings.
