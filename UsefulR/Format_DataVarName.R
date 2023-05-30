@@ -29,7 +29,11 @@ names(data_full)
 [28] "Date of distant metastasis"              
 [29] "Duration of follow-up in days"     
 
-# Format variable names into the unified style (e.g., Patient ID -> Patient.id; Race/Ethnicity -> Race.ethnicity)
+##------Format variable names into the unified style (e.g., Patient ID -> Patient.id; Race/Ethnicity -> Race.ethnicity)------
 temp_name <- names(data_full)
 temp_name <- sapply(strsplit(temp_name, split = "\\-|\\s|\\(|\\)|\\/|\\%|^the$"), function(x) paste(x[!x %in% c("", "-", "(", ")", "/", "%", "the")], collapse = ".")) # \\s means the literal space 
+temp_name <- gsub("$", ".", temp_name) # Chemotherapy without any comma [differ from Patient.ID]
 temp_name <- sub("\\..*", ".", temp_name) %0% tolower(substring(temp_name, regexpr("*.\\.", temp_name) + 2))
+temp_name <- gsub(".$", "", temp_name)
+names(data_full) <- temp_name
+
