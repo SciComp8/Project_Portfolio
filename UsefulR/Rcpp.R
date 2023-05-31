@@ -27,3 +27,8 @@ microbenchmark(
   sumC(x),
   sumR(x)
 )
+
+# Source the C++ code
+sourceCpp("Ex3.cpp")
+f3(c(T, F))
+f3(c(2 < 3, 3 > 4))
