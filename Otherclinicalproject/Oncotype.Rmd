@@ -85,7 +85,7 @@ names(data_full) <- temp_name
 all_char <- sapply(names(data_full)[sapply(data_full, is.character)], function(x) with(data_full, table(get(x), useNA = "ifany")))  
 View(all_char)
 
-## Recode variables
+##------Recode variables------
 data_full <- as.data.table(data_full)
 data_full[,Patient.gender:=factor(Patient.gender, levels=c("Female", "Male"))]
 data_full[,Race.ethnicity:=factor(Race.ethnicity, levels=c("White", "African-American", "Asian", "Hispanic", "Mixed", "West Indian"))]
