@@ -1,0 +1,123 @@
+---
+title: "Oncotype Project"
+author: "Anni Liu"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+knit: knitautomator::knit_filename
+output:
+  word_document:
+    fig_caption: no
+    fig_height: 4
+    fig_width: 4
+    highlight: null
+    toc: yes
+    reference_docx: Oncotype_manuscript_style_V0.docx.docx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  options(scipen = 999, digits = 4),
+  cache = TRUE,
+  error = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  tidy.opts = list(width.cutoff = 60),
+  tidy = TRUE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Data preparations
+
+```{r include=FALSE}
+## Attach libraries and functions
+easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table")
+"%_%" <- function(m, n) paste0(m, "_", n)
+"%0%" <- function(m, n) paste0(m, n)
+
+piece.table.wrapper <- function (y, grp, dat, transpose = F, method = "fisher") {
+  if (transpose == T) {
+    y.f <- grp
+    grp.f <- y
+  } else {
+    y.f <- y
+    grp.f <- grp
+  }
+  dat <- get(dat)
+  out.i <- BTKR::fsmry2.by.grp(y = dat[, y.f], 
+                               grp = dat[, grp.f], 
+                               cmp.method = method)
+    
+  cat("\n#### " %0% y.f %0% " ~ " %0% grp.f %0% "\n")
+    
+  if (class(out.i) == "list") {
+    cat("\nSummary" %0% "\n")
+    print(knitr::kable(out.i[[1]]))
+    cat("\nMissingness" %0% "\n")
+    print(knitr::kable(out.i[[2]]))
+  } else {
+    print(knitr::kable(out.i)) 
+  }
+}
+```
+
+```{r load_cleaned_data, include=FALSE}
+data_full <- read_fst(path = "../data/derived/2023Jun10_dat_oncotype.RData")
+```
+
+```{r eval=FALSE, include=FALSE}
+##------Load raw oncotype dataset------
+data_full <- read_xlsx("../data/raw/Oncotype database WCM 2010-2023 for the statistician.xlsx", 
+                       sheet = "Sheet1", 
+                       range = c("A1:AC1452"), 
+                       col_names = TRUE,
+                       na = c("Unknown", "", "NA", "Not applicable ", "Not applicable", "Not aplicable", "n/a", "N/a", "Unknown grade (not reported or unavailable)", "Unknown (not reported or unavailable)"))
+
+##------Format variable names into the unified style (e.g., Patient ID -> Patient.id; Race/Ethnicity -> Race.ethnicity)------
+temp_name <- names(data_full)
+temp_name <- sapply(strsplit(temp_name, split = "\\-|\\s|\\(|\\)|\\/|\\%|^the$"), function(x) paste(x[!x %in% c("", "-", "(", ")", "/", "%", "the")], collapse = ".")) # \\s means the literal space 
+temp_name <- gsub("$", ".", temp_name) # Chemotherapy without any comma [differ from Patient.ID]
+temp_name <- sub("\\..*", ".", temp_name) %0% tolower(substring(temp_name, regexpr("*.\\.", temp_name) + 2))
+temp_name <- gsub(".$", "", temp_name)
+names(data_full) <- temp_name
+
+##------Check the structure and distribution of character variables------
+all_char <- sapply(names(data_full)[sapply(data_full, is.character)], function(x) with(data_full, table(get(x), useNA = "ifany")))  
+View(all_char)
+
+## Recode variables
+data_full <- as.data.table(data_full)
+data_full[,Patient.gender:=factor(Patient.gender, levels=c("Female", "Male"))]
+data_full[,Race.ethnicity:=factor(Race.ethnicity, levels=c("White", "African-American", "Asian", "Hispanic", "Mixed", "West Indian"))]
+data_full[,Procedure:=factor(Procedure, levels=c("Lumpectomy", "Total mastectomy"))]
+data_full[,Axila.procedure:=factor(Axila.procedure, levels=c("Sentinel LN biopsy", "Axillary LN dissection", "None"))]
+data_full[,Chemotherapy:=factor(Chemotherapy, levels=c("No", "Yes"))]
+data_full[,Endocrine.therapy:=factor(Endocrine.therapy, levels=c("Yes", "No"))]
+data_full[,Radiation.therapy:=factor(Radiation.therapy, levels=c("Yes", "No"))]
+data_full[,T.stage:=gsub("^T1.*", "T1", gsub("T3|T4", "T3|T4", Pathologic.t.stage)) |> factor(levels=c("T1", "T2", "T3|T4"))]
+
+
+
+##------Check the structure and distribution of factor variables------
+all_fac <- sapply(names(data_full)[sapply(data_full, is.factor)], function(x) with(data_full, table(get(x), useNA = "ifany")))
+View(all_fac)
+
+all_fac_lev <- sapply(names(all_fac), function(x) with(data_full, levels(get(x))))
+View(all_fac_lev)
+
+```
+
+```{r save_cleaned_data, eval=FALSE, include=FALSE}
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+write_fst(data_full, 
+          path = paste0("../data/derived/", date.analysis, "_dat_oncotype.RData"), 
+          compress = 50, uniform_encoding = T)
+
+write.csv(data_full, 
+          file = paste0("../data/derived/", date.analysis, "_dat_oncotype.csv"), 
+          row.names = F)
+```
+
+```{r load_cleaned_data_again, include=FALSE}
+data_full <- read_fst(path = "../data/derived/2023Jun10_dat_oncotype.RData")
+```
