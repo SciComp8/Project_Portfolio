@@ -13,6 +13,7 @@ output:
     reference_docx: Oncotype_manuscript_style_V0.docx.docx
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   options(scipen = 999, digits = 4),
@@ -31,7 +32,7 @@ knitr::opts_chunk$set(
 
 ```{r include=FALSE}
 ## Attach libraries and functions
-easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table")
+easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table") |> suppressPackageStartupMessages()
 "%_%" <- function(m, n) paste0(m, "_", n)
 "%0%" <- function(m, n) paste0(m, n)
 
@@ -62,7 +63,7 @@ piece.table.wrapper <- function (y, grp, dat, transpose = F, method = "fisher") 
 ```
 
 ```{r load_cleaned_data, include=FALSE}
-data_full <- read_fst(path = "../data/derived/2023Jun10_dat_oncotype.RData")
+data_full <- read_fst(path = "../data/derived/2023May14_dat_MDCAsian.RData")
 ```
 
 ```{r eval=FALSE, include=FALSE}
@@ -94,30 +95,38 @@ data_full[,Axila.procedure:=factor(Axila.procedure, levels=c("Sentinel LN biopsy
 data_full[,Chemotherapy:=factor(Chemotherapy, levels=c("No", "Yes"))]
 data_full[,Endocrine.therapy:=factor(Endocrine.therapy, levels=c("Yes", "No"))]
 data_full[,Radiation.therapy:=factor(Radiation.therapy, levels=c("Yes", "No"))]
-data_full[,T.stage:=gsub("^T1.*", "T1", gsub("T3|T4", "T3|T4", Pathologic.t.stage)) |> factor(levels=c("T1", "T2", "T3|T4"))]
+data_full[,T.stage.2:=gsub("*.1.*", "T1", gsub("T3|T4", "T3|T4", Pathologic.t.stage)) |> factor(levels=c("T1", "T2", "T3|T4"))]
+data_full[,N.stage.2:=ifelse(is.na(N.stage), NA, ifelse(N.stage %in% c(0, "0(i+)"), "N0", "N1|N2|N3")) |> factor(levels=c("N0", "N1|N2|N3"))]
+data_full[,ER.status:=factor(ER.status, levels=c("Positive", "Negative"))]
+data_full[,PR.status:=factor(PR.status, levels=c("Positive", "Negative"))]
+data_full[,HER2.status:=factor(HER2.status, levels=c("Negative", "Equivocal", "Positive"))]
+data_full[,Histological.type:=factor(Histological.type, levels=c("Invasive ductal carcinoma", "Invasive lobular carcinoma", "Mixed ductal and lobular"))]
+data_full[,Histological.grade:=factor(Histological.grade, levels=c("Well differentiated", "Moderately differentiated", "Poorly differentiated"))]
+data_full[,Histological.grade.2:=factor(Histological.grade, labels=c("Non-high grade", "Non-high grade", "High grade")) |> factor(levels=c("Non-high grade", "High grade"))]
+data_full[,Lymphovascular.invasion:=factor(Lymphovascular.invasion, levels=c("No", "Yes"))]
+data_full[,Local.recurrence:=factor(Local.recurrence.at.follow.up, levels=c("No", "Yes"))]
+data_full[,Distant.metastasis:=factor(Distant.metastasis.at.follow.up, levels=c("No", "Yes"))]
 
-
-
-##------Check the structure and distribution of factor variables------
+##------Check the structure and distribution of new factor variables [! missing distribution]------
 all_fac <- sapply(names(data_full)[sapply(data_full, is.factor)], function(x) with(data_full, table(get(x), useNA = "ifany")))
-View(all_fac)
+# View(all_fac)
 
 all_fac_lev <- sapply(names(all_fac), function(x) with(data_full, levels(get(x))))
-View(all_fac_lev)
-
+# View(all_fac_lev)
 ```
 
 ```{r save_cleaned_data, eval=FALSE, include=FALSE}
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 write_fst(data_full, 
-          path = paste0("../data/derived/", date.analysis, "_dat_oncotype.RData"), 
+          path = paste0("../data/derived/", date.analysis, "_data_oncotype.RData"), 
           compress = 50, uniform_encoding = T)
 
 write.csv(data_full, 
-          file = paste0("../data/derived/", date.analysis, "_dat_oncotype.csv"), 
+          file = paste0("../data/derived/", date.analysis, "_data_oncotype.csv"), 
           row.names = F)
 ```
 
 ```{r load_cleaned_data_again, include=FALSE}
-data_full <- read_fst(path = "../data/derived/2023Jun10_dat_oncotype.RData")
+data_full <- read_fst(path = "../data/derived/2023Jun11_data_oncotype.RData")
 ```
+
