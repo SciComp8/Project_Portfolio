@@ -11,7 +11,7 @@ This is a compiled list of my programming work affiliated with collaborative and
 * [Lipidomics and transcriptomics analysis](#Lipidomics-and-transcriptomics-analysis)
 
 ## **Statistical analysis for breast cancer surgery clinical data**
-**Breast cancer among Asian women in New York City** - This project uses the descriptive statistics, hypothesis tests, and multivariable regression modeling to delve deepper into the distributions of diverse factors such as demographics of the communities, insurance type, mammographic density, T and N stages, and tumor subtype in two hospitals, and to detect the predictors related to presenting at an early stage of breast cancer. By examining both aggregated and disaggregated racial/ethnic and hospital site data, we are interested in identifying the disparities in breast cancer diagnosis and treatment.
+** Multidisciplinary breast program in New York City** - This project uses the descriptive statistics, hypothesis tests, and multivariable regression modeling to delve deepper into the distributions of diverse factors such as demographics of the communities, insurance type, mammographic density, T and N stages, and tumor subtype in two hospitals, and to detect the predictors related to presenting at an early stage of breast cancer. By examining both aggregated and disaggregated racial/ethnic and hospital site data, we are interested in identifying the disparities in breast cancer diagnosis and treatment.
 - [MDCAsian_v1.Rmd](MDCAsian/MDCAsian_v1.Rmd)
 - [MDCAsian_v2.Rmd](MDCAsian/MDCAsian_v2.Rmd)
 - [MDCAsian_PredictiveModeling.Rmd](MDCAsian/MDCAsian_PredictiveModeling.Rmd)
