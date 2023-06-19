@@ -11,10 +11,10 @@ This is a compiled list of my programming work affiliated with collaborative and
 * [Lipidomics and transcriptomics analysis](#Lipidomics-and-transcriptomics-analysis)
 
 ## **Statistical analysis for breast cancer surgery clinical data**
-** Multidisciplinary breast program in New York City** - This project uses the descriptive statistics, hypothesis tests, and multivariable regression modeling to delve deepper into the distributions of diverse factors such as demographics of the communities, insurance type, mammographic density, T and N stages, and tumor subtype in two hospitals, and to detect the predictors related to presenting at an early stage of breast cancer. By examining both aggregated and disaggregated racial/ethnic and hospital site data, we are interested in identifying the disparities in breast cancer diagnosis and treatment.
-- [MDCAsian_v1.Rmd](MDCAsian/MDCAsian_v1.Rmd)
-- [MDCAsian_v2.Rmd](MDCAsian/MDCAsian_v2.Rmd)
-- [MDCAsian_PredictiveModeling.Rmd](MDCAsian/MDCAsian_PredictiveModeling.Rmd)
+**Multidisciplinary breast program in New York City** - This project uses the descriptive statistics, hypothesis tests, and multivariable regression modeling to delve deepper into the distributions of diverse factors such as demographics of the communities, insurance type, mammographic density, T and N stages, and tumor subtype in two hospitals, and to detect the predictors related to presenting at an early stage of breast cancer. By examining both aggregated and disaggregated racial/ethnic and hospital site data, we are interested in identifying the disparities in breast cancer diagnosis and treatment.
+- [MDC_v1.Rmd](MDC/MDC_v1.Rmd)
+- [MDC_v2.Rmd](MDC/MDC_v2.Rmd)
+- [MDC_PredictiveModeling.Rmd](MDC/MDC_PredictiveModeling.Rmd)
 
 **Triple negative breast cancer** - In this project, we evaluate the incidence and phenotypic distribution of subsequent ipsilateral or new primary contralateral breast cancer in patients with a history of triple negative breast cancer. The incidence rates of local recurrence and new primary breast cancer are estimated using the Kaplan-Meier approach. The cumulative incidence rates of local recurrence and new primary breast cancer with ER, PR, HER2 marker values are estimated using the cumulative incidence function, which accounts for the positive marker and the negative marker as competing risks. A by-product of this project is a pipeline that predicts the subsequent breast cancer event in 5 years using the machine learning approaches (e.g., random forest).
 
