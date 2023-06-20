@@ -20,4 +20,4 @@
 	• Prepare a publication-ready summary table of the univariable and multivariable logistic regression results. The table should resemble the structure of the table 3 presented in the paper.
 
 ## Figure: postmastectomy reconstruction rate over time
-• Prepare a line plot which demonstrates the trend of the postmastectomy reconstruction rate over time. The reconstruction rate and time information is reflected in the variables Recon? (yes/no), and procedure year, respectively. As suggested by XXX, do not visualize the female surgeon volume over time. Similar to Figure 1 in the paper, the rate on the y-axis should be expressed in the percentage.
+	• Prepare a line plot which demonstrates the trend of the postmastectomy reconstruction rate over time. The reconstruction rate and time information is reflected in the variables Recon? (yes/no), and procedure year, respectively. As suggested by XXX, do not visualize the female surgeon volume over time. Similar to Figure 1 in the paper, the rate on the y-axis should be expressed in the percentage.
