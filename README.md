@@ -5,7 +5,7 @@ This is a compiled list of my programming work affiliated with collaborative and
 ## Table of contents
 
 * [Bayesian model averaging for RNA-Seq count data](#Bayesian-model-averaging-for-RNA-Seq-count-data)
-* [Statistical analysis for breast cancer surgery clinical data](#Statistical-analysis-for-breast-cancer-surgery-clinical-data)
+* [Statistical analysis for breast cancer surgery data](#Statistical-analysis-for-breast-cancer-surgery-data)
 * [Differential expression analysis pipeline for single cell data](#Differential-expression-analysis-pipeline-for-single-cell-data)
 * [Bayesian integrative clustering for multi-omics data](#Bayesian-integrative-clustering-for-multi-omics-data)
 * [Lipidomics and transcriptomics analysis](#Lipidomics-and-transcriptomics-analysis)
@@ -16,7 +16,7 @@ Accurately identifying differentially expressed genes(DEGs) can offer reliable i
 - [AnalysisPipeline.Rmd](BMARNASeq/AnalysisPipeline.Rmd)
 - [GenerateCheck_TrainingTestData.Rmd](BMARNASeq/GenerateCheck_TrainingTestData.Rmd)
 
-## **Statistical analysis for breast cancer surgery clinical data**
+## **Statistical analysis for breast cancer surgery data**
 **Multidisciplinary breast program in New York City** - This project uses the descriptive statistics, hypothesis tests, and multivariable regression modeling to delve deepper into the distributions of diverse factors such as demographics of the communities, insurance type, mammographic density, T and N stages, and tumor subtype in two hospitals, and to detect the predictors related to presenting at an early stage of breast cancer. By examining both aggregated and disaggregated racial/ethnic and hospital site data, we are interested in identifying the disparities in breast cancer diagnosis and treatment.
 - [MDC_v1.Rmd](MDC/MDC_v1.Rmd)
 - [MDC_v2.Rmd](MDC/MDC_v2.Rmd)
