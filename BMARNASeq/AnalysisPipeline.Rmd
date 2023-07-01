@@ -2129,7 +2129,7 @@ for (var.name in var.vec) {
 ```
 
 
-## Contruct enrichment analysis
+## !Contruct enrichment analysis
 ```{r}
 library(clusterProfiler)
 library(org.Hs.eg.db)
@@ -2661,7 +2661,7 @@ ids
 # 2 TIMM8A ENSG00000126953
 
 
-##------voom.limma_UVM-----
+##------voom.limma_MVM-----
 method.name = "VoomLimma"
 method.name.2 = "voom_limma"
 model.type = "Multi"
@@ -4115,3 +4115,4 @@ for (var.i in var.vec) {
 ```{r}
 sessionInfo()
 ```
+
