@@ -73,11 +73,12 @@ for (threshold.i in threshold.vec) {
   for (seed.i in seed.vec) { 
     load(sprintf("../ApplicationData/derived/RandomSeed/Top5000/MultiModel/BMAseqMulti%sFDR1.RData", seed.i))
     for (var.i in var.vec) { 
-      cDEG.bestmodel.i <- collect_bestmodel(threshold = threshold.i, seed = seed.i, var.name = var.i)[["cDEG.model.result"]] |> list()
-      noncDEG.bestmodel.i <- collect_bestmodel(threshold = threshold.i, seed = seed.i, var.name = var.i)[["noncDEG.model.result"]] |> list()
+      results <- collect_bestmodel(threshold = threshold.i, seed = seed.i, var.name = var.i) # Remove duplicated function calls to collect_bestmodel() 
+      cDEG.bestmodel.i <- results[["cDEG.model.result"]] > list()
+      noncDEG.bestmodel.i <- results[["noncDEG.model.result"]] |> list()
       names(cDEG.bestmodel.i) = names(noncDEG.bestmodel.i) = paste0(var.i, "+", threshold.i, "+", seed.i) 
-      cDEG.bestmodel.list <- c(cDEG.bestmodel.list, cDEG.bestmodel.i)
-      noncDEG.bestmodel.list <- c(noncDEG.bestmodel.list, noncDEG.bestmodel.i)
+      cDEG.bestmodel.list[[length(cDEG.bestmodel.list) + 1]] <- cDEG.bestmodel.i
+      noncDEG.bestmodel.list[[length(noncDEG.bestmodel.list) + 1]] <- noncDEG.bestmodel.i
     }
   }
 }
