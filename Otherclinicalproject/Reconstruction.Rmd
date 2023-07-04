@@ -1,0 +1,343 @@
+---
+title: "Reconstruction Project"
+author: "Anni Liu"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+knit: knitautomator::knit_filename
+output:
+  word_document:
+    fig_caption: no
+    fig_height: 4
+    fig_width: 4
+    highlight: null
+    toc: yes
+    reference_docx: manuscript_style_V0.docx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  options(scipen = 999, digits = 4),
+  cache = TRUE,
+  error = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  tidy.opts = list(width.cutoff = 60),
+  tidy = TRUE,
+  fig.width = 12,
+  fig.height = 8
+)
+```
+
+# Data preparations
+
+```{r include=FALSE}
+## Attach libraries and functions
+easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "zeallot", "BTKR", "MASS") |> suppressPackageStartupMessages()
+"%_%" <- function(m, n) paste0(m, "_", n)
+"%0%" <- function(m, n) paste0(m, n)
+"%+%" <- function(m) paste0(m, collapse = "+")
+```
+
+```{r load_cleaned_data, include=FALSE}
+data_full <- read_fst(path = "../data/derived/2023Jul03_data_recon.RData")
+```
+
+```{r eval=FALSE, include=FALSE}
+##------Load raw dataset------
+data_full <- read_xlsx("../data/raw/Mastectomy Recon Data_June_STATS_V2.xlsx", 
+                       sheet = "Mastectomy 2017-2021 (stats)", 
+                       range = c("A1:Y606"), 
+                       col_names = T,
+                       na = c("Unknown", "", "NA", "Not applicable ", "Not applicable", "Not aplicable", "n/a", "N/a", "N/A", "Unknown grade (not reported or unavailable)", "Unknown (not reported or unavailable)", "Unk", "unk"))
+
+##------Format variable names into the unified style (e.g., Patient ID -> Patient.id)------
+temp_name <- names(data_full)
+temp_name <- sapply(strsplit(temp_name, split = "\\-|\\s|\\(|\\)|\\/|\\%|^the$|\\?|,"), function(x) paste(x[!x %in% c("", "-", "(", ")", "/", "%", "the", "?", ",")], collapse = ".")) # \\s means the literal space 
+temp_name <- gsub('\"', "", temp_name) # "Smoker.use.\"current\".\"former\".or.\"never\""
+temp_name <- gsub("$", ".", temp_name) # Race without any comma [vs Patient.ID]
+temp_name <- sub("\\..*", ".", temp_name) %0% tolower(substring(temp_name, regexpr("*.\\.", temp_name) + 2))
+temp_name <- gsub(".$", "", temp_name)
+names(data_full) <- temp_name
+
+##------Check the structure and distribution of character variables------
+all_char <- sapply(names(data_full)[sapply(data_full, is.character)], function(x) with(data_full, table(get(x), useNA = "ifany")))  
+# View(all_char)
+
+##------Recode variables------
+data_full <- as.data.table(data_full)
+data_full[,Procedure.year:=factor(Procedure.year)]
+data_full[,Race.1:=gsub("^chi", "Chi", 
+                        gsub("^tai", "Tai", 
+                             gsub("^tib", "Tib", 
+                                  gsub("^jap", "Jap", Race))))]
+table(data_full$Race.1, data_full$Race.2)
+table(data_full$Race.2, data_full$Race.3)
+data_full[,Race.2:=factor(Race.2, levels=c("East Asian", "South Asian", "Southeast Asian", "Asian Other", "White", "Black", "Hispanic", "Other"))]
+data_full[,Race.3:=factor(Race.3, levels=c("Asian", "White", "Black", "Hispanic", "Other"))]
+data_full[,Primary.language.english:=factor(Primary.language.english, levels=c("Yes", "No"))]
+data_full[,Insurance:=factor(Insurance, levels=c("Medicare", "Medicaid", "Private"))]
+data_full[,Smoke:=gsub("^c", "C",
+                       gsub("^f", "F",
+                            gsub("^n", "N", Smoker.use.current.former.or.never)))]
+data_full[,Smoke:=factor(Smoke, levels=c("Never", "Former", "Current"))]
+data_full[,Diagnosis:=factor(Diagnosis.dcis.idc.etc, 
+                             labels=c("Atypia/in situ", "Invasive", "Prophylaxis/risk reducing"))]
+data_full[,Diagnosis:=factor(Diagnosis, levels=c("Prophylaxis/risk reducing", "Atypia/in situ", "Invasive"))]
+data_full[,Chemotherapy:=factor(Chemo.neoadjuvant.adjuvent.or.none, labels=c("Adjuvant", "Neoadjuvant", "None"))]
+data_full[,Chemotherapy:=factor(Chemotherapy, levels=c("None", "Adjuvant", "Neoadjuvant"))]
+data_full[,Endocrine.therapy:=factor(Endocrine.therapy, levels=c("Anastrazole", "Exemestane", "Letrozole", "Tamoxifen", "None"))]
+data_full[,Radiation:=factor(Radiation, levels=c("No", "Yes"))]
+data_full[,Surgeon.gender:=factor(Surgeon.gender, levels=c("Female", "Male"))]
+data_full[,Language.concordance:=factor(Patient.physician.language.concordance, levels=c("Yes", "No"))]
+data_full[,Surgery.type:=factor(Type.of.surgery, labels=c("Bilateral mastectomy", "Unilateral mastectomy"))]
+data_full[,Surgery.type:=factor(Surgery.type, levels=c("Unilateral mastectomy", "Bilateral mastectomy"))]
+data_full[,Bilateral.cancer:=factor(if.bilateral.mastectomy.bilateral.cancer, levels=c("No", "Yes"))]
+data_full[,Bilateral.risk.reducing:=factor(if.bilateral.mastectomy.bilateral.risk.reducing, levels=c("No", "Yes"))]
+data_full[,Plastics.referral:=factor(Plastics.referral, labels=c("No", "No", "Yes", "Yes"))]
+data_full[,Plastics.referral:=factor(Plastics.referral, levels=c("No", "Yes"))]
+data_full[,Reconstruction:=factor(Recon.yes.no, labels=c("No", "No", "Yes", "Yes"))]
+data_full[,Reconstruction:=factor(Reconstruction, levels=c("No", "Yes"))]
+data_full[,Reconstruction.type:=factor(If.recon.type, labels=c("Autologous", "Implant"))]
+data_full[,Reconstruction.type:=factor(Reconstruction.type, levels=c("Implant", "Autologous"))]
+
+##------Check the structure and distribution of new factor variables [! missing distribution]------
+all_fac <- sapply(names(data_full)[sapply(data_full, is.factor)], function(x) with(data_full, table(get(x), useNA = "ifany")))
+# View(all_fac)
+
+all_fac_lev <- sapply(names(all_fac), function(x) with(data_full, levels(get(x))))
+# View(all_fac_lev)
+```
+
+```{r save_cleaned_data, eval=FALSE, include=FALSE}
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+write_fst(data_full, 
+          path = paste0("../data/derived/", date.analysis, "_data_recon.RData"), 
+          compress = 50, uniform_encoding = T)
+
+write.csv(data_full, 
+          file = paste0("../data/derived/", date.analysis, "_data_recon.csv"), 
+          row.names = F)
+```
+
+```{r load_cleaned_data_again, include=FALSE}
+data_full <- read_fst(path = "../data/derived/2023Jul03_data_recon.RData")
+```
+
+
+## Data dictionary
+* `Procedure.year`: year of undergoing the surgical procedure
+* `Age.at.diagnosis`: age at diagnosis (in years)
+* `Race`: all types of races
+* `Race.2`: racial status with categories: East Asian (reference); South Asian; Southeast Asian; Asian Other; White; Black; Hispanic; Other
+* `Race.3`: racial status with categories: Asian (reference); White; Black; Hispanic; Other
+* `Primary.language`: all types of patients' primary languages
+* `Primary.language.english`: if a patient's primary language is English: Yes (reference); No
+* `Language.concordance`: if a patient's primary language accords with a physician's speaking language: Yes (reference); No
+* `Insurance`: type of insurance with categories: Medicare (reference); Medicaid; Private
+* `BMI`: body mass index ($kg/m^2$)
+* `Charlson.comorbidity.index`: Charlson comorbidity index
+* `Smoke`: smoking status with categories: Never (reference); Former; Current
+* `Diagnosis`: diagnosis status with categories: Prophylaxis/risk reducing (reference); Atypia/in situ; Invasive
+* `Chemotherapy`: type of chemotherapy with categories: None (reference); Adjuvant; Neoadjuvant 
+* `Endocrine.therapy`: type of endocrine therapy with categories: Anastrazole (reference); Exemestane; Letrozole; Tamoxifen; None
+* `Radiation`:if a patient undergoes radiation therapy with categories: No (reference); Yes
+* `Surgeon.gender`: surgeon gender with categories: Female (reference); Male
+* `Surgery.type`: type of surgery with categories: Unilateral mastectomy (reference); Bilateral mastectomy
+* `Bilateral.cancer`: if a patient undergoes the bilateral mastectomy to remove cancer: No (reference); Yes
+* `Bilateral.risk.reducing`: if a patient undergoes the bilateral mastectomy to reduce the risk: No (reference); Yes
+* `Plastics referral`: if a patient is referred to plastic surgery: No (reference); Yes
+* `Reconstruction`: any reconstruction with categories: No (reference); Yes
+* `Reconstruction.type`: type of reconstruction with categories: Implant (reference); Autologous
+
+## Overall distributions of patient variables
+```{r include=FALSE, results="hide"}
+##------Set study variables for BTKR package------
+var_all <- c("Procedure.year",
+             "Age.at.diagnosis",
+             "Race.1",
+             "Race.2",
+             "Race.3",
+             "Primary.language",
+             "Primary.language.english",
+             "Language.concordance",
+             "Insurance",
+             "BMI",
+             "Charlson.comorbidity.index",
+             "Smoke",
+             "Diagnosis",
+             "Chemotherapy",
+             "Endocrine.therapy",
+             "Radiation",
+             "Surgeon.gender",
+             "Surgery.type",
+             "Bilateral.cancer",
+             "Bilateral.risk.reducing",
+             "Plastics.referral",
+             "Reconstruction",
+             "Reconstruction.type"
+             )
+
+# Create an indicator [0, 1] for all categorical variables 
+var_cat <- rep(x = 1, times = length(var_all))
+var_cat[var_all %in% names(data_full)[sapply(data_full, is.numeric)]] <- 0
+```
+
+
+```{r, results="hide"}
+out <- fsmry.dmgrph(dat = data_full,
+                    vars = var_all,
+                    vars.cat = var_cat,
+                    by = NULL)
+```
+
+
+```{r echo=FALSE, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Characteristics of the study population (publication-ready table)
+```{r echo=FALSE, warning=FALSE}
+var_focus <- c(
+  "Age.at.diagnosis",
+  "Race.2",
+  "Primary.language.english",
+  "Language.concordance",
+  "Insurance",
+  "BMI",
+  "Charlson.comorbidity.index",
+  "Smoke",
+  "Diagnosis",
+  "Chemotherapy",
+  "Endocrine.therapy",
+  "Radiation",
+  "Surgeon.gender",
+  "Surgery.type",
+  "Bilateral.cancer",
+  "Bilateral.risk.reducing",
+  "Plastics.referral",
+  "Reconstruction",
+  "Reconstruction.type"
+)
+
+var_label(data_full) <- list(
+  Age.at.diagnosis = "Age at diagnosis (years)",
+  Race.2 = "Race",
+  Primary.language.english = "English as the patient's primary language",
+  Language.concordance = "Patient-physician language concordance",
+  Insurance = "Type of insurance",
+  BMI = "Body mass index (kg/m2)",
+  Charlson.comorbidity.index = "Charlson Comorbidity Index",
+  Smoke = "Smoking status",
+  Diagnosis = "Diagnosis",
+  Chemotherapy = "Type of chemotherapy",
+  Endocrine.therapy = "Type of endocrine therapy",
+  Radiation = "Type of radiation",
+  Surgeon.gender = "Surgeon gender",
+  Surgery.type = "Type of surgery",
+  Bilateral.cancer = "Bilateral mastectomy to remove cancer",
+  Bilateral.risk.reducing = "Bilateral mastectomy to reduce risk",
+  Plastics.referral = "Plastics referral",
+  Reconstruction = "Any reconstruction",
+  Reconstruction.type = "Type of reconstruction"
+)
+
+
+tbl_summary(data = data_full |> select(var_focus), 
+            by = NULL,
+            type = c(all_continuous() ~ "continuous2", # "continuous2" summaries are shown on 2 or more rows
+                     all_dichotomous() ~ "categorical"),
+            missing = "ifany",
+            statistic = list(all_continuous() ~ c("{median} ({p25}, {p75})",
+                                                  "{mean} ± {sd}",
+                                                  "{min}-{max}"))) |>
+  modify_header(update = all_stat_cols() ~ "n = {n} \n n (%)") |>
+  modify_table_body(
+    dplyr::mutate, 
+    label = case_when(label == "N missing" ~ "Unknown",
+                      label == "Minimum-Maximum" ~ "Range",
+                      T ~ label)) |>
+  modify_footnote(update = everything() ~ NA) |> # Remove unnecessary footnotes
+  bold_labels() |>
+  as_flex_table() |>
+  bold(bold = T, part = "header")
+```
+
+
+## Characteristics of patients stratified by whether postmastectomy breast reconstruction was performed
+```{r echo=FALSE, results="hide"}
+idx.rm <- Position(f = function(i) {i == "Reconstruction"} , x = var_all) 
+out <- fsmry.dmgrph(dat = data_full,
+                    vars = var_all[-idx.rm],
+                    vars.cat = var_cat[-idx.rm],
+                    by = "Reconstruction")
+```
+
+
+```{r echo=FALSE, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Characteristics of patients stratified by whether postmastectomy breast reconstruction was performed (publication-ready table)
+```{r echo=FALSE, warning=FALSE}
+data_full_2 <- data_full
+data_full_2$Reconstruction <- factor(data_full_2$Reconstruction, labels = c("No reconstruction", "Reconstruction"))
+tbl_summary(data = data_full_2 |> select(var_focus), 
+            by = Reconstruction,
+            type = c(all_continuous() ~ "continuous2",
+                     all_dichotomous() ~ "categorical"),
+            missing = "ifany",
+            statistic = list(all_continuous() ~ c("{median} ({p25}, {p75})",
+                                                  "{mean} ± {sd}",
+                                                  "{min}-{max}"))) |>
+  modify_header(update = all_stat_cols() ~ "**{level}** \n (n = {n}) \n n (%)") |>
+  modify_table_body(
+    dplyr::mutate, 
+    label = case_when(label == "N missing" ~ "Unknown",
+                      label == "Minimum-Maximum" ~ "Range",
+                      T ~ label)) |>
+  modify_footnote(update = everything() ~ NA) |>
+  add_p(pvalue_fun = function(x) style_pvalue(x, digits = 3),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = T, B = 5000)) |>
+  bold_labels() |>
+  as_flex_table() |>
+  bold(bold = T, part = "header")
+```
+
+
+## Univariable logistic regression analyses of patient factors associated with reconstruction  
+```{r echo=FALSE, warning=FALSE}
+data_full$Plastics.referral <- factor(data_full$Plastics.referral, levels = c("Yes", "No")) # If set "No" as the reference level, the estimate will be extremely large and the table was stretched very wide
+tbl_uvregression(
+  data = data_full[var_focus],
+  method = glm,
+  y = Reconstruction,
+  method.args = list(family = binomial),
+  exponentiate = T
+)
+```
+
+
+## Multivariable backward stepwise selection logistic regression analyses of patient factors associated with reconstruction
+```{r echo=FALSE, warning=FALSE}
+covariates <- var_focus[-which(var_focus %in% c("Chemotherapy", "Endocrine.therapy", "Radiation", "Bilateral.cancer", "Bilateral.risk.reducing", "Plastics.referral", "Reconstruction.type", "Diagnosis"))]
+response <- "Reconstruction"
+
+data_full_3 <- na.omit(data_full[c("Patient.id", covariates, response)])
+glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), 
+               data = data_full_3, family = binomial)
+full.model <- glm.fit
+min.model <- glm("%0%"(response%0%"~", "%+%"(c("Age.at.diagnosis", "Race.2"))), 
+                 data = data_full_3, family = binomial)
+
+glm.fit.back <- stepAIC(object = full.model,
+                        direction = "backward", 
+                        scope = list(upper = full.model,
+                                     lower = min.model),
+                        trace = 0)
+
+tbl_regression(x = glm.fit.back, 
+               exponentiate = T,
+               pvalue_fun = function(x) style_pvalue(x, digits = 3)) |>
+  bold_labels() 
+```
