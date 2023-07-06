@@ -5,6 +5,7 @@ var.vec <- c("BMI", "AGE", "SEX", "MHABNWBC")
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
 threshold.vec <- 5000
 
+# Approach 1
 t0 <- microbenchmark::get_nanotime()
 for (threshold.i in threshold.vec) {
   for (var.name in var.vec) {
@@ -69,6 +70,8 @@ t1 <- microbenchmark::get_nanotime()
 t1 - t0
 # [1] 2.775805e+12
 
+                               
+# Approach 2
 t0 <- microbenchmark::get_nanotime()
 for (threshold.i in threshold.vec) {
   for (var.name in var.vec) {
