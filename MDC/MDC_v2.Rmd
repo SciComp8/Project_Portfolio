@@ -102,7 +102,7 @@ idx <- which(data_full$RaceEthnicity.1 == "NHB" & data_full$RaceEthnicity.2 %in%
 data_full[idx, c("RaceEthnicity.2")] <- "NHB"
 data_full$RaceEthnicity.2 <- gsub("As", "AS",
                                   gsub("HiS|His|^HB", "HIS", data_full$RaceEthnicity.2)) |> factor(levels = c("AS", "HIS", "NHB", "NHW", "OTH"), 
-                                                                                               labels = c("Asian", "Hispanic", "Non-hispanic black", "Non-hispanic white", "Other"))
+                                                                                                   labels = c("Asian", "Hispanic", "Non-hispanic black", "Non-hispanic white", "Other"))
 
 ##------Race.Asian------
 # Fix the value in `Race.Asian` of one subject (row 2941; NYPQ641)
