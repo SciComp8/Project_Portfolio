@@ -2,7 +2,7 @@ theme_BMA <- function(
     base_size = 12,
     base_family = "Arial"
 ){
-  theme_classic(base_size = base_size, base_family = base_family)+
+  theme_classic(base_size = base_size, base_family = base_family) +
     theme(
       legend.position = "none",
       panel.background = element_rect(fill = "white", colour = "white"),
