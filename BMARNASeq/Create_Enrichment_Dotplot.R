@@ -1,3 +1,10 @@
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(data.table)
+library(ggplot2)
+library(cowplot)
+library(grDevices)
+
 make_dotplot <- function(data.set = ora.obj.ordered, 
                          top.n = 20, 
                          method.name = "BMAseq", 
