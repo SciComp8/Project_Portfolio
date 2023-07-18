@@ -6,39 +6,69 @@ knit: knitautomator::knit_filename
 output:
   word_document:
     fig_caption: no
-    fig_height: 4
+    fig_height: 3
     fig_width: 4
     highlight: null
     toc: yes
     reference_docx: manuscript_style_V0.docx
+params:
+  date.analysis: !r format(Sys.Date(), "%Y%b%d")
+  plot.fig: TRUE
+  results.folder: FALSE
+editor_options: 
+  chunk_output_type: console
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  options(scipen = 999, digits = 4),
-  cache = TRUE,
-  error = FALSE,
-  message = FALSE,
-  warning = FALSE,
-  tidy.opts = list(width.cutoff = 60),
-  tidy = TRUE,
-  fig.width = 12,
-  fig.height = 8
-)
-```
-
-# Data preparations
 
 ```{r include=FALSE}
 ## Attach libraries and functions
-easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "zeallot", "BTKR", "MASS") |> suppressPackageStartupMessages()
+easypackages::libraries("tidyverse", "readxl", "gtsummary", "gt", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "zeallot", "BTKR", "MASS") |> suppressPackageStartupMessages()
 "%_%" <- function(m, n) paste0(m, "_", n)
 "%0%" <- function(m, n) paste0(m, n)
 "%+%" <- function(m) paste0(m, collapse = "+")
 ```
 
-```{r load_cleaned_data, include=FALSE}
-data_full <- read_fst(path = "../data/derived/2023Jul03_data_recon.RData")
+
+```{r global_options, include=F}
+if (params$plot.fig) {
+  dir.fig <- "../report/figs" %_% params$date.analysis %0% "/"
+  # Need "/", otherwise, the images are saved directly under the report folder
+  
+  if (!dir.exists(dir.fig)) { 
+    # If the figure directory does not exist, we create a new directory under the folder report using the name figs + current date passed from the params$date.analysis in YAML
+    dir.create(dir.fig) 
+  }
+  
+  knitr::opts_chunk$set( # Setting parameters when figures are plotted
+    fig.width = 4, fig.height = 3, 
+    fig.path = dir.fig, dev = "png", dpi = 300,
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+} else { # Setting parameters when figures are not plotted
+  knitr::opts_chunk$set(
+    echo = FALSE, warning = FALSE, message = FALSE,
+    cache = FALSE,
+    comment = ""
+  )
+}
+
+if (params$results.folder) { # Suitable when the results need to be stored outside the microsoft word report
+  dir.result <- "../report/results" %_% params$date.analysis
+  
+  if (!dir.exists(dir.result)) {
+    # If the directory does not exist, we create a new directory under the folder report using the name results + current date passed from the params$date.analysis in YAML 
+    
+    dir.create(dir.result)
+  }
+}
+```
+
+
+# Data preparations
+
+```{r load_cleaned_data, eval=FALSE, include=FALSE}
+data_full <- read_fst(path = "../data/derived/2023Jul17_data_recon.RData")
 ```
 
 ```{r eval=FALSE, include=FALSE}
@@ -63,16 +93,26 @@ all_char <- sapply(names(data_full)[sapply(data_full, is.character)], function(x
 # View(all_char)
 
 ##------Recode variables------
+help(":=")
 data_full <- as.data.table(data_full)
 data_full[,Procedure.year:=factor(Procedure.year)]
 data_full[,Race.1:=gsub("^chi", "Chi", 
                         gsub("^tai", "Tai", 
                              gsub("^tib", "Tib", 
                                   gsub("^jap", "Jap", Race))))]
+data_full$Race.1 <- factor(data_full$Race.1)
+levels(data_full$Race.1) <- fct_relevel(.f = levels(data_full$Race.1), "Other", after = Inf) |> levels()
 table(data_full$Race.1, data_full$Race.2)
 table(data_full$Race.2, data_full$Race.3)
 data_full[,Race.2:=factor(Race.2, levels=c("East Asian", "South Asian", "Southeast Asian", "Asian Other", "White", "Black", "Hispanic", "Other"))]
 data_full[,Race.3:=factor(Race.3, levels=c("Asian", "White", "Black", "Hispanic", "Other"))]
+data_full[,Primary.language:=gsub("^ara", "Ara", 
+                                  gsub("^kor", "Kor", 
+                                       gsub("^por", "Por", 
+                                            gsub("^rus", "Rus",
+                                                 gsub("^spa", "Spa", Primary.language)))))]
+data_full[,Primary.language:=factor(Primary.language)]
+levels(data_full$Primary.language) <- fct_relevel(.f = levels(data_full$Primary.language), "Other", after = Inf) |> levels()
 data_full[,Primary.language.english:=factor(Primary.language.english, levels=c("Yes", "No"))]
 data_full[,Insurance:=factor(Insurance, levels=c("Medicare", "Medicaid", "Private"))]
 data_full[,Smoke:=gsub("^c", "C",
@@ -119,14 +159,15 @@ write.csv(data_full,
 ```
 
 ```{r load_cleaned_data_again, include=FALSE}
-data_full <- read_fst(path = "../data/derived/2023Jul03_data_recon.RData")
+data_full <- read_fst(path = "../data/derived/2023Jul17_data_recon.RData")
 ```
 
 
-## Data dictionary
-* `Procedure.year`: year of undergoing the surgical procedure
+**Data dictionary**
+
+* `Procedure.year`: year of undergoing the mastectomy
 * `Age.at.diagnosis`: age at diagnosis (in years)
-* `Race`: all types of races
+* `Race.1`: all types of races
 * `Race.2`: racial status with categories: East Asian (reference); South Asian; Southeast Asian; Asian Other; White; Black; Hispanic; Other
 * `Race.3`: racial status with categories: Asian (reference); White; Black; Hispanic; Other
 * `Primary.language`: all types of patients' primary languages
@@ -182,7 +223,7 @@ var_cat[var_all %in% names(data_full)[sapply(data_full, is.numeric)]] <- 0
 ```
 
 
-```{r, results="hide"}
+```{r echo=FALSE, results="hide"}
 out <- fsmry.dmgrph(dat = data_full,
                     vars = var_all,
                     vars.cat = var_cat,
@@ -200,6 +241,7 @@ knitr::kable(out[[1]], row.names = F)
 var_focus <- c(
   "Age.at.diagnosis",
   "Race.2",
+  "Primary.language",
   "Primary.language.english",
   "Language.concordance",
   "Insurance",
@@ -222,6 +264,7 @@ var_focus <- c(
 var_label(data_full) <- list(
   Age.at.diagnosis = "Age at diagnosis (years)",
   Race.2 = "Race",
+  Primary.language = "Patient's primary language",
   Primary.language.english = "English as the patient's primary language",
   Language.concordance = "Patient-physician language concordance",
   Insurance = "Type of insurance",
@@ -241,8 +284,7 @@ var_label(data_full) <- list(
   Reconstruction.type = "Type of reconstruction"
 )
 
-
-tbl_summary(data = data_full |> select(var_focus), 
+tbl_summary(data = data_full |> dplyr::select(var_focus), 
             by = NULL,
             type = c(all_continuous() ~ "continuous2", # "continuous2" summaries are shown on 2 or more rows
                      all_dichotomous() ~ "categorical"),
@@ -259,7 +301,9 @@ tbl_summary(data = data_full |> select(var_focus),
   modify_footnote(update = everything() ~ NA) |> # Remove unnecessary footnotes
   bold_labels() |>
   as_flex_table() |>
-  bold(bold = T, part = "header")
+  bold(bold = T, part = "header") |>
+  mk_par(part = "body", i = 44, j = "label",
+         value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")"))
 ```
 
 
@@ -281,8 +325,8 @@ knitr::kable(out[[1]], row.names = F)
 ## Characteristics of patients stratified by whether postmastectomy breast reconstruction was performed (publication-ready table)
 ```{r echo=FALSE, warning=FALSE}
 data_full_2 <- data_full
-data_full_2$Reconstruction <- factor(data_full_2$Reconstruction, labels = c("No reconstruction", "Reconstruction"))
-tbl_summary(data = data_full_2 |> select(var_focus), 
+data_full_2$Reconstruction <- factor(data_full_2$Reconstruction, labels = c("No reconstruction", "Reconstruction")) |> relevel("Reconstruction")
+tbl_summary(data = data_full_2 |> dplyr::select(var_focus), 
             by = Reconstruction,
             type = c(all_continuous() ~ "continuous2",
                      all_dichotomous() ~ "categorical"),
@@ -301,29 +345,54 @@ tbl_summary(data = data_full_2 |> select(var_focus),
         test.args = all_tests("fisher.test") ~ list(simulate.p.value = T, B = 5000)) |>
   bold_labels() |>
   as_flex_table() |>
-  bold(bold = T, part = "header")
+  bold(bold = T, part = "header") |> 
+  mk_par(part = "body", i = 44, j = "label",
+         value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")"))
 ```
 
 
-## Univariable logistic regression analyses of patient factors associated with reconstruction  
+## Univariable logistic regression analyses of patient factors associated with reconstruction in all patients
 ```{r echo=FALSE, warning=FALSE}
 data_full$Plastics.referral <- factor(data_full$Plastics.referral, levels = c("Yes", "No")) # If set "No" as the reference level, the estimate will be extremely large and the table was stretched very wide
-tbl_uvregression(
+data_full$Primary.language <- relevel(data_full$Primary.language, ref = "English")
+var_label(data_full) <- list(
+  Plastics.referral = "Plastics referral",
+  Primary.language = "Patient's primary language")
+
+t_uv <- tbl_uvregression(
   data = data_full[var_focus],
   method = glm,
   y = Reconstruction,
   method.args = list(family = binomial),
   exponentiate = T
 )
+t_uv
 ```
 
 
 ## Multivariable backward stepwise selection logistic regression analyses of patient factors associated with reconstruction
 ```{r echo=FALSE, warning=FALSE}
-covariates <- var_focus[-which(var_focus %in% c("Chemotherapy", "Endocrine.therapy", "Radiation", "Bilateral.cancer", "Bilateral.risk.reducing", "Plastics.referral", "Reconstruction.type", "Diagnosis"))]
+covariates <- var_focus[-which(var_focus %in% c("Chemotherapy", "Endocrine.therapy", "Radiation", "Bilateral.cancer", "Bilateral.risk.reducing", "Plastics.referral", "Reconstruction.type", "Diagnosis", "Reconstruction"))]
 response <- "Reconstruction"
 
 data_full_3 <- na.omit(data_full[c("Patient.id", covariates, response)])
+
+var_label(data_full_3) <- list(
+  Age.at.diagnosis = "Age at diagnosis (years)",
+  Race.2 = "Race",
+  Primary.language = "Patient's primary language",
+  Primary.language.english = "English as the patient's primary language",
+  Language.concordance = "Patient-physician language concordance",
+  Insurance = "Type of insurance",
+  BMI = "Body mass index (kg/m2)",
+  Charlson.comorbidity.index = "Charlson Comorbidity Index",
+  Smoke = "Smoking status",
+  Surgeon.gender = "Surgeon gender",
+  Surgery.type = "Type of surgery",
+  Reconstruction = "Any reconstruction"
+)
+
+
 glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), 
                data = data_full_3, family = binomial)
 full.model <- glm.fit
@@ -336,8 +405,53 @@ glm.fit.back <- stepAIC(object = full.model,
                                      lower = min.model),
                         trace = 0)
 
-tbl_regression(x = glm.fit.back, 
-               exponentiate = T,
-               pvalue_fun = function(x) style_pvalue(x, digits = 3)) |>
+t_mv <- tbl_regression(x = glm.fit.back, 
+                       exponentiate = T,
+                       pvalue_fun = function(x) style_pvalue(x, digits = 3),
+                       add_estimate_to_reference_rows = T) |>
   bold_labels() 
+t_mv
+```
+
+```{r echo=FALSE, results="hide"}
+car::vif(glm.fit.back) |> knitr::kable()
+```
+
+
+## Univariable and multivariable logistic regression analyses of patient factors associated with reconstruction (publication-ready table)
+```{r echo=FALSE, warning=FALSE}
+t_uv_2 <- tbl_uvregression(
+  data = data_full_3[c(covariates, response)], # Here use data_full_3
+  method = glm,
+  y = Reconstruction,
+  method.args = list(family = binomial),
+  exponentiate = T,
+  hide_n = T,
+  add_estimate_to_reference_rows = T
+)
+
+t_merge <- tbl_merge(tbls = list(t_uv_2, t_mv),
+                     tab_spanner = c("**Univariable analysis**", "**Multivariable analysis**"))
+
+# t_merge[["table_styling"]][["header"]][["column"]]
+
+t_merge |> 
+  as_flex_table() %>%
+  width(width = 2.5, unit = "cm")
+```
+
+
+# Trend of the postmastectomy reconstruction rate over time
+```{r echo=FALSE, warning=FALSE}
+line_plot_data <- dplyr::count(data_full, Procedure.year, Reconstruction)
+Reconstruction_count <- line_plot_data$n
+Reconstruction_rate <- Reconstruction_count[c(F, T)] / dplyr::count(data_full, Procedure.year)[["n"]]
+Reconstruction_data <- data.frame(Year = line_plot_data$Procedure.year |> unique(), Reconstruction_rate = Reconstruction_rate)
+
+ggplot(data = Reconstruction_data, 
+       mapping = aes(x = Year, y = Reconstruction_rate)) +
+  geom_line(aes(group = 1), color = "#0073C2FF") +
+  theme_minimal() + 
+  labs(y = "Reconstruction Rate", x = "Year") + 
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.1))
 ```
