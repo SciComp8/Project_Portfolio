@@ -28,7 +28,6 @@ knitr::opts_chunk$set(
 ```
 
 # Data preparations
-
 ```{r include=FALSE}
 ## Attach libraries and functions
 easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "BTKR") |> suppressPackageStartupMessages()
