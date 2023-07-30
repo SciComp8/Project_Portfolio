@@ -189,11 +189,11 @@ uni_TMM_top <- function(seed.num = 999, threshold = 2000) {
                               mc.cores = 10)
   
   voom.eFDR.train2 <- mclapply(1:length(vars),
-                             function(i) {
-                               q.val <- voom.eFDR.train[[i]][["qvalues"]]
-                               return(q.val[order(q.val)[1:threshold]])
-                             },
-                             mc.cores = 10)
+                               function(i) {
+                                 q.val <- voom.eFDR.train[[i]][["qvalues"]]
+                                 return(q.val[order(q.val)[1:threshold]])
+                               },
+                               mc.cores = 10)
   
   names(design.train) = names(voom.train) = names(voom.fit.train) = names(voom.eFDR.train) = names(voom.eFDR.train2) = vars 
   
