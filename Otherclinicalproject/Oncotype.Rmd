@@ -430,39 +430,39 @@ data_female_mixed <- data_female |>
 data_female_na <- data_female |> 
   filter(is.na(Race.ethnicity))
 
-var_label(data_full) = var_label(data_female) = var_label(data_female_white) = 
+var_label(data_full) = var_label(data_female) = var_label(data_female_white) =
   var_label(data_female_african) = var_label(data_female_asian) = var_label(data_female_hispanic) = var_label(data_female_mixed) = var_label(data_female_na) = list(
-  Patient.gender = "Sex",
-  Age.at.diagnosis = "Age at diagnosis (year)",
-  Race.ethnicity = "Race/ethnicity",
-  BMI = "Body mass index (kg/m2)",
-  Height = "Height (m)",
-  Weight = "Weight (kg)",
-  Time.to.follow.up.year = "Time to last follow-up (year)",
-  Pathologic.t.stage = "Original T stage",
-  T.stage.2 = "Recoded T stage",
-  N.stage = "Original N stage",
-  N.stage.2 = "Recoded N stage",
-  ER.status = "Estrogen receptor",
-  PR.status = "Progesterone receptor",
-  HER2.status = "Human epidermal growth factor receptor",
-  Oncotype.score = "Oncotype score",
-  Histological.type = "Histology type",
-  Histological.grade = "Original histology grade",
-  Histological.grade.2 = "Recoded histology grade",
-  Tumor.size.cm = "Tumor size (cm)",
-  Lymphovascular.invasion = "Lymphovascular invasion",
-  Surgical.procedure = "Surgical procedure",
-  Axila.procedure = "Axila procedure",
-  Endocrine.therapy = "Endocrine therapy",
-  Radiation.therapy = "Radiation therapy",
-  Local.recurrence = "Local recurrence",
-  Distant.metastasis = "Distant metastasis",
-  Time.to.local.recurrence.year = "Time to local recurrence (year)",
-  Time.to.distant.metastasis.year = "Time to distant metastasis (year)",
-  Local.recurrence.3year.2 = "3-year local recurrence",
-  Distant.metastasis.3year.2 = "3-year distant metastasis"
-)
+    Patient.gender = "Sex",
+    Age.at.diagnosis = "Age at diagnosis (year)",
+    Race.ethnicity = "Race/ethnicity",
+    BMI = "Body mass index (kg/m2)",
+    Height = "Height (m)",
+    Weight = "Weight (kg)",
+    Time.to.follow.up.year = "Time to last follow-up (year)",
+    Pathologic.t.stage = "Original T stage",
+    T.stage.2 = "Recoded T stage",
+    N.stage = "Original N stage",
+    N.stage.2 = "Recoded N stage",
+    ER.status = "Estrogen receptor",
+    PR.status = "Progesterone receptor",
+    HER2.status = "Human epidermal growth factor receptor",
+    Oncotype.score = "Oncotype score",
+    Histological.type = "Histology type",
+    Histological.grade = "Original histology grade",
+    Histological.grade.2 = "Recoded histology grade",
+    Tumor.size.cm = "Tumor size (cm)",
+    Lymphovascular.invasion = "Lymphovascular invasion",
+    Surgical.procedure = "Surgical procedure",
+    Axila.procedure = "Axila procedure",
+    Endocrine.therapy = "Endocrine therapy",
+    Radiation.therapy = "Radiation therapy",
+    Local.recurrence = "Local recurrence",
+    Distant.metastasis = "Distant metastasis",
+    Time.to.local.recurrence.year = "Time to local recurrence (year)",
+    Time.to.distant.metastasis.year = "Time to distant metastasis (year)",
+    Local.recurrence.3year.2 = "3-year local recurrence",
+    Distant.metastasis.3year.2 = "3-year distant metastasis"
+  )
 ```
 
 
