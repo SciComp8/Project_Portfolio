@@ -22,17 +22,135 @@ knitr::opts_chunk$set(
   warning = FALSE,
   tidy.opts = list(width.cutoff = 60),
   tidy = TRUE,
-  fig.width = 12,
-  fig.height = 8
+  fig.width = 4,
+  fig.height = 3,
+  dev = c("png"), 
+  dpi = 600
 )
 ```
+
 
 # Data preparations
 ```{r include=FALSE}
 ## Attach libraries and functions
-easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "BTKR") |> suppressPackageStartupMessages()
+easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "BTKR", "corrr", "multcomp") |> suppressPackageStartupMessages()
 "%_%" <- function(m, n) paste0(m, "_", n)
 "%0%" <- function(m, n) paste0(m, n)
+
+cor_plot_wrapper <-
+  function(cor_method = "spearman",
+           var_y = "BMI.at.diagnosis",
+           y_label = "Body mass index",
+           var_focus = NULL,
+           data_set = NULL) {
+    data_set <- data_set
+    yname <- var_y
+    ylab <- y_label
+    y <- data_set[, yname]
+    vars.ana <- var_focus
+    vars.ana.class <- unlist(lapply(data_set[, vars.ana], function(x)
+      paste(class(x), collapse = ".")))
+    vars.ana.ch <- vars.ana[grep("factor", vars.ana.class)]
+    
+    vars.ana.cat <- rep(0, length(vars.ana))
+    vars.ana.cat[vars.ana %in% vars.ana.ch] <- 1
+    
+    out <- vector(length = length(vars.ana), mode = "list")
+    names(out) <- vars.ana
+    
+    for (i in 1:length(vars.ana)) {
+      cat(paste0("\n#### ", yname, " ~ ", vars.ana[i], "\n"))
+      x <- data_set[, vars.ana[i]]
+      if (vars.ana.cat[i] == 1) {
+        xlevs <- levels(factor(x))
+        xlevs <- xlevs[xlevs %in% unique(x)]
+        xnlevs <- length(xlevs)
+        
+        if (xnlevs == 2) {
+          out[[i]] <- wilcox.test(y ~ x, data = data_set)
+          p <- out[[i]]$p.value
+          cat("\n~~~~~\n")
+          print(out[[i]])
+          cat("\n~~~~~\n")
+          compare_method <- "wilcox"
+        } else {
+          out[[i]] <- kruskal.test(y ~ x, data = data_set)
+          p <- out[[i]]$p.value
+          cat("\n~~~~~\n")
+          print(out[[i]])
+          cat("\n~~~~~\n")
+          compare_method <- "kruskal"
+        }
+        
+        p.txt <- fpval.txt(p)
+        p.txt <- ifelse(p.txt == "<0.001", "P<0.001", p.txt)
+        
+        fsmry.graph(
+          y = y,
+          x = factor(as.vector(x), levels = xlevs),
+          type = "bxp",
+          y.plab = ylab,
+          x.plab = label_attribute(data_set[[vars.ana[i]]]),
+          xnames = xlevs,
+          mar = c(3.5, 3.5, 0.5, 0.5),
+          mgp = c(2.0, 0.8, 0),
+          cex.lab = 1,
+          cex.axis = 1
+        )
+        legend("topleft",
+               legend = paste0(compare_method, ":", p.txt),
+               bty = "n",
+               cex = 1)
+        cat("\n")
+      } else {
+        out[[i]] <- cor.test(y, x, method = cor_method)
+        cat("\n~~~~~\n")
+        print(out[[i]])
+        cat("\n~~~~~\n")
+        
+        p <- out[[i]]$p.value
+        p.txt <- fpval.txt(p)
+        p.txt <- ifelse(p.txt == "<0.001", "P<0.001", p.txt)
+        rho <- round(out[[i]]$estimate, 2)
+        fsmry.graph(
+          y = y,
+          x = x,
+          type = "scatter",
+          y.plab = ylab,
+          x.plab = label_attribute(data_set[[vars.ana[i]]]),
+          mar = c(3.5, 3.5, 0.5, 0.5),
+          mgp = c(2.0, 0.8, 0),
+          cex.lab = 1,
+          cex.axis = 1
+        )
+        xytline <- line(x = x, y = y)
+        abline(coef(xytline))
+        legend("topleft",
+               paste0(cor_method, " r=", rho, ", ", p.txt),
+               cex = 1.0,
+               bty = "n")
+        cat("\n")
+      }
+    }
+  }
+
+
+cor.table.wrapper <- function (data_set = data_set,
+                               var_focus = c("BMI.at.diagnosis", 
+                                             "Height", "Weight",
+                                             "Tumor.size.cm",
+                                             "Oncotype.score",
+                                             "Age.at.diagnosis"),
+                               cor_method = "spearman") {
+  x <- data_set |> 
+    dplyr::select(all_of(var_focus)) |> 
+    correlate(use = "pairwise.complete.obs", 
+              method = cor_method, 
+              diagonal = 1,
+              quiet = T) |>  
+    shave()
+  fashion(x) |> knitr::kable()
+}
 
 piece.table.wrapper <- function (y, grp, dat, transpose = F, method = "fisher") {
   if (transpose == T) {
@@ -256,6 +374,7 @@ data_full <- read_fst(path = "../data/derived/2023Jul20_data_oncotype.RData")
 * `Local.recurrence.3year.2`: if a patient has the local recurrence within 3-year follow-up: No (reference); Yes
 * `Distant.metastasis.3year.2`: if a patient has the distant metastasis within 3-year follow-up: No (reference); Yes
 
+# Summary tables
 
 ## Overall distributions of patient variables
 ```{r echo=FALSE, warning=FALSE}
@@ -292,46 +411,62 @@ var_focus <- c("Patient.gender",
                "Local.recurrence.3year.2",
                "Distant.metastasis.3year.2")
 
-# var_label(data_full) <- list(
-#   Patient.gender = "Sex",
-#   Age.at.diagnosis = "Age at diagnosis (year)",
-#   Race.ethnicity = "Race/ethnicity",
-#   BMI = "Body mass index (kg/m2)",
-#   Height = "Height (m)",
-#   Weight = "Weight (kg)",
-#   Time.to.follow.up.year = "Time to last follow-up (year)",
-#   Pathologic.t.stage = "Original T stage",
-#   T.stage.2 = "Recoded T stage",
-#   N.stage = "Original N stage",
-#   N.stage.2 = "Recoded N stage",
-#   ER.status = "Estrogen receptor",
-#   PR.status = "Progesterone receptor",
-#   HER2.status = "Human epidermal growth factor receptor",
-#   Oncotype.score = "Oncotype score",
-#   Histological.type = "Histology type",
-#   Histological.grade = "Original histology grade",
-#   Histological.grade.2 = "Recoded histology grade",
-#   Tumor.size.cm = "Tumor size (cm)",
-#   Lymphovascular.invasion = "Lymphovascular invasion",
-#   Surgical.procedure = "Surgical procedure",
-#   Axila.procedure = "Axila procedure",
-#   Endocrine.therapy = "Endocrine therapy",
-#   Radiation.therapy = "Radiation therapy",
-#   Local.recurrence = "Local recurrence",
-#   Distant.metastasis = "Distant metastasis",
-#   Time.to.local.recurrence.year = "Time to local recurrence (year)",
-#   Time.to.distant.metastasis.year = "Time to distant metastasis (year)",
-#   Local.recurrence.3year.2 = "3-year local recurrence",
-#   Distant.metastasis.3year.2 = "3-year distant metastasis"
-# )
-
 # Create an indicator [0, 1] for all categorical variables 
 var_cat <- rep(x = 1, times = length(var_focus))
 var_cat[var_focus %in% names(data_full)[sapply(data_full, is.numeric)]] <- 0
+
+data_female <- data_full[data_full$Patient.gender == "Female", ]
+
+data_female_white <- data_female |> 
+  filter(Race.ethnicity == "White")
+data_female_african <- data_female |> 
+  filter(Race.ethnicity == "African-American")
+data_female_asian <- data_female |> 
+  filter(Race.ethnicity == "Asian")
+data_female_hispanic <- data_female |> 
+  filter(Race.ethnicity == "Hispanic")
+data_female_mixed <- data_female |> 
+  filter(Race.ethnicity == "Mixed")
+data_female_na <- data_female |> 
+  filter(is.na(Race.ethnicity))
+
+var_label(data_full) = var_label(data_female) = var_label(data_female_white) = 
+  var_label(data_female_african) = var_label(data_female_asian) = var_label(data_female_hispanic) = var_label(data_female_mixed) = var_label(data_female_na) = list(
+  Patient.gender = "Sex",
+  Age.at.diagnosis = "Age at diagnosis (year)",
+  Race.ethnicity = "Race/ethnicity",
+  BMI = "Body mass index (kg/m2)",
+  Height = "Height (m)",
+  Weight = "Weight (kg)",
+  Time.to.follow.up.year = "Time to last follow-up (year)",
+  Pathologic.t.stage = "Original T stage",
+  T.stage.2 = "Recoded T stage",
+  N.stage = "Original N stage",
+  N.stage.2 = "Recoded N stage",
+  ER.status = "Estrogen receptor",
+  PR.status = "Progesterone receptor",
+  HER2.status = "Human epidermal growth factor receptor",
+  Oncotype.score = "Oncotype score",
+  Histological.type = "Histology type",
+  Histological.grade = "Original histology grade",
+  Histological.grade.2 = "Recoded histology grade",
+  Tumor.size.cm = "Tumor size (cm)",
+  Lymphovascular.invasion = "Lymphovascular invasion",
+  Surgical.procedure = "Surgical procedure",
+  Axila.procedure = "Axila procedure",
+  Endocrine.therapy = "Endocrine therapy",
+  Radiation.therapy = "Radiation therapy",
+  Local.recurrence = "Local recurrence",
+  Distant.metastasis = "Distant metastasis",
+  Time.to.local.recurrence.year = "Time to local recurrence (year)",
+  Time.to.distant.metastasis.year = "Time to distant metastasis (year)",
+  Local.recurrence.3year.2 = "3-year local recurrence",
+  Distant.metastasis.3year.2 = "3-year distant metastasis"
+)
 ```
 
 
-```{r echo=FALSE, results="asis"}
+```{r include=FALSE, results="asis"}
 out <- fsmry.dmgrph(dat = data_full,
                     vars = var_focus,
                     vars.cat = var_cat,
@@ -345,7 +480,7 @@ knitr::kable(out[[1]], row.names = F)
 
 
 ## Overall distributions of patient variables in female patients
-```{r echo=FALSE, results="asis"}
+```{r include=FALSE, results="asis"}
 out <- fsmry.dmgrph(dat = data_full[data_full$Patient.gender == "Female", ],
                     vars = var_focus,
                     vars.cat = var_cat,
@@ -358,8 +493,390 @@ knitr::kable(out[[1]], row.names = F)
 ```
 
 
-```{r}
+# Association analyses in all female patients
+## The overall spearman correlation coefficient table
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female, cor_method = "spearman")
+```
+
+
+## The overall pearson correlation coefficient table
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female, cor_method = "pearson")
+```
+
+
+## Spearman correlation between BMI and height/weight/tumor size/oncotype score/age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+## Pearson correlation between BMI and height/weight/tumor size/oncotype score/age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+## Spearman correlation between height and weight/tumor size/oncotype score/age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+## Pearson correlation between height and weight/tumor size/oncotype score/age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+## Spearman correlation between weight and tumor size/oncotype score/age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+## Pearson correlation between weight and tumor size/oncotype score/age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+## Spearman correlation between tumor size and oncotype score/age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Tumor.size.cm",
+                 y_label = "Tumor size (cm)",
+                 var_focus = c("Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+## Pearson correlation between tumor size and oncotype score/age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Tumor.size.cm",
+                 y_label = "Tumor size (cm)",
+                 var_focus = c("Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+## Spearman correlation between oncotype score and age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Oncotype.score",
+                 y_label = "Oncotype score",
+                 var_focus = c("Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+## Pearson correlation between oncotype score and age
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Oncotype.score",
+                 y_label = "Oncotype score",
+                 var_focus = c("Age.at.diagnosis"),
+                 data_set = data_female) 
+```
+
+
+```{r eval=FALSE, include=FALSE}
 data_full$Patient.id[c(which(is.na(data_full$Surgical.procedure)), which(is.na(data_full$Endocrine.therapy)), which(is.na(data_full$Radiation.therapy))) |> unique()]
+```
+
+
+## Distribution of BMI across T stage/N stage/histological type/grade/lymphovascular invasion
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female) 
+```
+
+
+## Distribution of height across T stage/N stage/histological type/grade/lymphovascular invasion
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female) 
+```
+
+
+## Distribution of weight across T stage/N stage/histological type/grade/lymphovascular invasion
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female) 
+```
+
+
+# Association analyses across different racial groups in female patients
+## The overall spearman correlation coefficient table in female white patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_white, cor_method = "spearman")
+```
+
+
+## The overall pearson correlation coefficient table in female white patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_white, cor_method = "pearson")
+```
+
+
+## The overall spearman correlation coefficient table in female african american patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_african, cor_method = "spearman")
+```
+
+
+## The overall pearson correlation coefficient table in female african american patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_african, cor_method = "pearson")
+```
+
+
+## The overall spearman correlation coefficient table in female asian patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_asian, cor_method = "spearman")
+```
+
+
+## The overall pearson correlation coefficient table in female asian patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_asian, cor_method = "pearson")
+```
+
+
+## The overall spearman correlation coefficient table in female hispanic patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_hispanic, cor_method = "spearman")
+```
+
+
+## The overall pearson correlation coefficient table in female hispanic patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_hispanic, cor_method = "pearson")
+```
+
+
+## The overall spearman correlation coefficient table in female mixed patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_mixed, cor_method = "spearman")
+```
+
+
+## The overall pearson correlation coefficient table in female mixed patients
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_mixed, cor_method = "pearson")
+```
+
+
+## The overall spearman correlation coefficient table in female patients with NA races
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_na, cor_method = "spearman")
+```
+
+
+## The overall pearson correlation coefficient table in female mixed patients with NA races
+```{r echo=FALSE, results="asis"}
+cor.table.wrapper(data_set = data_female_na, cor_method = "pearson")
+```
+
+
+## Spearman correlation between BMI and height/weight/tumor size/oncotype score/age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Pearson correlation between BMI and height/weight/tumor size/oncotype score/age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Spearman correlation between height and weight/tumor size/oncotype score/age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Pearson correlation between height and weight/tumor size/oncotype score/age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Spearman correlation between weight and tumor size/oncotype score/age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Pearson correlation between weight and tumor size/oncotype score/age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Spearman correlation between tumor size and oncotype score/age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Tumor.size.cm",
+                 y_label = "Tumor size (cm)",
+                 var_focus = c("Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Pearson correlation between tumor size and oncotype score/age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Tumor.size.cm",
+                 y_label = "Tumor size (cm)",
+                 var_focus = c("Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Spearman correlation between oncotype score and age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Oncotype.score",
+                 y_label = "Oncotype score",
+                 var_focus = c("Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Pearson correlation between oncotype score and age in female white patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.6930455635491}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Oncotype.score",
+                 y_label = "Oncotype score",
+                 var_focus = c("Age.at.diagnosis"),
+                 data_set = data_female_white) 
+```
+
+
+## Distribution of BMI across T stage/N stage/histological type/grade/lymphovascular invasion in female white patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_white) 
+```
+
+
+## Distribution of height across T stage/N stage/histological type/grade/lymphovascular invasion in female white patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_white) 
+```
+
+
+## Distribution of weight across T stage/N stage/histological type/grade/lymphovascular invasion in female white patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_white) 
 ```
 
 
