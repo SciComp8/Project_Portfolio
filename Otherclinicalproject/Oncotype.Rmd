@@ -752,6 +752,106 @@ cor_plot_wrapper(cor_method = "pearson",
 ```
 
 
+## Spearman correlation between BMI and height/weight/tumor size/oncotype score/age in female african patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_african) 
+```
+
+
+## Pearson correlation between BMI and height/weight/tumor size/oncotype score/age in female african patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_african) 
+```
+
+
+## Spearman correlation between BMI and height/weight/tumor size/oncotype score/age in female asian patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_asian) 
+```
+
+
+## Pearson correlation between BMI and height/weight/tumor size/oncotype score/age in female asian patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_asian) 
+```
+
+
+## Spearman correlation between BMI and height/weight/tumor size/oncotype score/age in female hispanic patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_hispanic) 
+```
+
+
+## Pearson correlation between BMI and height/weight/tumor size/oncotype score/age in female hispanic patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_hispanic) 
+```
+
+
+## Spearman correlation between BMI and height/weight/tumor size/oncotype score/age in female mixed patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_mixed) 
+```
+
+
+## Pearson correlation between BMI and height/weight/tumor size/oncotype score/age in female mixed patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_mixed) 
+```
+
+
+## Spearman correlation between BMI and height/weight/tumor size/oncotype score/age in female patients with NA races
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_na) 
+```
+
+
+## Pearson correlation between BMI and height/weight/tumor size/oncotype score/age in female patients with NA races
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("Height", "Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_na) 
+```
+
+
 ## Spearman correlation between height and weight/tumor size/oncotype score/age in female white patients
 ```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
 cor_plot_wrapper(cor_method = "spearman",
@@ -769,6 +869,106 @@ cor_plot_wrapper(cor_method = "pearson",
                  y_label = "Height (m)",
                  var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
                  data_set = data_female_white) 
+```
+
+
+## Spearman correlation between height and weight/tumor size/oncotype score/age in female african patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_african) 
+```
+
+
+## Pearson correlation between height and weight/tumor size/oncotype score/age in female african patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_african) 
+```
+
+
+## Spearman correlation between height and weight/tumor size/oncotype score/age in female asian patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_asian) 
+```
+
+
+## Pearson correlation between height and weight/tumor size/oncotype score/age in female asian patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_asian) 
+```
+
+
+## Spearman correlation between height and weight/tumor size/oncotype score/age in female hispanic patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_hispanic) 
+```
+
+
+## Pearson correlation between height and weight/tumor size/oncotype score/age in female hispanic patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_hispanic) 
+```
+
+
+## Spearman correlation between height and weight/tumor size/oncotype score/age in female mixed patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_mixed) 
+```
+
+
+## Pearson correlation between height and weight/tumor size/oncotype score/age in female mixed patients
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_mixed) 
+```
+
+
+## Spearman correlation between height and weight/tumor size/oncotype score/age in female patients with NA races
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "spearman",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_na) 
+```
+
+
+## Pearson correlation between height and weight/tumor size/oncotype score/age in female patients with NA races
+```{r echo=FALSE, results="asis", fig.height=3, fig.width=4, out.height=287.5399361022364, out.width=383.69304556354916}
+cor_plot_wrapper(cor_method = "pearson",
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("Weight", "Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
+                 data_set = data_female_na) 
 ```
 
 
@@ -790,6 +990,8 @@ cor_plot_wrapper(cor_method = "pearson",
                  var_focus = c("Tumor.size.cm", "Oncotype.score", "Age.at.diagnosis"),
                  data_set = data_female_white) 
 ```
+
+
 
 
 ## Spearman correlation between tumor size and oncotype score/age in female white patients
