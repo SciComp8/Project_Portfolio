@@ -36,6 +36,7 @@ knitr::opts_chunk$set(
 easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "BTKR", "corrr", "multcomp") |> suppressPackageStartupMessages()
 "%_%" <- function(m, n) paste0(m, "_", n)
 "%0%" <- function(m, n) paste0(m, n)
+"%+%" <- function(m) paste0(m, collapse = "+")
 
 cor_plot_wrapper <-
   function(cor_method = "spearman",
@@ -152,6 +153,23 @@ cor.table.wrapper <- function (data_set = data_set,
   fashion(x) |> knitr::kable()
 }
 
+glm_wrapper <- function(y = NULL, x = NULL, data_set = NULL, family_type = NULL) {
+  glm.fit <- glm("%0%"(y%0%"~", "%+%"(x)), 
+                 data = data_set, family = family_type)
+
+  t_mv <- tbl_regression(x = glm.fit, 
+                        exponentiate = T,
+                        pvalue_fun = function(x) style_pvalue(x, digits = 3),
+                        add_estimate_to_reference_rows = T) |>
+    add_n() |> 
+    bold_labels() |>
+    as_flex_table() |>
+    bold(bold = T, part = "header") |> 
+    mk_par(part = "body", i = 1, j = "label",
+           value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")"))
+  t_mv
+}
+
 piece.table.wrapper <- function (y, grp, dat, transpose = F, method = "fisher") {
   if (transpose == T) {
     y.f <- grp
@@ -179,7 +197,7 @@ piece.table.wrapper <- function (y, grp, dat, transpose = F, method = "fisher") 
 ```
 
 ```{r check_cleaned_data, include=FALSE}
-data_full <- read_fst(path = "../data/derived/2023Jul20_data_oncotype.RData")
+data_full <- read_fst(path = "../data/derived/2023Aug06_data_oncotype.RData")
 ```
 
 ```{r eval=FALSE, include=FALSE}
@@ -218,25 +236,32 @@ data_full[,Radiation.therapy:=factor(Radiation.therapy, levels=c("Yes", "No"))]
 # Create a treatment modality variable that clearly reflects the combined category of Surgical.procedure, Endocrine.therapy, and Radiation.therapy
 paste(data_full$Surgical.procedure, 
       paste0("Endo", data_full$Endocrine.therapy), 
-      paste0("Rad", data_full$Radiation.therapy)) |> table(useNA = "ifany")
- #        Lumpectomy EndoNA RadNA         Lumpectomy EndoNA RadNo 
+      paste0("Rad", data_full$Radiation.therapy), sep = "|") |> table(useNA = "ifany")
+ #        Lumpectomy|EndoNA|RadNA         Lumpectomy|EndoNA|RadNo 
  #                             18                               4 
- #       Lumpectomy EndoNA RadYes         Lumpectomy EndoNo RadNA 
+ #       Lumpectomy|EndoNA|RadYes         Lumpectomy|EndoNo|RadNA 
  #                             11                               1 
- #        Lumpectomy EndoNo RadNo        Lumpectomy EndoNo RadYes 
+ #        Lumpectomy|EndoNo|RadNo        Lumpectomy|EndoNo|RadYes 
  #                             32                              48 
- #       Lumpectomy EndoYes RadNA        Lumpectomy EndoYes RadNo 
+ #       Lumpectomy|EndoYes|RadNA        Lumpectomy|EndoYes|RadNo 
  #                              9                              41 
- #      Lumpectomy EndoYes RadYes                 NA EndoNA RadNA 
+ #      Lumpectomy|EndoYes|RadYes                 NA|EndoNA|RadNA 
  #                            843                               1 
- #  Total mastectomy EndoNA RadNA   Total mastectomy EndoNA RadNo 
+ #  Total mastectomy|EndoNA|RadNA   Total mastectomy|EndoNA|RadNo 
  #                              8                               6 
- # Total mastectomy EndoNA RadYes   Total mastectomy EndoNo RadNo 
+ # Total mastectomy|EndoNA|RadYes   Total mastectomy|EndoNo|RadNo 
  #                              1                              23 
- # Total mastectomy EndoNo RadYes  Total mastectomy EndoYes RadNA 
+ # Total mastectomy|EndoNo|RadYes  Total mastectomy|EndoYes|RadNA 
  #                              3                               1 
- # Total mastectomy EndoYes RadNo Total mastectomy EndoYes RadYes 
+ # Total mastectomy|EndoYes|RadNo Total mastectomy|EndoYes|RadYes 
  #                            335                              66 
+
+data_full$Treatment.modality <- paste(data_full$Surgical.procedure, 
+                                      paste0("Endocrine", data_full$Endocrine.therapy), 
+                                      paste0("Radiation", data_full$Radiation.therapy),
+                                      sep = "|") |>
+  factor() |>
+  relevel(ref = "Lumpectomy|EndocrineYes|RadiationYes")
 
 data_full[,Height:=Height.m]
 data_full[,Weight:=Weight.at.diagnosis.kg]
@@ -335,7 +360,7 @@ write.csv(data_full,
 ```
 
 ```{r load_cleaned_data_again, include=FALSE}
-data_full <- read_fst(path = "../data/derived/2023Jul20_data_oncotype.RData")
+data_full <- read_fst(path = "../data/derived/2023Aug06_data_oncotype.RData")
 ```
 
 
@@ -366,6 +391,7 @@ data_full <- read_fst(path = "../data/derived/2023Jul20_data_oncotype.RData")
 * `Chemotherapy`: chemotherapy treatment with categories: No (reference); Yes
 * `Endocrine.therapy`: endocrine therapy with categories: Yes (reference); No
 * `Radiation.therapy`: radiation therapy with categories: Yes (reference); No
+* `Treatment.modality`: combined value in surgical procedure, endocrine therapy, and radiation therapy with categories: Lumpectomy|EndocrineYes|RadiationYes (reference); Lumpectomy|EndocrineNo|RadiationNo; Lumpectomy|EndocrineNo|RadiationYes; Lumpectomy|EndocrineYes|RadiationNo; Total mastectomy|EndocrineNo|RadiationNo; Total mastectomy|EndocrineNo|RadiationYes; Total mastectomy|EndocrineYes|RadiationNo; Total mastectomy|EndocrineYes|RadiationYes
 * `Local.recurrence`: local recurrence with categories: No (reference); Yes
 * `Distant.metastasis`: distant metastasis with categories: No (reference); Yes
 * `Alive.dead.status`: patient status with categories: Alive (reference); Dead
@@ -430,8 +456,15 @@ data_female_mixed <- data_female |>
 data_female_na <- data_female |> 
   filter(is.na(Race.ethnicity))
 
+a <- table(data_full$Treatment.modality) |> names()
+cat_focus <- a[!grepl(pattern = "NA", x = a)]
+data_female_2 <- data_full |> 
+  filter(Patient.gender == "Female",
+         Treatment.modality %in% cat_focus)
+data_female_2$Treatment.modality <- droplevels(data_female_2$Treatment.modality) # Drop unused levels of Treatment.modality
+
 var_label(data_full) = var_label(data_female) = var_label(data_female_white) =
-  var_label(data_female_african) = var_label(data_female_asian) = var_label(data_female_hispanic) = var_label(data_female_mixed) = var_label(data_female_na) = list(
+  var_label(data_female_african) = var_label(data_female_asian) = var_label(data_female_hispanic) = var_label(data_female_mixed) = var_label(data_female_na) = var_label(data_female_2) = list(
     Patient.gender = "Sex",
     Age.at.diagnosis = "Age at diagnosis (year)",
     Race.ethnicity = "Race/ethnicity",
@@ -456,6 +489,7 @@ var_label(data_full) = var_label(data_female) = var_label(data_female_white) =
     Axila.procedure = "Axila procedure",
     Endocrine.therapy = "Endocrine therapy",
     Radiation.therapy = "Radiation therapy",
+    Treatment.modality = "Treatment modality",
     Local.recurrence = "Local recurrence",
     Distant.metastasis = "Distant metastasis",
     Time.to.local.recurrence.year = "Time to local recurrence (year)",
@@ -1348,6 +1382,86 @@ cor_plot_wrapper(cor_method = NULL,
 ```
 
 
+## Distribution of BMI across T stage/N stage/histological type/grade/lymphovascular invasion in female african patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_african) 
+```
+
+
+## Distribution of BMI across T stage/N stage/histological type/grade/lymphovascular invasion in female asian patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_asian) 
+```
+
+
+## Distribution of BMI across T stage/N stage/histological type/grade/lymphovascular invasion in female hispanic patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_hispanic) 
+```
+
+
+## Distribution of BMI across T stage/N stage/histological type/grade/lymphovascular invasion in female mixed patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_mixed) 
+```
+
+
+## Distribution of BMI across T stage/N stage/histological type/grade/lymphovascular invasion in female patients with NA races
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "BMI.at.diagnosis",
+                 y_label = "Body mass index",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_na) 
+```
+
+
 ## Distribution of height across T stage/N stage/histological type/grade/lymphovascular invasion in female white patients
 ```{r include=FALSE, results="asis", }
 cor_plot_wrapper(cor_method = NULL,
@@ -1364,6 +1478,86 @@ cor_plot_wrapper(cor_method = NULL,
 ```
 
 
+## Distribution of height across T stage/N stage/histological type/grade/lymphovascular invasion in female african patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_african) 
+```
+
+
+## Distribution of height across T stage/N stage/histological type/grade/lymphovascular invasion in female asian patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_asian) 
+```
+
+
+## Distribution of height across T stage/N stage/histological type/grade/lymphovascular invasion in female hispanic patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_hispanic) 
+```
+
+
+## Distribution of height across T stage/N stage/histological type/grade/lymphovascular invasion in female mixed patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_mixed) 
+```
+
+
+## Distribution of height across T stage/N stage/histological type/grade/lymphovascular invasion in female patients with NA races
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Height",
+                 y_label = "Height (m)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_na) 
+```
+
+
 ## Distribution of weight across T stage/N stage/histological type/grade/lymphovascular invasion in female white patients
 ```{r include=FALSE, results="asis", }
 cor_plot_wrapper(cor_method = NULL,
@@ -1377,6 +1571,131 @@ cor_plot_wrapper(cor_method = NULL,
                                "Lymphovascular.invasion"
                                ),
                  data_set = data_female_white) 
+```
+
+
+## Distribution of weight across T stage/N stage/histological type/grade/lymphovascular invasion in female african patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_african) 
+```
+
+
+## Distribution of weight across T stage/N stage/histological type/grade/lymphovascular invasion in female asian patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_asian) 
+```
+
+
+## Distribution of weight across T stage/N stage/histological type/grade/lymphovascular invasion in female hispanic patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_hispanic) 
+```
+
+
+## Distribution of weight across T stage/N stage/histological type/grade/lymphovascular invasion in female mixed patients
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_mixed) 
+```
+
+
+## Distribution of weight across T stage/N stage/histological type/grade/lymphovascular invasion in female patients with NA races
+```{r include=FALSE, results="asis", }
+cor_plot_wrapper(cor_method = NULL,
+                 var_y = "Weight",
+                 y_label = "Weight (kg)",
+                 var_focus = c("T.stage.2", 
+                               "N.stage.2",
+                               "Histological.type",
+                               "Histological.grade",
+                               "Histological.grade.2",
+                               "Lymphovascular.invasion"
+                               ),
+                 data_set = data_female_na) 
+```
+
+
+# Multivariable logistic regression analyses in female patients
+## Association between locoregional recurrence and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype.
+```{r include=FALSE, results="asis", }
+response <- "Local.recurrence.2"
+covariates <- c("BMI", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+```{r include=FALSE, results="asis", }
+response <- "Local.recurrence.2"
+covariates <- c("Weight", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+```{r include=FALSE, results="asis", }
+response <- "Local.recurrence.2"
+covariates <- c("Height", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+## Association between distant metastasis and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype.
+```{r include=FALSE, results="asis", }
+response <- "Distant.metastasis.2"
+covariates <- c("BMI", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+```{r include=FALSE, results="asis", }
+response <- "Distant.metastasis.2"
+covariates <- c("Weight", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+```{r include=FALSE, results="asis", }
+response <- "Distant.metastasis.2"
+covariates <- c("Height", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
 ```
 
 
