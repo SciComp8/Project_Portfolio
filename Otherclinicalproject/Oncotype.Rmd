@@ -32,8 +32,9 @@ knitr::opts_chunk$set(
 
 # Data preparations
 ```{r include=FALSE}
-## Attach libraries and functions
-easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "BTKR", "corrr", "multcomp") |> suppressPackageStartupMessages()
+#####Attach libraries and wrappers#####
+easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "BTKR", "corrr", "multcomp", "survival") |> suppressPackageStartupMessages()
+
 "%_%" <- function(m, n) paste0(m, "_", n)
 "%0%" <- function(m, n) paste0(m, n)
 "%+%" <- function(m) paste0(m, collapse = "+")
@@ -156,18 +157,67 @@ cor.table.wrapper <- function (data_set = data_set,
 glm_wrapper <- function(y = NULL, x = NULL, data_set = NULL, family_type = NULL) {
   glm.fit <- glm("%0%"(y%0%"~", "%+%"(x)), 
                  data = data_set, family = family_type)
-
   t_mv <- tbl_regression(x = glm.fit, 
-                        exponentiate = T,
-                        pvalue_fun = function(x) style_pvalue(x, digits = 3),
-                        add_estimate_to_reference_rows = T) |>
+                         exponentiate = T,
+                         pvalue_fun = function(x) style_pvalue(x, digits = 3),
+                         add_estimate_to_reference_rows = T) |>
     add_n() |> 
     bold_labels() |>
     as_flex_table() |>
-    bold(bold = T, part = "header") |> 
+    bold(bold = T, part = "header")
+
+  if (!"BMI" %in% x) {
+    t_mv
+  } else {
+    t_mv <- t_mv |>
     mk_par(part = "body", i = 1, j = "label",
            value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")"))
-  t_mv
+    t_mv
+  }
+}
+
+cox_wrapper <- function(surv_time = NULL, surv_event = NULL, x = NULL, data_set = NULL) {
+  cox.fit <- coxph(formula("Surv(" %0% surv_time %0% "," %0% surv_event %0% ") ~ " %0% "%+%"(x)), 
+                   data = data_set)
+
+  t_mv <- tbl_regression(x = cox.fit, 
+                         exponentiate = T,
+                         pvalue_fun = function(x) style_pvalue(x, digits = 3),
+                         add_estimate_to_reference_rows = T) |>
+    add_n() |> 
+    bold_labels() |>
+    as_flex_table() |>
+    bold(bold = T, part = "header")
+  
+  if (!"BMI" %in% x) {
+    t_mv
+  } else {
+    t_mv <- t_mv |>
+    mk_par(part = "body", i = 1, j = "label",
+           value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")"))
+    t_mv
+  }
+}
+
+uni.coxph <- function(surv.data, surv.time, surv.event) {
+  dat.work <- get(surv.data)
+  out <- mclapply(1:length(vars.ana),
+                  function(i) {
+                    vars.missing <- ifelse(is.na(dat.work[, vars.ana[i]]), 
+                                           "missing", "non.missing") %>%
+                      factor(levels = c("non.missing", "missing"))
+                    res.i <- try(coxph(formula("Surv(" %0% surv.time %0% "," %0% surv.event %0% ") ~ " %0% vars.ana[i]), data = dat.work), silent = T) # Store errors due to insufficient levels of a factor variable; recap fcphuni.stat2
+                    if(any(vars.missing == "missing")) {
+                      res.i.miss <- coxph(formula("Surv(" %0% surv.time %0% "," %0% surv.event %0% ") ~ vars.missing"), 
+                                          data = dat.work)
+                      return(list(res.i, res.i.miss))
+                    } else {
+                      return(list(res.i))
+                    }
+                  },
+                mc.cores = 4L)
+  names(out) <- vars.ana
+  return(out)
 }
 
 piece.table.wrapper <- function (y, grp, dat, transpose = F, method = "fisher") {
@@ -197,7 +247,7 @@ piece.table.wrapper <- function (y, grp, dat, transpose = F, method = "fisher") 
 ```
 
 ```{r check_cleaned_data, include=FALSE}
-data_full <- read_fst(path = "../data/derived/2023Aug06_data_oncotype.RData")
+data_full <- read_fst(path = "../data/derived/2023Aug08_data_oncotype.RData")
 ```
 
 ```{r eval=FALSE, include=FALSE}
@@ -305,6 +355,7 @@ data_full[,Time.to.local.recurrence.year:=Time.to.local.recurrence/365.25]
 # summary(data_full$Time.to.local.recurrence.year)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
 # 0.3     1.7     2.3     3.6     4.1    12.7    1407 
+# No patients have the locoregional recurrence at diagnosis
 
 # Date of death info is not available: not able to consider if time to death happens before time to last follow-up 
 data_full[,Time.to.local.recurrence.or.follow.up:=ifelse(Local.recurrence=="Yes", Time.to.local.recurrence, Time.to.follow.up)]
@@ -319,6 +370,7 @@ data_full[,Time.to.distant.metastasis.year:=Time.to.distant.metastasis/365.25]
 # summary(data_full$Time.to.distant.metastasis.year)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
 # 0.5     2.1     3.7     4.4     6.4    10.1    1423 
+# No patients have the distant metastasis at diagnosis
 
 data_full[,Time.to.distant.metastasis.or.follow.up:=ifelse(Distant.metastasis=="Yes", Time.to.distant.metastasis, Time.to.follow.up)]
 data_full[,Time.to.distant.metastasis.or.follow.up.year:=Time.to.distant.metastasis.or.follow.up/365.25]
@@ -360,7 +412,7 @@ write.csv(data_full,
 ```
 
 ```{r load_cleaned_data_again, include=FALSE}
-data_full <- read_fst(path = "../data/derived/2023Aug06_data_oncotype.RData")
+data_full <- read_fst(path = "../data/derived/2023Aug08_data_oncotype.RData")
 ```
 
 
@@ -1655,7 +1707,7 @@ cor_plot_wrapper(cor_method = NULL,
 
 
 # Multivariable logistic regression analyses in female patients
-## Association between locoregional recurrence and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype.
+## Association between locoregional recurrence and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype
 ```{r include=FALSE, results="asis", }
 response <- "Local.recurrence.2"
 covariates <- c("BMI", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
@@ -1663,6 +1715,15 @@ glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type 
 ```
 
 
+## Association between 3-year locoregional recurrence and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+response <- "Local.recurrence.3year"
+covariates <- c("BMI", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+## Association between locoregional recurrence and weight, after adjustments of treatment modality, T stage, N stage, and oncotype
 ```{r include=FALSE, results="asis", }
 response <- "Local.recurrence.2"
 covariates <- c("Weight", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
@@ -1670,6 +1731,15 @@ glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type 
 ```
 
 
+## Association between 3-year locoregional recurrence and weight, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+response <- "Local.recurrence.3year"
+covariates <- c("Weight", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+## Association between locoregional recurrence and height, after adjustments of treatment modality, T stage, N stage, and oncotype
 ```{r include=FALSE, results="asis", }
 response <- "Local.recurrence.2"
 covariates <- c("Height", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
@@ -1677,7 +1747,15 @@ glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type 
 ```
 
 
-## Association between distant metastasis and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype.
+## Association between 3-year locoregional recurrence and height, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+response <- "Local.recurrence.3year"
+covariates <- c("Height", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+## Association between distant metastasis and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype
 ```{r include=FALSE, results="asis", }
 response <- "Distant.metastasis.2"
 covariates <- c("BMI", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
@@ -1685,6 +1763,15 @@ glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type 
 ```
 
 
+## Association between 3-year distant metastasis and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+response <- "Distant.metastasis.3year"
+covariates <- c("BMI", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+## Association between distant metastasis and weight, after adjustments of treatment modality, T stage, N stage, and oncotype
 ```{r include=FALSE, results="asis", }
 response <- "Distant.metastasis.2"
 covariates <- c("Weight", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
@@ -1692,10 +1779,84 @@ glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type 
 ```
 
 
+## Association between 3-year distant metastasis and weight, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+response <- "Distant.metastasis.3year"
+covariates <- c("Weight", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+## Association between distant metastasis and height, after adjustments of treatment modality, T stage, N stage, and oncotype
 ```{r include=FALSE, results="asis", }
 response <- "Distant.metastasis.2"
 covariates <- c("Height", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
 glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+## Association between 3-year distant metastasis and height, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+response <- "Distant.metastasis.3year"
+covariates <- c("Height", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+glm_wrapper(y = response, x = covariates, data_set = data_female_2, family_type = "binomial")
+```
+
+
+# Multivariable Cox proportional harzards regression analyses in female patients
+To build the multivariable survival models, the variable `Time.to.local.recurrence.or.follow.up.year` is created and defined as the time to the local recurrence for patients with the local recurrence and the time to last follow-up for patients without the local recurrence (censored). Likewise, `Time.to.distant.metastasis.or.follow.up.year` is created and defined as the time to the distant metastasis for patients with the distant metastasis and the time to last follow-up for patients without the distant metastasis (censored). Notice that the information on date of death is unavailable at this point.
+
+## Association between locoregional recurrence-free survival and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+surv_time <- "Time.to.local.recurrence.or.follow.up.year"
+surv_event <- "Local.recurrence.2"
+covariates <- c("BMI", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+cox_wrapper(surv_time, surv_event, x = covariates, data_set = data_female_2)
+```
+
+
+## Association between locoregional recurrence-free survival and weight, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+surv_time <- "Time.to.local.recurrence.or.follow.up.year"
+surv_event <- "Local.recurrence.2"
+covariates <- c("Weight", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+cox_wrapper(surv_time, surv_event, x = covariates, data_set = data_female_2)
+```
+
+
+## Association between locoregional recurrence-free survival and height, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+surv_time <- "Time.to.local.recurrence.or.follow.up.year"
+surv_event <- "Local.recurrence.2"
+covariates <- c("Height", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+cox_wrapper(surv_time, surv_event, x = covariates, data_set = data_female_2)
+```
+
+
+## Association between distant metastasis-free survival and BMI, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+surv_time <- "Time.to.distant.metastasis.or.follow.up.year"
+surv_event <- "Distant.metastasis.2"
+covariates <- c("BMI", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+cox_wrapper(surv_time, surv_event, x = covariates, data_set = data_female_2)
+```
+
+
+## Association between distant metastasis-free survival and weight, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+surv_time <- "Time.to.distant.metastasis.or.follow.up.year"
+surv_event <- "Distant.metastasis.2"
+covariates <- c("Weight", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+cox_wrapper(surv_time, surv_event, x = covariates, data_set = data_female_2)
+```
+
+
+## Association between distant metastasis-free survival and height, after adjustments of treatment modality, T stage, N stage, and oncotype
+```{r include=FALSE, results="asis", }
+surv_time <- "Time.to.distant.metastasis.or.follow.up.year"
+surv_event <- "Distant.metastasis.2"
+covariates <- c("Height", "Treatment.modality", "T.stage.2", "N.stage.2", "Oncotype.score")
+cox_wrapper(surv_time, surv_event, x = covariates, data_set = data_female_2)
 ```
 
 
