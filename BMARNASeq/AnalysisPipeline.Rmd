@@ -847,7 +847,7 @@ for (var.i in var.vec) {
 ```
 
 
-## Estimate the duplicate rate of a common differentially expressed gene associated with a variable
+## Estimate the duplicate rate of a cDEG associated with a variable
 ```{r}
 cDEGs = cDEGs.list = NULL
 threshold.vec <- seq(1000, 5000, 1000)
@@ -1654,7 +1654,7 @@ for (var.i in var.vec) {
 ```
 
 
-## Estimate the duplicate rate of a common differentially expressed gene associated with a variable
+## Estimate the duplicate rate of a cDEG associated with a variable
 ```{r}
 cDEGs = cDEGs.list = NULL
 threshold.vec <- seq(1000, 5000, 1000)
@@ -1744,7 +1744,7 @@ saveRDS(organized_duplicate_rate_data, "../ApplicationData/derived/RandomSeed/Du
 ```
 
 
-## Make and save boxplots
+## Make and save the duplicate rate boxplots
 ```{r}
 organized_duplicate_rate_data <- readRDS("../ApplicationData/derived/RandomSeed/DuplicatedRateMatrix/MultiModel/organized_duplicate_rate_data.RDS")
 organized_duplicate_rate_data[,variable:=factor(variable,levels=c("BMI","AGE","SEX","MHABNWBC"))]
@@ -2826,6 +2826,7 @@ for (var.name in var.vec) {
 ```
 
 
+Here, we show biological insights of replicable DEGs that are uniquely and consistently detected with BMAseq or univariable edgeR.
 ```{r dotplot_cnetplot}
 ##------BMAseq-----
 # Show all cDEGs uniquely identified by BMAseq that appear in at least one seed
@@ -2838,7 +2839,7 @@ for (seed.i in seed.vec) {
   file.name <- paste0("../ApplicationData/derived/RandomSeed/HeatmapBoxplotData/", var.name, "_", threshold.i, "_", seed.i, ".RDS")
   class_freq_per_seed <- readRDS(file.name)
   class_freq_per_seed_BMAseq <- filter(class_freq_per_seed, Class == "100000000") |>
-    select(Class) |>
+    dplyr::select(Class) |>
     mutate(Seed = seed.i) |>
     rownames_to_column("cDEG")
   class_freq_all_seed_list[[as.character(seed.i)]] <- class_freq_per_seed_BMAseq 
@@ -2918,7 +2919,7 @@ make_dotplot <- function(data.set = ora.obj.ordered,
     scale_y_discrete(limits = term.ordered, labels = scales::label_wrap(70)) + 
     labs(y = NULL,
          color = ifelse(color.type == "pvalue", "p-value", 
-                        TeX("$-log_{10}$ p-value"))
+                        TeX("-$log_{10}$ (p-value)"))
          ) +
     ggtitle(paste0("Unique cDEGs of ", var.name)) + 
     theme_bw(base_size = 14, base_family = "Arial") +
@@ -2941,7 +2942,6 @@ date.analysis <- format(Sys.Date(), "%Y%b%d")
 ggsave(filename = sprintf("../ApplicationResult/AddViz/DotPlot/%s_%s_%s_%s.eps", date.analysis, "BMAseq", var.name, "all.seed"),
        plot = p, device = cairo_ps, dpi = 600, width = 10, height = 6, units = "in")
 
-
 ##------edgeR_UVM-----
 # Show all cDEGs uniquely identified by edgeR_UVM that appear in at least one seed
 var.name <- "BMI"
@@ -2954,7 +2954,7 @@ for (seed.i in seed.vec) {
   file.name <- paste0("../ApplicationData/derived/RandomSeed/HeatmapBoxplotData/", var.name, "_", threshold.i, "_", seed.i, ".RDS")
   class_freq_per_seed <- readRDS(file.name)
   class_freq_per_seed_BMAseq <- filter(class_freq_per_seed, Class == "000100000") |>
-    select(Class) |>
+    dplyr::select(Class) |>
     mutate(Seed = seed.i) |>
     rownames_to_column("cDEG")
   class_freq_all_seed_list[[as.character(seed.i)]] <- class_freq_per_seed_BMAseq 
@@ -4141,6 +4141,7 @@ write.table(unlist(unique.cDEGs.list) |> unique(), file = file.name, quote = F, 
 
 # Additional visualization
 ## Rearrange cDEGs number plots
+### All variables
 ```{r}
 ##------Load the cDEGs number data modeled under the univariable/multivariable framework------
 cDEGs_num_uni <- readRDS("../ApplicationResult/Uni/RandomSeed/numcDEGs/Boxplot/boxplot.data.num.BMA.RDS")
@@ -4192,7 +4193,100 @@ for (var.i in var.vec) {
 ```
 
 
+### BMI
+```{r}
+var.i <- "BMI"
+g <- cDEGs_num_all[variable == var.i] |>
+  ggplot(aes(y = num.cDEGs, x = method, group = method)) +
+  geom_boxplot(outlier.shape = NA, mapping = aes(color = method), lwd = 0.8) +
+  geom_jitter(aes(color = method), size = 1) +
+  # stat_summary(fun = median, geom = "line", aes(group = 1), color = "#0073C2FF") +
+  scale_color_manual(
+    values = c(
+      "#A73030FF",
+      "#3B3B3BFF",
+      "#0073C2FF",
+      "#EFC000FF",
+      "#868686FF",
+      "#8F7700FF",
+      "#7AA6DCFF",
+      "#003C67FF",
+      "#CD534CFF"
+    )
+  ) + # Avoid red-green combinations difficult for colour-blind readers
+  facet_wrap(vars(threshold)) +
+  geom_hline(aes(yintercept = -Inf)) +
+  geom_vline(aes(xintercept = -Inf)) +
+  coord_cartesian(clip = "off") +
+  labs(y = paste0("Number of cDEGs"),
+       x = "Method") +
+  theme_BMA()
+ggsave(
+  filename = sprintf(
+    "../ApplicationResult/AddViz/numcDEGs/%s_%s.eps",
+    date.analysis,
+    var.i
+  ),
+  plot = g,
+  device = "eps",
+  dpi = 600,
+  width = 8,
+  height = 6,
+  units = "in"
+)
+```
+
+
+### Each threshold in BMI
+```{r}
+var.i <- "BMI"
+threshold.vec <- seq(1000, 5000, 1000)
+for (threshold.i in threshold.vec) { 
+  cDEGs_num_threshold <- filter(cDEGs_num_all, threshold == threshold.i)
+  g <- cDEGs_num_threshold[variable == var.i] |>
+    ggplot(aes(y = num.cDEGs, x = method, group = method)) +
+    geom_boxplot(outlier.shape = NA, mapping = aes(color = method), lwd = 0.8) +
+    geom_jitter(aes(color = method), size = 1) +
+    scale_color_manual(
+      values = c(
+        "#A73030FF",
+        "#3B3B3BFF",
+        "#0073C2FF",
+        "#EFC000FF",
+        "#868686FF",
+        "#8F7700FF",
+        "#7AA6DCFF",
+        "#003C67FF",
+        "#CD534CFF"
+      )
+    ) + # Avoid red-green combinations difficult for color-blind readers
+    facet_wrap(vars(threshold)) +
+    geom_hline(aes(yintercept = -Inf)) +
+    geom_vline(aes(xintercept = -Inf)) +
+    coord_cartesian(clip = "off") +
+    labs(y = paste0("Number of cDEGs"),
+         x = "Method") +
+    theme_BMA()
+  ggsave(
+    filename = sprintf(
+      "../ApplicationResult/AddViz/numcDEGs/%s_%s_%s.eps",
+      date.analysis,
+      var.i,
+      threshold.i
+    ),
+    plot = g,
+    device = "eps",
+    dpi = 600,
+    width = 4,
+    height = 4,
+    units = "in"
+  )
+}
+```
+
+
 ## Rearrange cDEGs rate plots
+### All variables
 ```{r}
 ##------Load the cDEGs rate data modeled under the univariable/multivariable framework------
 cDEGs_rate_uni <- readRDS("../ApplicationResult/Uni/RandomSeed/ratecDEGs/Boxplot/boxplot.data.rate.BMA.RDS")
@@ -4249,7 +4343,190 @@ for (var.i in var.vec) {
 ```
 
 
-## [Optional] Make cDEGs rate line plots grouped by random seeds
+### BMI
+```{r}
+var.i <- "BMI"
+g <- cDEGs_rate_all[variable == var.i] |>
+  ggplot(aes(y = rate.cDEGs, x = method, group = method)) +
+  geom_boxplot(outlier.shape = NA, mapping = aes(color = method), lwd = 0.8) +
+  geom_jitter(aes(color = method), size = 1) +
+  # stat_summary(fun = median, geom = "line", aes(group = 1), color = "#0073C2FF") +
+  scale_color_manual(
+    values = c(
+      "#A73030FF",
+      "#3B3B3BFF",
+      "#0073C2FF",
+      "#EFC000FF",
+      "#868686FF",
+      "#8F7700FF",
+      "#7AA6DCFF",
+      "#003C67FF",
+      "#CD534CFF"
+    )
+  ) + # Avoid red-green combinations difficult for color-blind readers
+  scale_y_continuous(
+    labels = scales::label_number(accuracy = 0.01),
+    breaks = seq(0, 0.8, 0.1),
+    limits = c(0, 0.8)
+  ) +
+  facet_wrap(vars(threshold)) +
+  geom_hline(aes(yintercept = -Inf)) +
+  geom_vline(aes(xintercept = -Inf)) +
+  coord_cartesian(clip = "off") +
+  labs(y = paste0("Rate of cDEGs"),
+       x = "Method") +
+  theme_BMA()
+ggsave(
+  filename = sprintf(
+    "../ApplicationResult/AddViz/ratecDEGs/%s_%s.eps",
+    date.analysis,
+    var.i
+  ),
+  plot = g,
+  device = "eps",
+  dpi = 600,
+  width = 8,
+  height = 6,
+  units = "in"
+)
+```
+
+
+### Each threshold in BMI
+```{r}
+var.i <- "BMI"
+threshold.vec <- seq(1000, 5000, 1000)
+for (threshold.i in threshold.vec) { 
+  cDEGs_rate_threshold <- filter(cDEGs_rate_all, threshold == threshold.i)
+  g <- cDEGs_rate_threshold[variable == var.i] |>
+    ggplot(aes(y = rate.cDEGs, x = method, group = method)) +
+    geom_boxplot(outlier.shape = NA, mapping = aes(color = method), lwd = 0.8) +
+    geom_jitter(aes(color = method), size = 1) +
+    scale_color_manual(
+      values = c(
+        "#A73030FF",
+        "#3B3B3BFF",
+        "#0073C2FF",
+        "#EFC000FF",
+        "#868686FF",
+        "#8F7700FF",
+        "#7AA6DCFF",
+        "#003C67FF",
+        "#CD534CFF"
+      )
+    ) + # Avoid red-green combinations difficult for color-blind readers
+    scale_y_continuous(
+      labels = scales::label_number(accuracy = 0.01)
+    ) +
+    facet_wrap(vars(threshold)) +
+    geom_hline(aes(yintercept = -Inf)) +
+    geom_vline(aes(xintercept = -Inf)) +
+    coord_cartesian(clip = "off") +
+    labs(y = paste0("Rate of cDEGs"),
+         x = "Method") +
+    theme_BMA()
+  ggsave(
+    filename = sprintf(
+      "../ApplicationResult/AddViz/ratecDEGs/%s_%s_%s.eps",
+      date.analysis,
+      var.i,
+      threshold.i
+    ),
+    plot = g,
+    device = "eps",
+    dpi = 600,
+    width = 4,
+    height = 4,
+    units = "in"
+  )
+}
+```
+
+
+## Make cDEGs number line plots grouped by random seeds
+### Each threshold in BMI
+```{r}
+##------Preprocess data------
+cDEGs_num_uni <- readRDS("../ApplicationResult/Uni/RandomSeed/numcDEGs/Boxplot/boxplot.data.num.BMA.RDS")
+cDEGs_num_uni <- cDEGs_num_uni[cDEGs_num_uni$method!="BMAseq", ]
+cDEGs_num_multi <- readRDS("../ApplicationResult/Multi/RandomSeed/numcDEGs/Boxplot/boxplot.data.num.RDS")
+
+cDEGs_num_uni$method <- paste0(cDEGs_num_uni$method, "_UVM")
+cDEGs_num_multi$method <- ifelse(cDEGs_num_multi$method != "BMAseq", paste0(cDEGs_num_multi$method, "_MVM"), cDEGs_num_multi$method)
+cDEGs_num_all <- rbind(cDEGs_num_uni, cDEGs_num_multi)
+cDEGs_num_all$method <- factor(cDEGs_num_all$method,
+                               levels = c("BMAseq", "DESeq2_UVM", "DESeq2_MVM", "edgeR_UVM", "edgeR_MVM", "eBayes_UVM", "eBayes_MVM", "voom.limma_UVM", "voom.limma_MVM"))
+cDEGs_num_all$variable <- factor(cDEGs_num_all$variable,levels=c("BMI","AGE","SEX","MHABNWBC"))
+cDEGs_num_all$random.seed <- factor(cDEGs_rate_all$random.seed,
+                                    levels = c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999))
+
+var.i <- "BMI"
+threshold.vec <- seq(1000, 5000, 1000)
+for (threshold.i in threshold.vec) {
+  cDEGs_num_threshold <- filter(cDEGs_num_all, threshold == threshold.i, variable == var.i)
+  g <- cDEGs_num_threshold |>
+    ggplot(aes(y = num.cDEGs, x = method, group = random.seed)) +
+    geom_line(aes(color = random.seed)) +
+    geom_point(aes(color = random.seed), size = 0.8) + 
+    # Annotate the max value of cDEGs num per seed by enlarging its point size
+    geom_point(data = cDEGs_num_threshold |>
+                 group_by(random.seed) |>
+                 mutate(max.num = max(num.cDEGs)) |>
+                 dplyr::filter(num.cDEGs == max.num),
+               aes(y = max.num, x = method, color = random.seed), 
+               size = 2) +
+    facet_wrap(vars(threshold)) +
+    labs(
+      y = paste0("Number of cDEGs"),
+      x = "Method",
+      color = "Seed"
+    ) +
+    theme_BMA() +
+    theme(# legend.position = "none",
+      axis.text.x = element_text(
+        size = 9,
+        angle = 90,
+        hjust = 1,
+        color = "black",
+        vjust = 0.5
+      ))
+  
+    if (threshold.i != 5000) {
+      ggsave(
+        filename = sprintf(
+          "../ApplicationResult/AddViz/numcDEGs/%s_%s_line_%s.eps",
+          date.analysis,
+          var.i,
+          threshold.i
+        ),
+        plot = g,
+        device = "eps",
+        dpi = 600,
+        width = 4,
+        height = 4,
+        units = "in")
+    } else {
+      g <- g + theme(legend.position = "right")
+      ggsave(
+        filename = sprintf(
+          "../ApplicationResult/AddViz/numcDEGs/%s_%s_line_%s.eps",
+          date.analysis,
+          var.i,
+          threshold.i
+        ),
+        plot = g,
+        device = "eps",
+        dpi = 600,
+        width = 5.1,
+        height = 4,
+        units = "in")
+    }
+}
+```
+
+
+## Make cDEGs rate line plots grouped by random seeds
+### All variables
 ```{r}
 ##------Preprocess data------
 cDEGs_rate_uni <- readRDS("../ApplicationResult/Uni/RandomSeed/ratecDEGs/Boxplot/boxplot.data.rate.BMA.RDS")
@@ -4260,7 +4537,7 @@ cDEGs_rate_multi$method <- ifelse(cDEGs_rate_multi$method != "BMAseq", paste0(cD
 
 cDEGs_rate_all <- rbind(cDEGs_rate_uni, cDEGs_rate_multi)
 cDEGs_rate_all$method <- factor(cDEGs_rate_all$method,
-                               levels = c("BMAseq", "DESeq2_UVM", "DESeq2_MVM", "edgeR_UVM", "edgeR_MVM", "eBayes_UVM", "eBayes_MVM", "voom.limma_UVM", "voom.limma_MVM"))
+                                levels = c("BMAseq", "DESeq2_UVM", "DESeq2_MVM", "edgeR_UVM", "edgeR_MVM", "eBayes_UVM", "eBayes_MVM", "voom.limma_UVM", "voom.limma_MVM"))
 cDEGs_rate_all$variable <- factor(cDEGs_rate_all$variable,levels=c("BMI","AGE","SEX","MHABNWBC"))
 cDEGs_rate_all$random.seed <- factor(cDEGs_rate_all$random.seed,
                                      levels = c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999))
@@ -4299,6 +4576,77 @@ for (var.i in var.vec) {
       scale_y_continuous(labels = scales::label_number(accuracy = 0.01), breaks = seq(0, 0.8, 0.1), limits = c(0, 0.8))
       ggsave(filename = sprintf("../ApplicationResult/AddViz/ratecDEGs/%s_%s_line.eps", date.analysis, var.i),
              plot = g, device = "eps", dpi = 600, width = 9, height = 6, units = "in")
+  }
+}
+```
+
+
+### Each threshold in BMI
+```{r}
+var.i <- "BMI"
+threshold.vec <- seq(1000, 5000, 1000)
+for (threshold.i in threshold.vec) {
+  cDEGs_rate_threshold <- filter(cDEGs_rate_all, threshold == threshold.i, variable == var.i)
+  g <- cDEGs_rate_threshold |>
+    ggplot(aes(y = rate.cDEGs, x = method, group = random.seed)) +
+    geom_line(aes(color = random.seed)) +
+    geom_point(aes(color = random.seed), size = 0.8) + 
+    # Annotate the max value of cDEGs rate per seed by enlarging its point size
+    geom_point(data = cDEGs_rate_threshold |>
+                 group_by(random.seed) |>
+                 mutate(max.rate = max(rate.cDEGs)) |>
+                 dplyr::filter(rate.cDEGs == max.rate),
+               aes(y = max.rate, x = method, color = random.seed), 
+               size = 2) +
+    facet_wrap(vars(threshold)) +
+    labs(
+      y = paste0("Rate of cDEGs"),
+      x = "Method",
+      color = "Seed"
+    ) +
+    theme_BMA() +
+    theme(# legend.position = "none",
+      axis.text.x = element_text(
+        size = 9,
+        angle = 90,
+        hjust = 1,
+        color = "black",
+        vjust = 0.5
+      )) +
+    scale_y_continuous(
+      labels = scales::label_number(accuracy = 0.01)
+    )
+  
+  if (threshold.i != 5000) {
+    ggsave(
+      filename = sprintf(
+        "../ApplicationResult/AddViz/ratecDEGs/%s_%s_line_%s.eps",
+        date.analysis,
+        var.i,
+        threshold.i
+      ),
+      plot = g,
+      device = "eps",
+      dpi = 600,
+      width = 4,
+      height = 4,
+      units = "in")
+  } else {
+    g <- g + theme(legend.position = "right")
+    ggsave(
+      filename = sprintf(
+        "../ApplicationResult/AddViz/ratecDEGs/%s_%s_line_%s.eps",
+        date.analysis,
+        var.i,
+        threshold.i
+      ),
+      plot = g,
+      device = "eps",
+      dpi = 600,
+      width = 5.1,
+      height = 4,
+      units = "in"
+    )
   }
 }
 ```
@@ -4362,6 +4710,7 @@ for (var.i in var.vec) {
 
 
 ## Rearrange duplicated rate plots
+### All variables
 ```{r}
 ##------Load the duplicated rate data modeled under the univariable/multivariable framework------
 duplicate_rate_uni <- readRDS("../ApplicationData/derived/RandomSeed/DuplicatedRateMatrix/UniModel/organized_duplicate_rate_data.noBMA.RDS")
@@ -4412,6 +4761,25 @@ g2 <- duplicate_rate_all |>
   theme_BMA()
 ggsave(filename = sprintf("../ApplicationResult/AddViz/DuplicatedRate/%s_mean.eps", date.analysis),
        plot = g2, device = "eps", dpi = 600, width = 5, height = 5, units = "in")
+```
+
+
+### BMI
+```{r}
+duplicate_rate_bmi <- filter(duplicate_rate_all, variable == "BMI")
+g2 <- duplicate_rate_bmi |>
+  ggplot(mapping = aes(y = cDEGs.duplicate.rate.mean, x = method, group = method)) + 
+  geom_boxplot(outlier.shape = NA, lwd = 1) + 
+  geom_jitter(aes(color = method), size = 1.5) + 
+  geom_hline(aes(yintercept = -Inf)) + 
+  geom_vline(aes(xintercept = -Inf)) + 
+  coord_cartesian(clip = "off") + 
+  scale_y_continuous(labels = scales::label_number(accuracy = 0.01)) + 
+  scale_color_manual(values = c("#A73030FF", "#3B3B3BFF", "#0073C2FF", "#EFC000FF", "#868686FF", "#8F7700FF", "#7AA6DCFF", "#003C67FF", "#CD534CFF")) + # Avoid red-green combinations difficult for color-blind readers 
+  labs(y = "Mean duplicate rate of cDEGs", x = "Method") + 
+  theme_BMA()
+ggsave(filename = sprintf("../ApplicationResult/AddViz/DuplicatedRate/%s_mean.eps", date.analysis),
+       plot = g2, device = "eps", dpi = 600, width = 4, height = 5, units = "in")
 ```
 
 
