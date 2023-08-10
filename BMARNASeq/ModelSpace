@@ -63,3 +63,5 @@
 [62] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXfemale+AGE+MHABNWBC"
 [63] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXmale+AGE+MHABNWBC"  
 [64] "~1+BMI+SEX+BMIhigh.SEXmale+AGE+MHABNWBC"    
+
+# Revised model space for the interaction analysis 
