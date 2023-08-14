@@ -1,4 +1,4 @@
-# Model space for the interaction analysis 
+# Model space of BMAseq in the interaction analysis 
  [1] "~1"                                                                
  [2] "~1+BMI"                                                            
  [3] "~1+SEX"                                                            
@@ -64,4 +64,6 @@
 [63] "~1+BMIlow.SEXfemale.BMIhigh.SEXmale+BMIhigh.SEXmale+AGE+MHABNWBC"  
 [64] "~1+BMI+SEX+BMIhigh.SEXmale+AGE+MHABNWBC"    
 
-# Revised model space for the interaction analysis 
+# Two model designs of single model approaches in the interaction analysis 
+[1] "~1+BMI+SEX+BMI*SEX"
+[1] "~1+BMI+SEX+BMI*SEX+AGE+MHABNWBC"
