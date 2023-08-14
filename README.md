@@ -1,6 +1,6 @@
 # Molecular & clinical project-oriented programming
 
-This is a compiled list of my procedural programming work affiliated with collaborative and individual research projects, which span from statistical omics to healthcare research. 
+This repository includes my programming work affiliated with collaborative and individual research projects, which span from statistical omics to healthcare research. 
 
 ## Table of contents
 
