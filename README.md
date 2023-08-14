@@ -1,4 +1,4 @@
-<img width="742" alt="image" src="https://github.com/anniliu7/Projectcoding/assets/90419301/ef01bedb-bb26-4133-a775-fcb35db7b3d5"># Molecular & clinical project-oriented programming
+# Molecular & clinical project-oriented programming
 
 This is a compiled list of my procedural programming work affiliated with collaborative and individual research projects, which span from statistical omics to healthcare research. 
 
