@@ -1,4 +1,4 @@
-# Molecular & clinical project-oriented programming
+<img width="742" alt="image" src="https://github.com/anniliu7/Projectcoding/assets/90419301/ef01bedb-bb26-4133-a775-fcb35db7b3d5"># Molecular & clinical project-oriented programming
 
 This is a compiled list of my procedural programming work affiliated with collaborative and individual research projects, which span from statistical omics to healthcare research. 
 
@@ -11,7 +11,7 @@ This is a compiled list of my procedural programming work affiliated with collab
 * [Lipidomics and transcriptomics analysis](#Lipidomics-and-transcriptomics-analysis)
 
 ## **Bayesian model averaging for RNA-Seq count data**
-Accurately identifying differentially expressed genes(DEGs) can offer reliable insights into biological processes underlying specific conditions, and further aid in developing diagnostic biomarkers and targeted therapeutics. The goal of this project is to evaluate the performance of our novel `BMAseq` and other existing single-model approaches: `DESeq2`, `edgeR`, and `limma` on inferring replicable DEGs in the setting of univariable, multivaribles, and multivaribles with interaction terms. The RNA-seq count and phenotypic data from GTEx are randomly divided into 50% training set and 50% test set. The performance of each approach is assessed in the univariate, multivariate, multivariate with interaction settings.
+Accurately identifying differentially expressed genes(DEGs) can offer reliable insights into biological processes underlying specific conditions, and further aid in developing diagnostic biomarkers and targeted therapeutics. This project evaluates the performance of our novel multi-model `BMAseq` and other existing single-model approaches: `DESeq2`, `edgeR`, and `limma` on inferring replicable DEGs under the univariable, multivaribles, and multivaribles with interaction terms model designs. The RNA-seq count and phenotypic data from GTEx are randomly divided into 50% training set and 50% test set. For evaluation, we focus on measures that are of practical interest to researchers when analyzing their data sets. We investigate 1) number and rate of replicable DEGs at different ranking thresholds detected with different approaches; 2) consistency of replicable DEG detections between different approaches; 3) uniqueness of replicable DEG detections between different approaches; 4) major consistent detection ways of replicable DEGs; 5) biological insights of replicable DEGs that are uniquely and consistently identified by different approaches.
 
 - [AnalysisPipeline.Rmd](BMARNASeq/AnalysisPipeline.Rmd)
 - [GenerateCheck_TrainingTestData.Rmd](BMARNASeq/GenerateCheck_TrainingTestData.Rmd)
