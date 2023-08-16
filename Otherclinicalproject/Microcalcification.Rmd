@@ -397,46 +397,6 @@ vars.cat[vars.all %in% c("BMI", "Age.Dx", "Time.PLM.2", "Timing.CTX", "Time.PLM.
 The association between a categorical variable and a grouping variable (e.g., initial lumpectomy margins) is examined using the Fisher’s exact test. Difference in the value of a continuous variable among patients of different groups was examined using the Wilcoxon rank sum test (for two groups comparison) or Kruskal Wallis rank sum test (for more than two groups comparison). Notice that the p-value for the Wilcoxon rank sum test or Kruskal Wallis rank sum test is aligned with the median (IQR) summaries in a summary table. For variable with missing values, the difference in the proportion of missingness across different groups is also examined using the Fisher's exact test. All p values are two-sided. All statistical analyses are performed in R Version 4.2.3 (R Foundation for Statistical Computing, Vienna, Austria). The R packages "BTKR", "multcomp", "readxl", "tidyverse", and "fst" are used in this study. 
 
 
-# Summary of results
-Q1: What is the frequency of post-lumpectomy mammograms (PLM) being completed among lumpectomy patients?
-
-* 71 (59%, n = 121) lumpectomy patients complete the PLM (Table 1).
-
-Q2: What is the time to performance of these PLM relative to initiation of breast radiation? Exclude patients who received chemotherapy before radiation?
-
-* The minimum, the first quantile, median, mean (standard deviation, s.d.), the third quantile, and maximum of the time to performance of these PLM (in days) from the date of surgery in patients who do not receive chemotherapy before radiation are: `r dat.work.2 <- dat.work[which(dat.work$Timing.CTX.2 != "Before radiation"), ]; a <- summary(dat.work.2$Time.PLM.day.2) |> round(2); b <- sd(dat.work.2$Time.PLM.day.2, na.rm = T) |> round(2); paste(c(a[1:3], paste0(a[4], " (", b, ")"), a[5:6]), "days")` (Table 2). 
-
-* The minimum, the first quantile, median, mean (s.d.), the third quantile, and maximum of the time to initiation of breast radiation (in days) from the date of surgery in patients who complete PLM but do not receive chemotherapy before radiation are: `r a <- summary(dat.work.2[which(dat.work.2$PLM.2 == "Yes"), ]$Time.rad.day.2) |> round(2); b <- sd(dat.work.2[which(dat.work.2$PLM.2 == "Yes"), ]$Time.rad.day.2, na.rm = T) |> round(2); paste(c(a[1:3], paste0(a[4], " (", b, ")"), a[5:6]), "days")` (Table 2). 
-
-* Among patients who do not receive chemotherapy before radiation, the minimum, the first quantile, median, mean (s.d.), the third quantile, and maximum of the time to initiation of breast radiation (in days) from the date of surgery in patients who complete PLM and show the residual microcalcifications are: `r a <- summary(dat.work.2[which(dat.work.2$PLM.2 == "Yes" & dat.work.2$PLM.calcs.2 == "Yes"), ]$Time.rad.day.2) |> round(2); b <- sd(dat.work.2[which(dat.work.2$PLM.2 == "Yes" & dat.work.2$PLM.calcs.2 == "Yes"), ]$Time.rad.day.2, na.rm = T) |> round(2); paste(c(a[1:3], paste0(a[4], " (", b, ")"), a[5:6]), "days")`. The minimum, the first quantile, median, mean (s.d.), the third quantile, and maximum of the time to initiation of breast radiation (in days) from the date of surgery in patients who complete PLM but DO NOT show the residual microcalcifications are: `r a <- summary(dat.work.2[which(dat.work.2$PLM.2 == "Yes" & dat.work.2$PLM.calcs.2 == "No"), ]$Time.rad.day.2) |> round(2); b <- sd(dat.work.2[which(dat.work.2$PLM.2 == "Yes" & dat.work.2$PLM.calcs.2 == "No"), ]$Time.rad.day.2, na.rm = T) |> round(2); paste(c(a[1:3], paste0(a[4], " (", b, ")"), a[5:6]), "days")`. There is a statistically significant association between the time to initiation of breast radiation and the status of residual microcalcifications (p-value < 0.001) (Table 8). 
-
-Q3: What is the frequency of the PLM revealing residual microcalcifications (stratified by whether initial lumpectomy margins were negative, close or positive)?
-
-* Of 71 patients who complete PLM, 8 (17.78%, n = 45) of 45 patients with negative initial margins show the residual microcalcifications, compared to patients of other four patient groups: 5 (55.56%, n = 9) of 9 patients with positive initial margins, 3 (42.86%, n = 7) of 7 patients with close initial margins, 1 (25%, n = 4) of 4 patients with negative for carcinoma but close for DCIS initial margins, and 4 (66.67%, n = 6) of 6 patients with negative for carcinoma but positive for DCIS initial margins. There are statistically significant differences in the occurrence of residual microcalcifications among different types of initial margins (p-value = 0.020) (Table 3). 
-* When the initial lumpectomy margins are re-categorized as `Negative` and `Positive/close`, 8 (17.78%, n = 45) of 45 patients with negative initial margins show the residual microcalcifications, and 13 (50%, n = 26) of 26 patients with positive/close initial margins show the residual microcalcifications. This difference is statistically significant (p-value = 0.007) (Table 4).
-
-
-Q4: What is the frequency of re-excision being performed if residual microcalcifications were identified?
-
-* Of 21 patients with residual microcalcifications, 20 have re-excision information where 19 (95%, n = 20) patients receive the re-excision (Table 5).
-
-Q5: What is the frequency of additional cancer being detected in re-excision surgery performed to resect residual microcalcifications (stratified by whether initial lumpectomy margins were negative, close or positive)?
-
-* In terms of the additional carcinoma being detected in re-excision surgery performed to resect residual microcalcifications, 2 (40%, n = 5) of 5 patients with positive initial lumpectomy margins show the additional carcinoma. No patient with all other types of initial margins shows the additional carcinoma (Tables 6 and 7).
-* In terms of the additional DCIS being detected in re-excision surgery performed to resect residual microcalcifications, 2 (28.57%, n = 7) of 7 patients with negative initial margins, 2 (66.67%, n = 3) of 3 patients with close initial margins, 1 (20%, n = 5) of 5 patients with positive initial margins, 1 (100%, n = 1) of 1 patient with negative for carcinoma but close for DCIS initial margins, and 1 (33.33%, n = 3) of 3 patients with negative for carcinoma but positive for DCIS initial margins show the additional DCIS. These differences are not statistically significant (p-value = 0.414) (Table 6). When the initial lumpectomy margins are re-categorized as `Negative` and `Positive/close`, 2 (28.57%, n = 7) of 7 patients with negative initial margins and 5 (41.67%, n = 12) of 12 patients with positive/close initial margins show the additional DCIS. Similarly, these differences are not statistically significant (p-value = 0.512) (Table 7).
-* When DCIS and carcinoma are combined into one group of additional cancer, 2 (28.57%, n = 7) of 7 patients with negative initial margins, 2 (66.67%, n = 3) of 3 patients with close initial margins, 3 (60%, n = 5) of 5 patients with positive initial margins, 1 (100%, n = 1) of 1 patient with negative for carcinoma but close for DCIS initial margins, and 1 (33.33%, n = 3) of 3 patients with negative for carcinoma but positive for DCIS initial margins show the additional cancer. These differences are not statistically significant (p-value = 0.659) (Table 6). When the initial lumpectomy margins are re-categorized as `Negative` and `Positive/close`, 2 (28.57%, n = 7) of 7 patients with negative initial margins and 7 (58.33%, n = 12) of 12 patients with positive/close initial margins show the additional cancer. Similarly, these differences are not statistically significant (p-value = 0.350) (Table 7).
-
-
-Q6: What is the overall frequency of microcalcifications on surveillance imaging? 
-
-* Of 121 patients, 86 patients have information about microcalcifications on surveillance imaging where 4 (4.65%, n = 86) patients have the surveillance imaging with microcalcifications (Table 1).
-
-Q7: What is the median time to surveillance?
-
-* The median time to surveillance from the date of surgery is `r median(dat.work$Time.surv.day.2, na.rm = T)` days (Table 1).
-
-
-
 ## Patients characteristics for all patients in the dataset
 ```{r, results="hide"}
 out <- fsmry.dmgrph(
@@ -444,6 +404,37 @@ out <- fsmry.dmgrph(
   vars = vars.all,
   vars.cat = vars.cat,
   by = NULL)
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Patients characteristics by PLM for patients with available PLM information
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("PLM.2"))
+out <- fsmry.dmgrph(
+  dat = dat.work,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "PLM.2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## *Patients characteristics by PLM for patients with available PLM information
+```{r, results="hide"}
+dat.work.1 <- dat.work[dat.work$Initial.margin.3 == "Positive/close", ]
+vars.cat.rm <- which(vars.all %in% c("PLM.2"))
+out <- fsmry.dmgrph(
+  dat = dat.work.1,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "PLM.2")
 ```
 
 ```{r, results="asis"}
@@ -489,6 +480,22 @@ knitr::kable(out[[1]], row.names = F)
 vars.cat.rm <- which(vars.all %in% c("PLM.2", "Initial.margin.2", "Initial.margin.3"))
 out <- fsmry.dmgrph(
   dat = dat.work.3,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "Initial.margin.3")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## *Patients characteristics by initial lumpectomy margins (`Initial.margin.3`) for patients without PLM
+```{r, results="hide"}
+vars.cat.rm <- which(vars.all %in% c("PLM.2", "PLM.calcs.2", "Initial.margin.2", "Initial.margin.3", "Time.PLM.day.2"))
+dat.work.3.1 <- dat.work[which(dat.work$PLM.2 == "No"), ]
+out <- fsmry.dmgrph(
+  dat = dat.work.3.1,
   vars = vars.all[-vars.cat.rm],
   vars.cat = vars.cat[-vars.cat.rm],
   by = "Initial.margin.3")
