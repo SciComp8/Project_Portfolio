@@ -10,7 +10,7 @@ output:
     fig_width: 4
     highlight: null
     toc: yes
-    reference_docx: manuscript_style_V0.docx
+    reference_docx: manuscript_style_recon_V0.docx
 params:
   date.analysis: !r format(Sys.Date(), "%Y%b%d")
   plot.fig: TRUE
@@ -189,6 +189,7 @@ data_full <- read_fst(path = "../data/derived/2023Jul17_data_recon.RData")
 * `Reconstruction`: any reconstruction with categories: No (reference); Yes
 * `Reconstruction.type`: type of reconstruction with categories: Implant (reference); Autologous
 
+# Summary tables
 ## Overall distributions of patient variables
 ```{r include=FALSE, results="hide"}
 ##------Set study variables for BTKR package------
@@ -241,6 +242,7 @@ knitr::kable(out[[1]], row.names = F)
 var_focus <- c(
   "Age.at.diagnosis",
   "Race.2",
+  "Race.3",
   "Primary.language",
   "Primary.language.english",
   "Language.concordance",
@@ -264,6 +266,7 @@ var_focus <- c(
 var_label(data_full) <- list(
   Age.at.diagnosis = "Age at diagnosis (years)",
   Race.2 = "Race",
+  Race.3 = "Race",
   Primary.language = "Patient's primary language",
   Primary.language.english = "English as the patient's primary language",
   Language.concordance = "Patient-physician language concordance",
@@ -307,13 +310,29 @@ tbl_summary(data = data_full |> dplyr::select(var_focus),
 ```
 
 
-## Characteristics of patients stratified by whether postmastectomy breast reconstruction was performed
+## Characteristics of patients stratified by whether postmastectomy breast reconstruction was performed (column percentage)
 ```{r echo=FALSE, results="hide"}
-idx.rm <- Position(f = function(i) {i == "Reconstruction"} , x = var_all) 
+var.idx.rm <- Position(f = function(i) {i == "Reconstruction"} , x = var_all) 
 out <- fsmry.dmgrph(dat = data_full,
-                    vars = var_all[-idx.rm],
-                    vars.cat = var_cat[-idx.rm],
+                    vars = var_all[-var.idx.rm],
+                    vars.cat = var_cat[-var.idx.rm],
                     by = "Reconstruction")
+```
+
+
+```{r echo=FALSE, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Characteristics of patients stratified by whether postmastectomy breast reconstruction was performed (row percentage)
+```{r echo=FALSE, results="hide"}
+# Examine the reconstruction rate for each category level
+out <- fsmry.dmgrph(dat = data_full,
+                    vars = var_all[-var.idx.rm],
+                    vars.cat = var_cat[-var.idx.rm],
+                    by = "Reconstruction",
+                    prop.by.row = T)
 ```
 
 
@@ -346,7 +365,7 @@ tbl_summary(data = data_full_2 |> dplyr::select(var_focus),
   bold_labels() |>
   as_flex_table() |>
   bold(bold = T, part = "header") |> 
-  mk_par(part = "body", i = 44, j = "label",
+  mk_par(part = "body", i = 50, j = "label",
          value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")"))
 ```
 
@@ -355,6 +374,8 @@ tbl_summary(data = data_full_2 |> dplyr::select(var_focus),
 ```{r echo=FALSE, warning=FALSE}
 data_full$Plastics.referral <- factor(data_full$Plastics.referral, levels = c("Yes", "No")) # If set "No" as the reference level, the estimate will be extremely large and the table was stretched very wide
 data_full$Primary.language <- relevel(data_full$Primary.language, ref = "English")
+data_full$Diagnosis <- factor(data_full$Diagnosis, levels = c("Invasive", "Atypia/in situ", "Prophylaxis/risk reducing")) # Use invasive as the reference category
+
 var_label(data_full) <- list(
   Plastics.referral = "Plastics referral",
   Primary.language = "Patient's primary language")
@@ -365,22 +386,32 @@ t_uv <- tbl_uvregression(
   y = Reconstruction,
   method.args = list(family = binomial),
   exponentiate = T
-)
+) |> 
+  bold_labels() |>
+  as_flex_table() |>
+  bold(bold = T, part = "header") |> 
+  mk_par(part = "body", i = 46, j = "label",
+         value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")"))
 t_uv
 ```
 
 
 ## Multivariable backward stepwise selection logistic regression analyses of patient factors associated with reconstruction
+The backward stepwise logistic regression is used to estimate the independent effects of factors predictive of reconstruction. The full model includes the candidate predictors which are `Age.at.diagnosis`, `Race.2`, `Primary.language.english`, `Language.concordance`, `Insurance`, `BMI`, `Charlson.comorbidity.index`, `Smoke`, `Diagnosis`, `Surgeon.gender`, `Surgery.type`, `Plastics.referral`.
 ```{r echo=FALSE, warning=FALSE}
-covariates <- var_focus[-which(var_focus %in% c("Chemotherapy", "Endocrine.therapy", "Radiation", "Bilateral.cancer", "Bilateral.risk.reducing", "Plastics.referral", "Reconstruction.type", "Diagnosis", "Reconstruction"))]
+covariates <- var_focus[-which(var_focus %in% c("Race.3", "Chemotherapy", "Primary.language", "Endocrine.therapy", "Radiation", "Bilateral.cancer", "Bilateral.risk.reducing", "Reconstruction.type", "Reconstruction"))]
 response <- "Reconstruction"
+
+# "Plastics.referral"
+# "Diagnosis"
 
 data_full_3 <- na.omit(data_full[c("Patient.id", covariates, response)])
 
 var_label(data_full_3) <- list(
   Age.at.diagnosis = "Age at diagnosis (years)",
   Race.2 = "Race",
-  Primary.language = "Patient's primary language",
+  # Race.3 = "Race",
+  # Primary.language = "Patient's primary language",
   Primary.language.english = "English as the patient's primary language",
   Language.concordance = "Patient-physician language concordance",
   Insurance = "Type of insurance",
@@ -389,9 +420,9 @@ var_label(data_full_3) <- list(
   Smoke = "Smoking status",
   Surgeon.gender = "Surgeon gender",
   Surgery.type = "Type of surgery",
-  Reconstruction = "Any reconstruction"
+  Reconstruction = "Any reconstruction",
+  Plastics.referral = "Plastics referral"
 )
-
 
 glm.fit <- glm("%0%"(response%0%"~", "%+%"(covariates)), 
                data = data_full_3, family = binomial)
@@ -409,16 +440,21 @@ t_mv <- tbl_regression(x = glm.fit.back,
                        exponentiate = T,
                        pvalue_fun = function(x) style_pvalue(x, digits = 3),
                        add_estimate_to_reference_rows = T) |>
-  bold_labels() 
+  add_n() |> 
+  bold_labels() |>
+  as_flex_table() |>
+  bold(bold = T, part = "header")
 t_mv
 ```
 
-```{r echo=FALSE, results="hide"}
+## Assess the multicollinearity via variance inflation factor
+```{r echo=FALSE, results='asis'}
 car::vif(glm.fit.back) |> knitr::kable()
 ```
 
 
 ## Univariable and multivariable logistic regression analyses of patient factors associated with reconstruction (publication-ready table)
+Notice that both the univariable logistic regression results and multivariable backward stepwise selection logistic regression results are obtained from the study population of the same size, that is, 601.
 ```{r echo=FALSE, warning=FALSE}
 t_uv_2 <- tbl_uvregression(
   data = data_full_3[c(covariates, response)], # Here use data_full_3
@@ -430,28 +466,77 @@ t_uv_2 <- tbl_uvregression(
   add_estimate_to_reference_rows = T
 )
 
-t_merge <- tbl_merge(tbls = list(t_uv_2, t_mv),
+t_mv_2 <- tbl_regression(x = glm.fit.back, 
+                         exponentiate = T,
+                         pvalue_fun = function(x) style_pvalue(x, digits = 3),
+                         add_estimate_to_reference_rows = T) |>
+  bold_labels() 
+
+t_merge <- tbl_merge(tbls = list(t_uv_2, t_mv_2),
                      tab_spanner = c("**Univariable analysis**", "**Multivariable analysis**"))
 
 # t_merge[["table_styling"]][["header"]][["column"]]
 
 t_merge |> 
-  as_flex_table() %>%
-  width(width = 2.5, unit = "cm")
+  as_flex_table() |>
+  mk_par(part = "body", i = 22, j = "label",
+         value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")")) |>
+  width(width = 3, unit = "cm")
 ```
 
 
-# Trend of the postmastectomy reconstruction rate over time
-```{r echo=FALSE, warning=FALSE}
+# Trend of the postmastectomy reconstruction rate over time (added with exact 95% confidence intervals)
+```{r echo=FALSE, warning=FALSE, fig.height = 3, fig.width = 4, out.height=287.5399361022364, out.width=383.69304556354916}
 line_plot_data <- dplyr::count(data_full, Procedure.year, Reconstruction)
 Reconstruction_count <- line_plot_data$n
 Reconstruction_rate <- Reconstruction_count[c(F, T)] / dplyr::count(data_full, Procedure.year)[["n"]]
-Reconstruction_data <- data.frame(Year = line_plot_data$Procedure.year |> unique(), Reconstruction_rate = Reconstruction_rate)
+
+# Estimate the 95% confidence interval using the exact method
+r <- binom.confint(x = Reconstruction_count[c(F, T)], n = dplyr::count(data_full, Procedure.year)[["n"]], conf.level = 0.95, methods = "exact")
+
+Reconstruction_data <- data.frame(Year = line_plot_data$Procedure.year |> unique(), Reconstruction_rate = Reconstruction_rate, Lower = r$lower, Upper = r$upper)
 
 ggplot(data = Reconstruction_data, 
        mapping = aes(x = Year, y = Reconstruction_rate)) +
-  geom_line(aes(group = 1), color = "#0073C2FF") +
+  geom_line(aes(group = 1), color = "steelblue2") +
+  geom_ribbon(aes(x = 1:length(Year), ymin = Lower, ymax = Upper), linetype = 2, alpha = 0.1) + 
   theme_minimal() + 
   labs(y = "Reconstruction Rate", x = "Year") + 
-  scale_y_continuous(labels = scales::percent_format(accuracy = 0.1))
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.1),
+                     limits = c(0, 0.6)) +
+  theme(legend.position = "none",
+        axis.text = element_text(color = "black"),
+        panel.grid.major.y = element_line(linewidth = 0.7), # Adjust the horizontal grid line
+        panel.grid.minor.y = element_line(linewidth = 0.7),
+        panel.grid.major.x = element_blank() # Remove the vertical grid lines
+  )
+```
+
+
+# Trend of the postmastectomy reconstruction rate over time (added with Agresti-Coull 95% confidence intervals)
+```{r echo=FALSE, warning=FALSE, fig.height = 3, fig.width = 4, out.height=287.5399361022364, out.width=383.69304556354916}
+# Estimate the 95% confidence interval using the Agresti-Coull method
+r <- binom.confint(x = Reconstruction_count[c(F, T)], n = dplyr::count(data_full, Procedure.year)[["n"]], conf.level = 0.95, methods = "ac")
+
+Reconstruction_data <- data.frame(Year = line_plot_data$Procedure.year |> unique(), Reconstruction_rate = Reconstruction_rate, Lower = r$lower, Upper = r$upper)
+
+ggplot(data = Reconstruction_data, 
+       mapping = aes(x = Year, y = Reconstruction_rate)) +
+  geom_line(aes(group = 1), color = "steelblue2") +
+  geom_ribbon(aes(x = 1:length(Year), ymin = Lower, ymax = Upper), linetype = 2, alpha = 0.1) + 
+  theme_minimal() + 
+  labs(y = "Reconstruction Rate", x = "Year") + 
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.1),
+                     limits = c(0, 0.6)) +
+  theme(legend.position = "none",
+        axis.text = element_text(color = "black"),
+        panel.grid.major.y = element_line(linewidth = 0.7), # Adjust the horizontal grid line
+        panel.grid.minor.y = element_line(linewidth = 0.7),
+        panel.grid.major.x = element_blank() # Remove the vertical grid lines
+  )
+```
+
+# Session information
+```{r}
+sessionInfo()
 ```
