@@ -21,7 +21,7 @@ editor_options:
 
 ```{r include=FALSE}
 ## Attach libraries and functions
-easypackages::libraries("tidyverse", "readxl", "gtsummary", "gt", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "zeallot", "BTKR", "MASS") |> suppressPackageStartupMessages()
+easypackages::libraries("tidyverse", "readxl", "gtsummary", "gt", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "zeallot", "BTKR", "MASS", "binom") |> suppressPackageStartupMessages()
 "%_%" <- function(m, n) paste0(m, "_", n)
 "%0%" <- function(m, n) paste0(m, n)
 "%+%" <- function(m) paste0(m, collapse = "+")
@@ -305,7 +305,7 @@ tbl_summary(data = data_full |> dplyr::select(var_focus),
   bold_labels() |>
   as_flex_table() |>
   bold(bold = T, part = "header") |>
-  mk_par(part = "body", i = 44, j = "label",
+  mk_par(part = "body", i = 50, j = "label",
          value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")"))
 ```
 
@@ -443,9 +443,11 @@ t_mv <- tbl_regression(x = glm.fit.back,
   add_n() |> 
   bold_labels() |>
   as_flex_table() |>
-  bold(bold = T, part = "header")
+  bold(bold = T, part = "header") |>
+  width(width = 3.5, unit = "cm")
 t_mv
 ```
+
 
 ## Assess the multicollinearity via variance inflation factor
 ```{r echo=FALSE, results='asis'}
@@ -479,7 +481,7 @@ t_merge <- tbl_merge(tbls = list(t_uv_2, t_mv_2),
 
 t_merge |> 
   as_flex_table() |>
-  mk_par(part = "body", i = 22, j = "label",
+  mk_par(part = "body", i = 21, j = "label",
          value = as_paragraph("Body mass index (kg/m", as_sup("2"), ")")) |>
   width(width = 3, unit = "cm")
 ```
