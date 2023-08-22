@@ -2,6 +2,10 @@ library(tidyverse)
 library(clusterProfiler)
 library(enrichplot)
 library(latex2exp)
+library(igraph)
+library(ggraph)
+source("cnetplot_c.R") # Customize the color/order of the edge and legend
+source("utilities.R")
 
 ##------BMAseq-----
 # Show all cDEGs uniquely identified by BMAseq that appear in at least one seed
@@ -46,10 +50,28 @@ ora.obj <-
 ora.obj.df <- ora.obj@result
 ora.obj.ordered <- ora.obj.df[order(ora.obj.df$Count, decreasing = T), ]
 
-p <- cnetplot(x = ora.obj,
-         showCategory = ora.obj.ordered$Description[1:6],
-         circular = T, 
-         color.params = list(foldChange = NULL, edge = TRUE)) + 
+# p <- cnetplot(x = ora.obj,
+#          showCategory = ora.obj.ordered$Description[1:6],
+#          circular = T, 
+#          color.params = list(foldChange = NULL, edge = TRUE)) + 
+#   theme(legend.title = element_text(size = 14),
+#         legend.text = element_text(size = 12))
+
+p <- cnetplot.enrichResult(
+  x = ora.obj,
+  showCategory = ora.obj.ordered$Description[1:6],
+  circular = T,
+  colorEdge = T,
+  color_category = c(
+    "#A73030FF",
+    "#CD534CFF",
+    "#8F7700FF",
+    "#EFC000FF",
+    "#003C67FF",
+    "#0073C2FF"
+  ),
+  node_label = "gene"
+) +
   theme(legend.title = element_text(size = 14),
         legend.text = element_text(size = 12))
 
@@ -160,10 +182,21 @@ ora.obj <-
 ora.obj.df <- ora.obj@result
 ora.obj.ordered <- ora.obj.df[order(ora.obj.df$Count, decreasing = T), ]
 
-p <- cnetplot(x = ora.obj,
-         showCategory = ora.obj.ordered$Description[1:6],
-         circular = T, 
-         color.params = list(foldChange = NULL, edge = TRUE)) + 
+p <- cnetplot.enrichResult(
+  x = ora.obj,
+  showCategory = ora.obj.ordered$Description[1:6],
+  circular = T,
+  colorEdge = T,
+  color_category = c(
+    "#A73030FF",
+    "#CD534CFF",
+    "#8F7700FF",
+    "#EFC000FF",
+    "#003C67FF",
+    "#0073C2FF"
+  ),
+  node_label = "gene"
+) +
   theme(legend.title = element_text(size = 14),
         legend.text = element_text(size = 12))
 
@@ -225,10 +258,6 @@ ora.obj.df <- ora.obj@result
 ora.obj.ordered <- ora.obj.df[order(ora.obj.df$Count, decreasing = T), ]
 
 # options(ggrepel.max.overlaps = Inf) # Always show all labels, regardless of too many overlaps.
-source("cnetplot_c.R") # Customize the color of edges
-source("utilities.R")
-library(igraph)
-library(ggraph)
 p <- cnetplot.enrichResult(
   x = ora.obj,
   showCategory = ora.obj.ordered$Description[1:6],
@@ -237,10 +266,10 @@ p <- cnetplot.enrichResult(
   color_category = c(
       "#A73030FF",
       "#CD534CFF",
-      "#003C67FF",
-      "#0073C2FF",
       "#8F7700FF",
-      "#EFC000FF"
+      "#EFC000FF",
+      "#003C67FF",
+      "#0073C2FF"
     ),
   node_label = "gene"
 ) +
@@ -249,7 +278,7 @@ p <- cnetplot.enrichResult(
 
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 ggsave(filename = sprintf("../ApplicationResult/AddViz/cnetplot/%s_%s_%s_%s.eps", date.analysis, "all", var.name, "all.seed"),
-       plot = p, device = cairo_ps, dpi = 600, width = 18, height = 12, units = "in")
+       plot = p, device = cairo_ps, dpi = 600, width = 16, height = 12, units = "in")
 
 make_dotplot <- function(data.set = ora.obj.ordered, 
                          top.n = 20, 
