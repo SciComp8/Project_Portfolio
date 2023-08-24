@@ -360,6 +360,9 @@ Notice that the `time to PLM (days)` of the column T in subjects (IDs: `r with(d
 
 ```{r set_variables}
 dat.work <- dat.full
+
+dat.work$Reexcision.3 <- factor(dat.work$Reexcision.2, labels = c("No", "Yes", "Yes")) |> factor(levels = c("No", "Yes"))
+
 vars.all <- c(
   "Race.2",
   "BMI",
@@ -378,6 +381,7 @@ vars.all <- c(
   "Initial.margin.3",
   "PLM.calcs.2",
   "Reexcision.2", 
+  "Reexcision.3",
   "Pathology.reex.2",
   "Pathology.reex.3",
   "Surv.micalc.2",
@@ -426,7 +430,7 @@ knitr::kable(out[[1]], row.names = F)
 ```
 
 
-## *Patients characteristics by PLM for patients with available PLM information
+## Patients characteristics by PLM for patients who have positive/close inital margins with available PLM information
 ```{r, results="hide"}
 dat.work.1 <- dat.work[dat.work$Initial.margin.3 == "Positive/close", ]
 vars.cat.rm <- which(vars.all %in% c("PLM.2"))
@@ -490,22 +494,6 @@ knitr::kable(out[[1]], row.names = F)
 ```
 
 
-## *Patients characteristics by initial lumpectomy margins (`Initial.margin.3`) for patients without PLM
-```{r, results="hide"}
-vars.cat.rm <- which(vars.all %in% c("PLM.2", "PLM.calcs.2", "Initial.margin.2", "Initial.margin.3", "Time.PLM.day.2"))
-dat.work.3.1 <- dat.work[which(dat.work$PLM.2 == "No"), ]
-out <- fsmry.dmgrph(
-  dat = dat.work.3.1,
-  vars = vars.all[-vars.cat.rm],
-  vars.cat = vars.cat[-vars.cat.rm],
-  by = "Initial.margin.3")
-```
-
-```{r, results="asis"}
-knitr::kable(out[[1]], row.names = F)
-```
-
-
 ## Patients characteristics by residual microcalcification (`PLM.calcs.2`) for patients with completed PLM
 ```{r, results="hide"}
 vars.cat.rm <- which(vars.all %in% c("PLM.2", "PLM.calcs.2"))
@@ -523,7 +511,7 @@ knitr::kable(out[[1]], row.names = F)
 
 ## Patients characteristics by initial lumpectomy margins (`Initial.margin.2`) for patients in re-excision surgery performed to resect residual microcalcifications
 ```{r, results="hide"}
-dat.work.4 <- dat.work[which(dat.work$PLM.calcs.2 == "Yes" & dat.work$Reexcision.2 == "Yes"), ]
+dat.work.4 <- dat.work[which(dat.work$PLM.calcs.2 == "Yes" & dat.work$Reexcision.3 == "Yes"), ]
 
 vars.cat.rm <- which(vars.all %in% c("Initial.margin.2", "Initial.margin.3", "Reexcision.2", "PLM.calcs.2", "PLM.2"))
 out <- fsmry.dmgrph(
@@ -540,7 +528,7 @@ knitr::kable(out[[1]], row.names = F)
 
 ## Patients characteristics by initial lumpectomy margins (`Initial.margin.3`) for patients in re-excision surgery performed to resect residual microcalcifications
 ```{r, results="hide"}
-dat.work.4 <- dat.work[which(dat.work$PLM.calcs.2 == "Yes" & dat.work$Reexcision.2 == "Yes"), ]
+dat.work.4 <- dat.work[which(dat.work$PLM.calcs.2 == "Yes" & dat.work$Reexcision.3 == "Yes"), ]
 
 vars.cat.rm <- which(vars.all %in% c("Initial.margin.2", "Initial.margin.3", "Reexcision.2", "PLM.calcs.2", "PLM.2"))
 out <- fsmry.dmgrph(
@@ -575,4 +563,3 @@ knitr::kable(out[[1]], row.names = F)
 ```{r}
 sessionInfo()
 ```
-
