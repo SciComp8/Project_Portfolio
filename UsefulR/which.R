@@ -34,3 +34,5 @@ dat.work$SxRT <- droplevels(dat.work$SxRT)
 table(dat.work$SxRT, useNA = "ifany")
 # LumpectomyRTYes  LumpectomyRTNo            <NA> 
 #             490             141             155 
+
+DDX1.pos.train <- which(grepl(pattern = "ENSG00000079785", x = names(temp$BMAseq.eFDR.Main.train[["BMI"]])))
