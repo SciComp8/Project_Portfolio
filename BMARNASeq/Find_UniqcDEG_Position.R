@@ -169,3 +169,52 @@ full_join(a[[1]], a[[2]], by = "ID") |>
   full_join(a[[3]], by = "ID") |>
   full_join(a[[4]], by = "ID") |>
   dplyr::select(ID, everything()) |> View()
+
+
+##------KRT71/LCE1A/LORICRIN/LCE2B position in the ranking list------
+best.model <- read_excel("../ApplicationData/derived/RandomSeed/BestModelMatrix/BMI_5000.xlsx")
+best.model <- best.model |> column_to_rownames(var = "...1")
+# SYMBOL         ENSEMBL
+# 1   KRT71 ENSG00000139648
+
+# General case for all possible seeds
+# Find which random seed trial shows KRT71 as the cDEG detected with edgeR_UVM at a 5000 ranking threshold
+seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+seed.trial <- character()
+KRT71.pos <- LCE1A.pos <- LORICRIN.pos <- LCE2B.pos <- numeric()
+
+find_position <- function(IDstring) {
+  seed.trial <- character()
+  cDEG.pos <- numeric()
+  for (seed.i in seed.vec) {
+    temp <- new.env()
+    target.file <- sprintf("../ApplicationData/derived/RandomSeed/Top5000/UniModel/Trim/edgeRUni%s.RData", seed.i)
+    load(target.file, envir = temp)
+    if (grepl(pattern = IDstring, x = temp[["edgeR.eFDR.GeneName.train"]][["BMI"]]) |> sum() == 1) {
+      seed.trial.i <- paste0("train.", seed.i)
+      seed.trial <- c(seed.trial, seed.trial.i)
+      cDEG.pos.i <- which(grepl(pattern = IDstring, x = temp[["edgeR.eFDR.GeneName.train"]][["BMI"]]))
+      cDEG.pos <- c(cDEG.pos, cDEG.pos.i)
+    }
+    
+    if (grepl(pattern = IDstring, x = temp[["edgeR.eFDR.GeneName.test"]][["BMI"]]) |> sum() == 1) {
+      seed.trial.i <- paste0("test.", seed.i)
+      seed.trial <- c(seed.trial, seed.trial.i)
+      cDEG.pos.i <- which(grepl(pattern = IDstring, x = temp[["edgeR.eFDR.GeneName.test"]][["BMI"]]))
+      cDEG.pos <- c(cDEG.pos, cDEG.pos.i)
+    }
+    rm("temp")
+  }
+  names(cDEG.pos) <- seed.trial
+  return(cDEG.pos)
+}
+
+IDstring <- c("ENSG00000139648", "ENSG00000186844", "ENSG00000203782", "ENSG00000159455")
+a <- lapply(IDstring, find_position)
+uniq.cDEG <- c("KRT71", "LCE1A", "LORICRIN", "LCE2B")
+b <- lapply(uniq.cDEG, function(i) {name <- paste0(i, ".pos"); df <- a[[which(i == uniq.cDEG)]] |> data.frame(); df$ID <- rownames(df); colnames(df)[1] <- i; return(df)})
+
+full_join(b[[1]], b[[2]], by = "ID") |> 
+  full_join(b[[3]], by = "ID") |>
+  full_join(b[[4]], by = "ID") |>
+  dplyr::select(ID, everything()) |> View()
