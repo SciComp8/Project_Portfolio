@@ -1,4 +1,6 @@
 #####Among cDEGs detected within the other 8 approaches, estimate the percentage of these cDEGs identified by one approach - all seeds#####
+library(tidyverse)
+var.name <- c("BMI")
 p.fun <- function(SMA.method.1 = NULL, SMA.method.2 = NULL, data.set = NULL) {
   d <- data.set |> 
     filter(.data[[SMA.method.1]] == 1) |> 
@@ -62,6 +64,7 @@ theme_BMA <- function(
 }
 
 p.final <- mutate(p.final, percentage_cDEGs_2 = round(100*percentage_cDEGs))
+p.final <- mutate(.data = p.final, across(.cols = starts_with("Approach"), .fns = ~ factor(.x, levels = SMA.method.all)))
 g <- ggplot(data = p.final, 
        mapping = aes(x = approach_1, y = approach_2, color = percentage_cDEGs_2, size = percentage_cDEGs_2)) + 
   geom_point() + 
@@ -77,3 +80,20 @@ g <- ggplot(data = p.final,
 
 ggsave(filename = sprintf("../ApplicationResult/AddViz/shared_discovery/%s_%s_%s_dotplot.eps", date.analysis, var.name, "all_seed"),
        plot = g, device = cairo_ps, dpi = 600, width = 8, height = 8, units = "in")
+
+p.final2 <- p.final |> filter(!(approach_1 %in% c("eBayes_MVM", "eBayes_UVM")), !(approach_2 %in% c("eBayes_MVM", "eBayes_UVM")))
+g2 <- ggplot(data = p.final2, 
+            mapping = aes(x = approach_1, y = approach_2, color = percentage_cDEGs_2, size = percentage_cDEGs_2)) + 
+  geom_point() + 
+  theme_BMA() + 
+  scale_color_viridis(direction = -1, option = "F") + 
+  geom_text(mapping = aes(label = percentage_cDEGs_2), size = 4, nudge_x = 0.45, nudge_y = 0.25, color = "black") + 
+  scale_size(range = c(1, 15)) + # Also modify the color mapping to the mixmimum size
+  labs(x = "Approach", y = "Approach", color = "Percentage \nof cDEGs") + 
+  guides(size = "none") + 
+  theme(legend.position = "right", 
+        legend.key.height = unit(5, "line"),
+        axis.text.y = element_text(color = "black"))
+  
+ggsave(filename = sprintf("../ApplicationResult/AddViz/shared_discovery/%s_%s_%s_dotplot2.eps", date.analysis, var.name, "all_seed"),
+       plot = g2, device = cairo_ps, dpi = 600, width = 7, height = 7, units = "in")
