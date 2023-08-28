@@ -1,5 +1,5 @@
 ---
-title: "Assessment of multi-model BMAseq and other single-model approaches (DESeq2, edgeR, limma) on inferring replicable differentially expressed genes"
+title: "Multi-model BMAseq and other single-model approaches (DESeq2, edgeR, limma) on inferring robust differentially expressed genes"
 author: "Anni Liu"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output: rmarkdown::html_vignette
@@ -28,6 +28,8 @@ easypackages::libraries("BMAseq", "limma", "qvalue", "parallel", "tidyverse",
                         "org.Hs.eg.db", "latex2exp", "enrichplot", "patchwork") |> suppressPackageStartupMessages()
 
 Bayesfactor <- BMAseq:::Bayesfactor
+source("theme_BMA.R")
+date.analysis <- format(Sys.Date(), "%Y%b%d")
 ```
 
 
@@ -104,6 +106,7 @@ BMAseq.multi.postprob.norm <- function(dat.expr.counts, dat.pheno, var.pool, max
 
     # estimate voom weights
     y0 <- voom(counts = dat.expr.counts, 
+               design = NULL,
                lib.size = colSums(dat.expr.counts)*calcNormFactors(dat.expr.counts))
     input.dat.expr <- y0$E
     input.weights <- y0$weights
@@ -4143,21 +4146,6 @@ write.table(unlist(unique.cDEGs.list) |> unique(), file = file.name, quote = F, 
 ## Rearrange cDEGs number boxplots
 ### All variables
 ```{r}
-##------Set the plot theme------
-theme_BMA <- function(
-    base_size = 12,
-    base_family = "Arial"
-) {
-  theme_classic(base_size = base_size, base_family = base_family) +
-    theme(
-      legend.position = "none",
-      panel.background = element_rect(fill = "white", colour = "white"),
-      axis.text.x = element_text(size = 9, angle = 90, hjust = 1, color = "black", vjust = 0.5),
-      strip.background = element_rect(fill = "white", color = "black", linewidth = 0.6), # Customize the box border in strip
-      strip.placement = "inside"
-    )
-}
-
 ##------Load the cDEGs number data modeled under the univariable/multivariable framework------
 cDEGs_num_uni <- readRDS("../ApplicationResult/Uni/RandomSeed/numcDEGs/Boxplot/boxplot.data.num.BMA.RDS")
 cDEGs_num_uni <- cDEGs_num_uni[cDEGs_num_uni$method!="BMAseq", ]
@@ -4635,7 +4623,6 @@ for (var.i in var.vec) {
       geom_boxplot(outlier.shape = NA, mapping = aes(color = method), lwd = 0.8) + 
       geom_line(aes(color = random.seed)) + 
       geom_point(aes(color = random.seed), size = 0.8) + 
-      # stat_summary(fun = median, geom = "line", aes(group = 1), color = "#0073C2FF") +  
       facet_wrap(vars(threshold)) + 
       labs(y = paste0("Rate of ", var.i, "-related cDEGs"), 
            x = "Method",
@@ -4651,7 +4638,6 @@ for (var.i in var.vec) {
       ggplot(aes(y = rate.cDEGs, x = method, group = random.seed)) + 
       geom_line(aes(color = random.seed)) + 
       geom_point(aes(color = random.seed), size = 0.8) + 
-      # stat_summary(fun = median, geom = "line", aes(group = 1), color = "#0073C2FF") +  
       facet_wrap(vars(threshold)) + 
       labs(y = paste0("Rate of ", var.i, "-related cDEGs"), 
            x = "Method",
@@ -4759,7 +4745,6 @@ for (var.i in var.vec) {
       geom_line(aes(color = random.seed)) + 
       geom_boxplot(aes(group = method), outlier.shape = NA, alpha = 0.5) + 
       geom_point(aes(color = random.seed), size = 0.8, alpha = 0.6) + 
-      # stat_summary(fun = median, geom = "line", aes(group = 1), color = "#0073C2FF") +  
       facet_wrap(vars(threshold)) + 
       labs(y = paste0("Rate of ", var.i, "-related cDEGs"), 
            x = "Method",
@@ -4776,7 +4761,6 @@ for (var.i in var.vec) {
       geom_line(aes(color = random.seed)) + 
       geom_boxplot(aes(group = method), outlier.shape = NA, alpha = 0.5) + 
       geom_point(aes(color = random.seed), size = 0.8, alpha = 0.6) + 
-      # stat_summary(fun = median, geom = "line", aes(group = 1), color = "#0073C2FF") +  
       facet_wrap(vars(threshold)) + 
       labs(y = paste0("Rate of ", var.i, "-related cDEGs"), 
            x = "Method",
@@ -4858,6 +4842,71 @@ for (threshold.i in threshold.vec) {
     )
   }
 }
+```
+
+
+## Make cDEGs median rate line plots
+```{r}
+box::use(dplyr = dplyr)
+##------Preprocess data------
+cDEGs_rate_uni <- readRDS("../ApplicationResult/Uni/RandomSeed/ratecDEGs/Boxplot/boxplot.data.rate.BMA.RDS")
+cDEGs_rate_uni <- cDEGs_rate_uni[cDEGs_rate_uni$method!="BMAseq", ]
+cDEGs_rate_multi <- readRDS("../ApplicationResult/Multi/RandomSeed/ratecDEGs/Boxplot/boxplot.data.rate.RDS")
+cDEGs_rate_uni$method <- paste0(cDEGs_rate_uni$method, "_UVM")
+cDEGs_rate_multi$method <- ifelse(cDEGs_rate_multi$method != "BMAseq", paste0(cDEGs_rate_multi$method, "_MVM"), cDEGs_rate_multi$method)
+
+cDEGs_rate_all <- rbind(cDEGs_rate_uni, cDEGs_rate_multi)
+cDEGs_rate_all$method <- factor(cDEGs_rate_all$method,
+                                levels = c("BMAseq", "DESeq2_UVM", "DESeq2_MVM", "edgeR_UVM", "edgeR_MVM", "eBayes_UVM", "eBayes_MVM", "voom.limma_UVM", "voom.limma_MVM"))
+cDEGs_rate_all$variable <- factor(cDEGs_rate_all$variable,levels=c("BMI","AGE","SEX","MHABNWBC"))
+cDEGs_rate_all$random.seed <- factor(cDEGs_rate_all$random.seed,
+                                     levels = c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999))
+cDEGs_rate_BMI <- dplyr$filter(.data = cDEGs_rate_all, variable == "BMI")
+cDEGs_rate_mean_BMI <- dplyr$summarise(.data = cDEGs_rate_BMI,
+                                       mean.rate.cDEGs = mean(rate.cDEGs),
+                                       .by = c(threshold, method))
+cDEGs_rate_mean_BMI$threshold <- factor(cDEGs_rate_mean_BMI$threshold,
+                                        levels = 1000:5000)
+cDEGs_rate_mean_BMI$line.type <- ifelse(grepl(pattern = "BMAseq|*.UVM", x = cDEGs_rate_mean_BMI$method), "solid", "dashed") |> factor(levels = c("solid", "dashed"))
+
+g <- cDEGs_rate_mean_BMI |>
+  ggplot(aes(y = mean.rate.cDEGs, x = threshold, color = method, group = method, linetype = line.type)) +
+  geom_line() +
+  geom_point(size = 0.8) +
+  labs(y = paste0("Mean rate of cDEGs"),
+       x = "Ranking threshold",
+       color = "Method",
+       linetype = "Method") +
+  theme_BMA() +
+  theme(
+    legend.position = "right",
+    axis.text.x = element_text(
+      size = 9,
+      angle = 0,
+      hjust = 0.5,
+      color = "black",
+      vjust = 0.5
+    )) +
+  scale_y_continuous(labels = scales::label_number(accuracy = 0.01),
+                     limits = c(0, 0.4)) + 
+  scale_color_manual(values = c("#A73030FF", rep(c("#003C67FF", "#0073C2FF", "#8F7700FF", "#EFC000FF"), each = 2))) +
+  guides(color = guide_legend(override.aes = list(linetype = c("solid", rep(c("solid", "dashed"), times = 4))))) + 
+  scale_linetype(guide = "none")
+
+var.i <- "BMI"
+ggsave(
+  filename = sprintf(
+    "../ApplicationResult/AddViz/ratecDEGs/%s_%s_median_line_all_threshold.eps",
+    date.analysis,
+    var.i
+  ),
+  plot = g,
+  device = "eps",
+  dpi = 600,
+  width = 5,
+  height = 5,
+  units = "in"
+)
 ```
 
 
@@ -5455,7 +5504,7 @@ for (var.name in var.vec) {
     geom_boxplot(aes(group = Class, color = Class),
                  outlier.shape = NA) + 
     geom_jitter(aes(color = Class), size = 0.8) + 
-    ylab(paste0("Number of ", var.name, "-related cDEGs")) + 
+    ylab(paste0("Number of cDEGs")) + 
     xlab("") + 
     theme_BMA() + 
     coord_flip() + 
@@ -5701,3 +5750,4 @@ ggsave(filename = sprintf("../ApplicationResult/AddViz/unique_discovery/%s_%s_%s
 ```{r}
 sessionInfo()
 ```
+
