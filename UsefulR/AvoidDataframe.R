@@ -39,3 +39,21 @@ Unit: microseconds
  cld
    a
    a
+
+# Case 3
+rolls <- matrix(sample(1:9, 6, replace = TRUE), ncol = 2)
+rolls_df <- data.frame(rolls)
+
+app <- function(x) {
+    apply(x, 1, sum)
+}
+
+microbenchmark(
+    df_sol = app(rolls_df),
+    mat_sol = app(rolls)
+)
+
+Unit: microseconds
+    expr   min     lq     mean median     uq     max neval cld
+  df_sol 47.27 48.840 55.20131 49.890 51.025 255.971   100   b
+ mat_sol 14.52 15.765 16.53882 16.325 17.045  28.531   100  a
