@@ -1,5 +1,5 @@
 ---
-title: "Multi-model BMAseq and other single-model approaches (DESeq2, edgeR, limma) on inferring robust differentially expressed genes"
+title: "Assessment of multi-model BMAseq and other single-model approaches on inferring robust differentially expressed genes"
 author: "Anni Liu"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output: rmarkdown::html_vignette
@@ -4910,15 +4910,15 @@ ggsave(
 ```
 
 
-## Rearrange duplicated rate plots
+## Rearrange rediscovery rate plots
 ### All variables
 ```{r}
-##------Load the duplicated rate data modeled under the univariable/multivariable framework------
+##------Load the rediscovery rate data modeled under the univariable/multivariable framework------
 duplicate_rate_uni <- readRDS("../ApplicationData/derived/RandomSeed/DuplicatedRateMatrix/UniModel/organized_duplicate_rate_data.noBMA.RDS")
 
 duplicate_rate_multi <- readRDS("../ApplicationData/derived/RandomSeed/DuplicatedRateMatrix/MultiModel/organized_duplicate_rate_data.RDS")
 
-##------Refine the duplicated rate data------
+##------Refine the rediscovery rate data------
 duplicate_rate_uni$method <- paste0(duplicate_rate_uni$method, "_UVM")
 duplicate_rate_multi$method <- ifelse(duplicate_rate_multi$method != "BMAseq", paste0(duplicate_rate_multi$method, "_MVM"), duplicate_rate_multi$method)
 duplicate_rate_all <- rbind(duplicate_rate_uni, duplicate_rate_multi)
@@ -4960,7 +4960,7 @@ g2 <- duplicate_rate_all |>
   scale_color_manual(values = c("#A73030FF", "#3B3B3BFF", "#0073C2FF", "#EFC000FF", "#868686FF", "#8F7700FF", "#7AA6DCFF", "#003C67FF", "#CD534CFF")) + # Avoid red-green combinations difficult for color-blind readers 
   labs(y = "Mean duplicate rate of cDEGs", x = "Method") + 
   theme_BMA()
-ggsave(filename = sprintf("../ApplicationResult/AddViz/DuplicatedRate/%s_mean.eps", date.analysis),
+ggsave(filename = sprintf("../ApplicationResult/AddViz/RediscoveryRate/%s_mean.eps", date.analysis),
        plot = g2, device = "eps", dpi = 600, width = 5, height = 5, units = "in")
 ```
 
@@ -4980,7 +4980,7 @@ g2 <- duplicate_rate_bmi |>
   scale_color_manual(values = c("#A73030FF", "#3B3B3BFF", "#0073C2FF", "#EFC000FF", "#868686FF", "#8F7700FF", "#7AA6DCFF", "#003C67FF", "#CD534CFF")) + # Avoid red-green combinations difficult for color-blind readers 
   labs(y = "Mean duplicate rate of cDEGs", x = "Method") + 
   theme_BMA()
-ggsave(filename = sprintf("../ApplicationResult/AddViz/DuplicatedRate/%s_mean.eps", date.analysis),
+ggsave(filename = sprintf("../ApplicationResult/AddViz/RediscoveryRate/%s_mean.eps", date.analysis),
        plot = g2, device = "eps", dpi = 600, width = 4, height = 5, units = "in")
 ```
 
@@ -4991,6 +4991,7 @@ duplicate_rate_all$threshold <- factor(duplicate_rate_all$threshold, levels = c(
 duplicate_rate_bmi <- filter(duplicate_rate_all, variable == "BMI")
 g2 <- duplicate_rate_bmi |>
   ggplot(mapping = aes(y = cDEGs.duplicate.rate.mean, x = method, group = threshold)) + 
+  geom_boxplot(outlier.shape = NA, mapping = aes(group = method), lwd = 0.8) +
   geom_line(aes(color = threshold)) + 
   geom_point(aes(color = threshold), size = 0.8) + 
     # Annotate the max value of cDEGs num per seed by enlarging its point size
@@ -5007,10 +5008,11 @@ g2 <- duplicate_rate_bmi |>
                      breaks = seq(0, 1, 0.01)) + 
   theme_BMA() + 
   scale_color_manual(values = c("#A73030FF", "#0073C2FF", "#003C67FF", "#8F7700FF", "#EFC000FF")) + # Avoid red-green combinations difficult for color-blind readers 
-  labs(y = "Mean duplicate rate of cDEGs", x = "Method", color = "Threshold") + 
+  labs(y = "Mean rediscovery rate of cDEGs", x = "Method", color = "Threshold") + 
   theme(legend.position = "right")
 
-ggsave(filename = sprintf("../ApplicationResult/AddViz/DuplicatedRate/%s_mean_each_threshold.eps", date.analysis),
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+ggsave(filename = sprintf("../ApplicationResult/AddViz/RediscoveryRate/%s_mean_each_threshold.eps", date.analysis),
        plot = g2, device = "eps", dpi = 600, width = 5, height = 5, units = "in")
 ```
 
