@@ -14,7 +14,9 @@ make_dotplot <- function(data.set = ora.obj.ordered,
                          top.n = 20, 
                          color.lower = NULL, 
                          color.upper = NULL, 
-                         color.type = c("pvalue", "qscore")) {
+                         color.type = c("pvalue", "qscore"),
+                         x_interval = 5,
+                         cDEG.type = "shared") {
   if (nrow(data.set) < top.n) {
     data.set <- data.set
   } else {
@@ -41,14 +43,14 @@ make_dotplot <- function(data.set = ora.obj.ordered,
               mapping = aes(x = Count, y = Description)) + 
     geom_point(aes(size = Count, color = get(color.type))) +
     scale_colour_gradient(limits = c(color.lower, color.upper), low = "blue", high = "red") + 
-    scale_size_continuous(breaks = seq(min.count, max.count, 5)) + # Count, not continuous scale
-    scale_x_continuous(breaks = seq(min.count, max.count, 5)) + # Count, not continuous scale
+    scale_size_continuous(breaks = seq(min.count, max.count, x_interval)) + # Count, not continuous scale
+    scale_x_continuous(breaks = seq(min.count, max.count, x_interval)) + # Count, not continuous scale
     scale_y_discrete(limits = term.ordered, labels = scales::label_wrap(70)) + 
     labs(y = NULL,
          color = ifelse(color.type == "pvalue", "p-value", 
                         TeX("-$log_{10}$ (p-value)"))
     ) +
-    ggtitle("Enriched pathways of shared cDEGs") + 
+    ggtitle(paste0("Enriched pathways of ", cDEG.type, " cDEGs")) + 
     theme_bw(base_size = 14, base_family = "Arial") +
     theme(plot.title = element_text(hjust = 0.5, face = "bold"),
           axis.text.y = element_text(size = 13, color = "black")) + 
@@ -57,7 +59,7 @@ make_dotplot <- function(data.set = ora.obj.ordered,
   return(p)
 }
 
-##------Perform enrichment analysis of cDEGs co-detected with all approaches-----
+##------Perform enrichment analysis of cDEGs co-detected with all approaches in a consistent manner-----
 var.name <- "BMI"
 threshold.i <- 5000
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
@@ -76,8 +78,9 @@ for (seed.i in seed.vec) {
 
 class_freq_all_seed_df <- do.call(rbind, class_freq_all_seed_list)
 
+# Select all cDEGs co-identified by all approaches that appear in at least 5 seeds
 class_freq_all_seed_df_new <- summarize(.data = class_freq_all_seed_df, cDEG.freq = n(), .by = "cDEG")
-class_freq_all_seed_df_select <- dplyr::filter(class_freq_all_seed_df_new, cDEG.freq >= 5) # Select all cDEGs co-identified by all approaches that appear in at least 5 seeds
+class_freq_all_seed_df_select <- dplyr::filter(class_freq_all_seed_df_new, cDEG.freq >= 5)
 shared_cDEG_all_seed <- sub("\\..*", "", class_freq_all_seed_df_select$cDEG)
 shared_cDEG_all_seed_gene_symbol <- bitr(shared_cDEG_all_seed, fromType = "ENSEMBL", 
                                          toType = c("SYMBOL"), 
@@ -129,3 +132,76 @@ p <- cnetplot.enrichResult(
         legend.text = element_text(size = 12))
 ggsave(filename = sprintf("../ApplicationResult/AddViz/cnetplot/%s_%s_%s_%s.eps", date.analysis, "all", var.name, "all.seed"),
        plot = p, device = cairo_ps, dpi = 600, width = 16, height = 12, units = "in")
+
+##------Perform enrichment analysis of cDEGs uniquely detected with BMAseq in a consistent manner-----
+var.name <- "BMI"
+threshold.i <- 5000
+seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+class_freq_all_seed_list <- vector(mode = "list", length = 10L)
+names(class_freq_all_seed_list) <- seed.vec 
+
+for (seed.i in seed.vec) {
+  file.name <- paste0("../ApplicationData/derived/RandomSeed/HeatmapBoxplotData/", var.name, "_", threshold.i, "_", seed.i, ".RDS")
+  class_freq_per_seed <- readRDS(file.name)
+  class_freq_per_seed_BMAseq <- filter(class_freq_per_seed, Class == "100000000") |>
+    dplyr::select(Class) |>
+    mutate(Seed = seed.i) |>
+    rownames_to_column("cDEG")
+  class_freq_all_seed_list[[as.character(seed.i)]] <- class_freq_per_seed_BMAseq 
+}
+
+class_freq_all_seed_df <- do.call(rbind, class_freq_all_seed_list)
+
+# Select all cDEGs uniquely identified by BMAseq that appear in at least 5 seeds
+class_freq_all_seed_df_new <- summarize(.data = class_freq_all_seed_df, cDEG.freq = n(), .by = "cDEG")
+class_freq_all_seed_df_select <- dplyr::filter(class_freq_all_seed_df_new, cDEG.freq >= 5)
+unique_cDEG_all_seed <- sub("\\..*", "", class_freq_all_seed_df_select$cDEG)
+unique_cDEG_all_seed_gene_symbol <- bitr(unique_cDEG_all_seed, fromType = "ENSEMBL", 
+                                         toType = c("SYMBOL"), 
+                                         OrgDb = "org.Hs.eg.db")
+
+# Perform ORA analysis on cDEGs uniquely identified by BMAseq that appear in at least 5 seeds
+ora.obj <-
+  enrichGO(
+    gene          = unique_cDEG_all_seed,
+    OrgDb         = "org.Hs.eg.db",
+    keyType       = "ENSEMBL",
+    ont           = "BP",
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    qvalueCutoff  = 0.2,
+    readable      = T
+  )
+
+ora.obj.df <- ora.obj@result
+ora.obj.ordered <- ora.obj.df[order(ora.obj.df$p.adjust), ]
+
+p <- make_dotplot(data.set = ora.obj.ordered, 
+                  top.n = 20, 
+                  color.lower = NULL, 
+                  color.upper = NULL, 
+                  color.type = "qscore",
+                  x_interval = 2,
+                  cDEG.type = "unique")
+ggsave(filename = sprintf("../ApplicationResult/AddViz/DotPlot/%s_%s_%s_%s.eps", date.analysis, "BMAseq", var.name, "all.seed"),
+       plot = p, device = cairo_ps, dpi = 600, width = 10, height = 6, units = "in")
+
+p <- cnetplot.enrichResult(
+  x = ora.obj,
+  showCategory = ora.obj.ordered$Description[1:6],
+  circular = T,
+  colorEdge = T,
+  color_category = c(
+    "#A73030FF",
+    "#CD534CFF",
+    "#8F7700FF",
+    "#EFC000FF",
+    "#003C67FF",
+    "#0073C2FF"
+  ),
+  node_label = "gene"
+) +
+  theme(legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+ggsave(filename = sprintf("../ApplicationResult/AddViz/cnetplot/%s_%s_%s_%s.eps", date.analysis, "BMAseq", var.name, "all.seed"),
+       plot = p, device = cairo_ps, dpi = 600, width = 11, height = 7, units = "in")
