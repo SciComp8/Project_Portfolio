@@ -1,0 +1,131 @@
+##------Set up the environment------
+library(tidyverse)
+library(clusterProfiler)
+library(enrichplot)
+library(latex2exp)
+library(igraph)
+library(ggraph)
+source("cnetplot_c.R") # Customize the color/order of the edge and legend
+source("utilities.R")
+date.analysis <- format(Sys.Date(), "%Y%b%d")
+
+# Make a function to create the enrichment dotplot
+make_dotplot <- function(data.set = ora.obj.ordered, 
+                         top.n = 20, 
+                         color.lower = NULL, 
+                         color.upper = NULL, 
+                         color.type = c("pvalue", "qscore")) {
+  if (nrow(data.set) < top.n) {
+    data.set <- data.set
+  } else {
+    data.set <- data.set[1:top.n, ]
+  }
+  term.ordered <- rev(data.set$Description)
+  color.type <- match.arg(color.type, c("pvalue", "qscore"))
+  min.count <- min(data.set$Count)
+  max.count <- max(data.set$Count)
+  
+  if (is.null(color.lower)) {
+    color.lower <- 0
+  }
+  if (is.null(color.upper)) {
+    if (color.type == "pvalue") {
+      color.upper <- range(data.set$pvalue)[2] |> round(2)
+    } else if (color.type == "qscore") {
+      data.set <- mutate(data.set, qscore = -log(pvalue, base = 10)) # Use the original p value to calculate the q score
+      color.upper <- range(data.set$qscore)[2] |> round(2) + 0.5 # Increase the upper bound of q score
+    }
+  } 
+  
+  p <- ggplot(data = data.set, 
+              mapping = aes(x = Count, y = Description)) + 
+    geom_point(aes(size = Count, color = get(color.type))) +
+    scale_colour_gradient(limits = c(color.lower, color.upper), low = "blue", high = "red") + 
+    scale_size_continuous(breaks = seq(min.count, max.count, 5)) + # Count, not continuous scale
+    scale_x_continuous(breaks = seq(min.count, max.count, 5)) + # Count, not continuous scale
+    scale_y_discrete(limits = term.ordered, labels = scales::label_wrap(70)) + 
+    labs(y = NULL,
+         color = ifelse(color.type == "pvalue", "p-value", 
+                        TeX("-$log_{10}$ (p-value)"))
+    ) +
+    ggtitle("Enriched pathways of shared cDEGs") + 
+    theme_bw(base_size = 14, base_family = "Arial") +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          axis.text.y = element_text(size = 13, color = "black")) + 
+    guides(size = guide_legend(order = 1)) # Order the discrete legend
+  
+  return(p)
+}
+
+##------Perform enrichment analysis of cDEGs co-detected with all approaches-----
+var.name <- "BMI"
+threshold.i <- 5000
+seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
+class_freq_all_seed_list <- vector(mode = "list", length = 10L)
+names(class_freq_all_seed_list) <- seed.vec 
+
+for (seed.i in seed.vec) {
+  file.name <- paste0("../ApplicationData/derived/RandomSeed/HeatmapBoxplotData/", var.name, "_", threshold.i, "_", seed.i, ".RDS")
+  class_freq_per_seed <- readRDS(file.name)
+  class_freq_per_seed_all <- filter(class_freq_per_seed, Class == "111111111") |>
+    dplyr::select(Class) |>
+    mutate(Seed = seed.i) |>
+    rownames_to_column("cDEG")
+  class_freq_all_seed_list[[as.character(seed.i)]] <- class_freq_per_seed_all
+}
+
+class_freq_all_seed_df <- do.call(rbind, class_freq_all_seed_list)
+
+class_freq_all_seed_df_new <- summarize(.data = class_freq_all_seed_df, cDEG.freq = n(), .by = "cDEG")
+class_freq_all_seed_df_select <- dplyr::filter(class_freq_all_seed_df_new, cDEG.freq >= 5) # Select all cDEGs co-identified by all approaches that appear in at least 5 seeds
+shared_cDEG_all_seed <- sub("\\..*", "", class_freq_all_seed_df_select$cDEG)
+shared_cDEG_all_seed_gene_symbol <- bitr(shared_cDEG_all_seed, fromType = "ENSEMBL", 
+                                         toType = c("SYMBOL"), 
+                                         OrgDb = "org.Hs.eg.db")
+
+ora.obj <-
+  enrichGO(
+    gene          = shared_cDEG_all_seed,
+    OrgDb         = "org.Hs.eg.db",
+    keyType       = "ENSEMBL",
+    ont           = "BP",
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    qvalueCutoff  = 0.2,
+    readable      = T
+  )
+
+ora.obj.df <- ora.obj@result
+# ora.obj.ordered <- ora.obj.df[order(ora.obj.df$Count, decreasing = T), ]
+ora.obj.ordered <- ora.obj.df[order(ora.obj.df$p.adjust), ] # Order the pathways using the adjusted p-value
+
+##------Visualize top 20 most significant enriched pathways using the dotplot-----
+p.dotplot <- make_dotplot(data.set = ora.obj.ordered, 
+                          top.n = 20, 
+                          color.lower = NULL, 
+                          color.upper = NULL, 
+                          color.type = "qscore")
+ggsave(filename = sprintf("../ApplicationResult/AddViz/DotPlot/%s_%s_%s_%s.eps", date.analysis, "all", var.name, "all.seed"),
+       plot = p.dotplot, device = cairo_ps, dpi = 600, width = 10, height = 6, units = "in")
+
+
+##------Visualize gene-pathway (top 6 most significant enriched pathways) linkages using the cnetplot-----
+p <- cnetplot.enrichResult(
+  x = ora.obj,
+  showCategory = ora.obj.ordered$Description[1:6],
+  circular = T,
+  colorEdge = T,
+  color_category = c(
+    "#A73030FF",
+    "#CD534CFF",
+    "#8F7700FF",
+    "#EFC000FF",
+    "#003C67FF",
+    "#0073C2FF"
+  ),
+  node_label = "gene"
+) +
+  theme(legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+ggsave(filename = sprintf("../ApplicationResult/AddViz/cnetplot/%s_%s_%s_%s.eps", date.analysis, "all", var.name, "all.seed"),
+       plot = p, device = cairo_ps, dpi = 600, width = 16, height = 12, units = "in")
