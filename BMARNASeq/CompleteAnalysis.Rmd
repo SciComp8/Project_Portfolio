@@ -4519,7 +4519,7 @@ for (threshold.i in threshold.vec) {
 ```{r}
 ##------Preprocess data------
 cDEGs_num_uni <- readRDS("../ApplicationResult/Uni/RandomSeed/numcDEGs/Boxplot/boxplot.data.num.BMA.RDS")
-cDEGs_num_uni <- cDEGs_num_uni[cDEGs_num_uni$method!="BMAseq", ]
+cDEGs_num_uni <- cDEGs_num_uni[cDEGs_num_uni$method != "BMAseq", ]
 cDEGs_num_multi <- readRDS("../ApplicationResult/Multi/RandomSeed/numcDEGs/Boxplot/boxplot.data.num.RDS")
 
 cDEGs_num_uni$method <- paste0(cDEGs_num_uni$method, "_UVM")
@@ -4527,7 +4527,7 @@ cDEGs_num_multi$method <- ifelse(cDEGs_num_multi$method != "BMAseq", paste0(cDEG
 cDEGs_num_all <- rbind(cDEGs_num_uni, cDEGs_num_multi)
 cDEGs_num_all$method <- factor(cDEGs_num_all$method,
                                levels = c("BMAseq", "DESeq2_UVM", "DESeq2_MVM", "edgeR_UVM", "edgeR_MVM", "eBayes_UVM", "eBayes_MVM", "voom.limma_UVM", "voom.limma_MVM"))
-cDEGs_num_all$variable <- factor(cDEGs_num_all$variable,levels=c("BMI","AGE","SEX","MHABNWBC"))
+cDEGs_num_all$variable <- factor(cDEGs_num_all$variable,levels = c("BMI","AGE","SEX","MHABNWBC"))
 cDEGs_num_all$random.seed <- factor(cDEGs_rate_all$random.seed,
                                     levels = c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999))
 
@@ -4725,7 +4725,7 @@ for (threshold.i in threshold.vec) {
 ```{r}
 ##------Preprocess data------
 cDEGs_rate_uni <- readRDS("../ApplicationResult/Uni/RandomSeed/ratecDEGs/Boxplot/boxplot.data.rate.BMA.RDS")
-cDEGs_rate_uni <- cDEGs_rate_uni[cDEGs_rate_uni$method!="BMAseq", ]
+cDEGs_rate_uni <- cDEGs_rate_uni[cDEGs_rate_uni$method != "BMAseq", ]
 cDEGs_rate_multi <- readRDS("../ApplicationResult/Multi/RandomSeed/ratecDEGs/Boxplot/boxplot.data.rate.RDS")
 cDEGs_rate_uni$method <- paste0(cDEGs_rate_uni$method, "_UVM")
 cDEGs_rate_multi$method <- ifelse(cDEGs_rate_multi$method != "BMAseq", paste0(cDEGs_rate_multi$method, "_MVM"), cDEGs_rate_multi$method)
@@ -4845,7 +4845,7 @@ for (threshold.i in threshold.vec) {
 ```
 
 
-## Make cDEGs median rate line plots
+## Make cDEGs mean rate line plots
 ```{r}
 box::use(dplyr = dplyr)
 ##------Preprocess data------
