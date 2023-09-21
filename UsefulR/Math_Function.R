@@ -26,6 +26,10 @@ cdf_values <- pnorm(x, mean = mean_value, sd = sd_value)
 plot(x, pdf_values, type = "l", col = "orange", lwd = 2, xlab = "X-axis", ylab = "PDF", main = "CDF of Normal Distribution")
 grid()
 
+# Calculate the probability of obtaining a normalized gene expression value that is within three standard deviations of the mean for gene_expression ∼ N(0, 1)
+pnorm(q = 3, mean = 0, sd = 1) - pnorm(q = -3, mean = 0, sd = 1)
+# [1] 0.9973002
+
 # Fit the generalized models
 mdl.fit <- pscl::zeroinfl(count~1|1, link = "logit", dist = "negbin", data = test.dat)
 mdl.fit <- VGAM::vglm(count~1, negbinomial, data = test.dat)
