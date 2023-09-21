@@ -8,6 +8,9 @@ library(ggraph)
 source("cnetplot_c.R") # Customize the color/order of the edge and legend
 source("utilities.R")
 date.analysis <- format(Sys.Date(), "%Y%b%d")
+var.name <- "BMI"
+threshold.i <- 5000
+seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
 
 # Make a function to create the enrichment dotplot
 make_dotplot <- function(data.set = ora.obj.ordered, 
@@ -60,9 +63,6 @@ make_dotplot <- function(data.set = ora.obj.ordered,
 }
 
 ##------Perform enrichment analysis of cDEGs co-detected with all approaches in a consistent manner-----
-var.name <- "BMI"
-threshold.i <- 5000
-seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
 class_freq_all_seed_list <- vector(mode = "list", length = 10L)
 names(class_freq_all_seed_list) <- seed.vec 
 
@@ -102,7 +102,7 @@ ora.obj.df <- ora.obj@result
 # ora.obj.ordered <- ora.obj.df[order(ora.obj.df$Count, decreasing = T), ]
 ora.obj.ordered <- ora.obj.df[order(ora.obj.df$p.adjust), ] # Order the pathways using the adjusted p-value
 
-##------Visualize top 20 most significant enriched pathways using the dotplot-----
+# Visualize top 20 most significant enriched pathways using the dotplot
 p.dotplot <- make_dotplot(data.set = ora.obj.ordered, 
                           top.n = 20, 
                           color.lower = NULL, 
@@ -112,7 +112,7 @@ ggsave(filename = sprintf("../ApplicationResult/AddViz/DotPlot/%s_%s_%s_%s.eps",
        plot = p.dotplot, device = cairo_ps, dpi = 600, width = 10, height = 6, units = "in")
 
 
-##------Visualize gene-pathway (top 6 most significant enriched pathways) linkages using the cnetplot-----
+# Visualize gene-pathway (top 6 most significant enriched pathways) linkages using the cnetplot
 p <- cnetplot.enrichResult(
   x = ora.obj,
   showCategory = ora.obj.ordered$Description[1:6],
@@ -134,9 +134,6 @@ ggsave(filename = sprintf("../ApplicationResult/AddViz/cnetplot/%s_%s_%s_%s.eps"
        plot = p, device = cairo_ps, dpi = 600, width = 16, height = 12, units = "in")
 
 ##------Perform enrichment analysis of cDEGs uniquely detected with BMAseq in a consistent manner-----
-var.name <- "BMI"
-threshold.i <- 5000
-seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
 class_freq_all_seed_list <- vector(mode = "list", length = 10L)
 names(class_freq_all_seed_list) <- seed.vec 
 
@@ -176,6 +173,7 @@ ora.obj <-
 ora.obj.df <- ora.obj@result
 ora.obj.ordered <- ora.obj.df[order(ora.obj.df$p.adjust), ]
 
+# Visualize top 20 most significant enriched pathways using the dotplot
 p <- make_dotplot(data.set = ora.obj.ordered, 
                   top.n = 20, 
                   color.lower = NULL, 
@@ -186,6 +184,7 @@ p <- make_dotplot(data.set = ora.obj.ordered,
 ggsave(filename = sprintf("../ApplicationResult/AddViz/DotPlot/%s_%s_%s_%s.eps", date.analysis, "BMAseq", var.name, "all.seed"),
        plot = p, device = cairo_ps, dpi = 600, width = 10, height = 6, units = "in")
 
+# Visualize gene-pathway (top 6 most significant enriched pathways) linkages using the cnetplot
 p <- cnetplot.enrichResult(
   x = ora.obj,
   showCategory = ora.obj.ordered$Description[1:6],
@@ -205,3 +204,57 @@ p <- cnetplot.enrichResult(
         legend.text = element_text(size = 12))
 ggsave(filename = sprintf("../ApplicationResult/AddViz/cnetplot/%s_%s_%s_%s.eps", date.analysis, "BMAseq", var.name, "all.seed"),
        plot = p, device = cairo_ps, dpi = 600, width = 11, height = 7, units = "in")
+
+##------Perform enrichment analysis of cDEGs uniquely detected with other single model-based methods in a consistent manner-----
+all_class <- c("010000000", "001000000", "000100000", "000010000", "000001000", "000000100", "000000010", "000000001")
+method_vec <- c("DESeq2_UVM", "DESeq2_MVM", "edgeR_UVM", "edgeR_MVM", "eBayes_UVM", "eBayes_MVM", "voom.limma_UVM", "voom.limma_MVM")
+for (i in seq_along(all_class)) {
+  class_freq_all_seed_list <- vector(mode = "list", length = 10L)
+  names(class_freq_all_seed_list) <- seed.vec 
+  for (seed.i in seed.vec) {
+    ## Import the matrix that records the class of each cDEGs per seed
+    file.name <- paste0("../ApplicationData/derived/RandomSeed/HeatmapBoxplotData/", var.name, "_", threshold.i, "_", seed.i, ".RDS")
+    class_freq_per_seed <- readRDS(file.name)
+    class_freq_per_seed_method <- filter(class_freq_per_seed, Class == all_class[i]) |>
+      dplyr::select(Class) |>
+      mutate(Seed = seed.i) |>
+      rownames_to_column("cDEG")
+    class_freq_all_seed_list[[as.character(seed.i)]] <- class_freq_per_seed_method
+  }
+  
+  class_freq_all_seed_df <- do.call(rbind, class_freq_all_seed_list)
+  
+  # Show all cDEGs uniquely identified by edgeR_UVM that appear in at least 5 seeds 
+  class_freq_all_seed_df_new <- summarize(.data = class_freq_all_seed_df, cDEG.freq = n(), .by = "cDEG")
+  class_freq_all_seed_df_select <- dplyr::filter(class_freq_all_seed_df_new, cDEG.freq >= 5)
+  unique_cDEG_all_seed <- sub("\\..*", "", class_freq_all_seed_df_select$cDEG)
+  unique_cDEG_all_seed_gene_symbol <- bitr(unique_cDEG_all_seed, fromType = "ENSEMBL", 
+                                           toType = c("SYMBOL"), 
+                                           OrgDb = "org.Hs.eg.db")
+  
+  # Perform ORA analysis on cDEGs uniquely identified by edgeR_UVM that appear in at least 5 seeds
+  ora.obj <-
+    enrichGO(
+      gene          = unique_cDEG_all_seed,
+      OrgDb         = "org.Hs.eg.db",
+      keyType       = "ENSEMBL",
+      ont           = "BP",
+      pAdjustMethod = "BH",
+      pvalueCutoff  = 0.05,
+      qvalueCutoff  = 0.2,
+      readable      = T
+    )
+  
+  ora.obj.df <- ora.obj@result
+  ora.obj.ordered <- ora.obj.df[order(ora.obj.df$p.adjust), ]
+  
+  p <- make_dotplot(data.set = ora.obj.ordered, 
+                    top.n = 20, 
+                    color.lower = NULL, 
+                    color.upper = NULL, 
+                    color.type = "qscore",
+                    x_interval = 2,
+                    cDEG.type = "unique")
+  ggsave(filename = sprintf("../ApplicationResult/AddViz/DotPlot/%s_%s_%s_%s.eps", date.analysis, method_vec[i], var.name, "all.seed"),
+         plot = p, device = cairo_ps, dpi = 600, width = 10, height = 6, units = "in")
+}
