@@ -10,6 +10,16 @@ mean_value <- 25
 sd_value <- 5
 pdf_values <- dnorm(x, mean = mean_value, sd = sd_value)
 plot(x, pdf_values, type = "l", col = "blue", lwd = 2, xlab = "X-axis", ylab = "PDF", main = "PDF of Normal Distribution")
+# type
+# "p" for points,
+# "l" for lines,
+# "b" for both,
+# "c" for the lines part alone of "b",
+# "o" for both ‘overplotted’,
+# "h" for ‘histogram’ like (or ‘high-density’) vertical lines,
+# "s" for stair steps,
+# "S" for other steps, see ‘Details’ below,
+# "n" for no plotting.
 grid() # Add gridlines (optional)
 
 cdf_values <- pnorm(x, mean = mean_value, sd = sd_value)
