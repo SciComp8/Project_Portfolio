@@ -4,14 +4,17 @@ ginv(t(x) %*% x)
 # Calculate the distribution function for the F distribution with df1 and df2 degrees of freedom
 pf(F.stat, df.M, df.E, lower.tail = F)
 
-# Calculate the probability density function for the normal distribution
+# Calculate and visualize the probability density function and cumulative distribution function for the normal distribution
 x <- seq(0, 40, by = 0.1)
 mean_value <- 25
 sd_value <- 5
 pdf_values <- dnorm(x, mean = mean_value, sd = sd_value)
-plot(x, pdf_values, type = "l", col = "blue", lwd = 2,
-     xlab = "X-axis", ylab = "PDF", main = "PDF of Normal Distribution")
+plot(x, pdf_values, type = "l", col = "blue", lwd = 2, xlab = "X-axis", ylab = "PDF", main = "PDF of Normal Distribution")
 grid() # Add gridlines (optional)
+
+cdf_values <- pnorm(x, mean = mean_value, sd = sd_value)
+plot(x, pdf_values, type = "l", col = "orange", lwd = 2, xlab = "X-axis", ylab = "PDF", main = "CDF of Normal Distribution")
+grid()
 
 # Fit the generalized models
 mdl.fit <- pscl::zeroinfl(count~1|1, link = "logit", dist = "negbin", data = test.dat)
