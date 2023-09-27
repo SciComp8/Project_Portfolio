@@ -1,6 +1,4 @@
-# Calculate the Moore-Penrose generalized inverse of a matrix X
-ginv(t(x) %*% x)
-
+# **Distribution**
 # Calculate the distribution function for the F distribution with df1 and df2 degrees of freedom
 pf(F.stat, df.M, df.E, lower.tail = F)
 
@@ -30,6 +28,17 @@ grid()
 pnorm(q = 3, mean = 0, sd = 1) - pnorm(q = -3, mean = 0, sd = 1)
 # [1] 0.9973002
 
+# Estimate the kurtosis
+library(haven)
+library(e1071)
+acath_data <- read_dta("acath.dta")
+kurtosis(acath_data$cad_dur)
+
+# **Matrix**
+# Calculate the Moore-Penrose generalized inverse of a matrix X
+ginv(t(x) %*% x)
+
+# **Model**
 # Fit the generalized models
 mdl.fit <- pscl::zeroinfl(count~1|1, link = "logit", dist = "negbin", data = test.dat)
 mdl.fit <- VGAM::vglm(count~1, negbinomial, data = test.dat)
