@@ -66,7 +66,7 @@ duplicate_rate_all$variable <- factor(duplicate_rate_all$variable,levels = c("BM
 
 ##------Make cDEGs mean rediscovery rate line and box plot------
 duplicate_rate_all$threshold <- factor(duplicate_rate_all$threshold, levels = c(1000, 2000, 3000, 4000, 5000))
-duplicate_rate_bmi <- filter(duplicate_rate_all, variable == "BMI")
+duplicate_rate_bmi <- dplyr$filter(duplicate_rate_all, variable == "BMI")
 g2 <- duplicate_rate_bmi |>
   ggplot(mapping = aes(y = cDEGs.duplicate.rate.mean, x = method, group = threshold)) + 
   geom_boxplot(outlier.shape = NA, mapping = aes(group = method), lwd = 0.8) +
@@ -75,9 +75,9 @@ g2 <- duplicate_rate_bmi |>
   # Annotate the max value of cDEGs num per seed by enlarging its point size
   geom_point(
     data = duplicate_rate_bmi |>
-      group_by(threshold) |>
-      mutate(max.rate.mean = max(cDEGs.duplicate.rate.mean)) |>
-      dplyr::filter(cDEGs.duplicate.rate.mean == max.rate.mean),
+      dplyr$group_by(threshold) |>
+      dplyr$mutate(max.rate.mean = max(cDEGs.duplicate.rate.mean)) |>
+      dplyr$filter(cDEGs.duplicate.rate.mean == max.rate.mean),
     aes(y = max.rate.mean, x = method, color = threshold),
     size = 2
   ) +
@@ -86,7 +86,7 @@ g2 <- duplicate_rate_bmi |>
                      breaks = seq(0, 1, 0.05)) + 
   theme_BMA() + 
   scale_color_manual(values = c("#A20056FF", "#008B45FF", "#008280FF", "#3B4992FF", "#631879FF")) + # Avoid red-green combinations difficult for color-blind readers 
-  labs(y = "Mean rediscovery rate of cDEGs", x = "Method", color = "Threshold") + 
+  labs(y = "Mean rediscovery rate of cDEGs", x = "Method", color = "Ranking threshold") + 
   theme(legend.position = "right")
 
 ggsave(filename = sprintf("../ApplicationResult/AddViz/2_MeanRates/mean_rate_%s_%s_%s.latex.eps", date.analysis, "BMAseq", var.name),
