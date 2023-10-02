@@ -1,5 +1,5 @@
 # Deletes the file(s) or directories 
-unlink("~/Downloads/Lab7_GWAS/lab7_cache", recursive = T)
+unlink("~/Downloads/Lab7_scRNAseq/lab7_cache", recursive = T)
 
 # Construct the path
 file.path("","p1","p2","p3", "filename")
@@ -10,6 +10,9 @@ dirname(file.path("","p1","p2","p3", "filename"))
 [1] "/p1/p2/p3"
 basename(file.path("","p1","p2","p3", "filename"))
 [1] "filename"
+
+# Download the file
+download.file(url = "https://XXX.tsv", destfile = "XXX.csv")
 
 # Read the file
 read.delim(file, sep = ",")
