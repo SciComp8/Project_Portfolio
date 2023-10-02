@@ -16,3 +16,4 @@ theme_BMA <- function(
 # Contrast color
 # steelblue vs indianred
 # #99CCFF (light blue) vs #FFCCCC (light pink)
+# green vs grey
