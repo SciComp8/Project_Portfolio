@@ -16,6 +16,7 @@ download.file(url = "https://XXX.tsv", destfile = "XXX.csv")
 
 # Read the file
 read.delim(file, sep = ",")
+readr::read_tsv("XXX.tsv")
 
 # Write the file
 file.name = "Matrix.txt"
