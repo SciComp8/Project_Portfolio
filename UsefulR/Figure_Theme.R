@@ -12,3 +12,6 @@ theme_BMA <- function(
       strip.placement = "inside"
     )
 }
+
+# Contrast color
+# steelblue vs indianred
