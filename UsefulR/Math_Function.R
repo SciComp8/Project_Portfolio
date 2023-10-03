@@ -28,6 +28,10 @@ grid()
 pnorm(q = 3, mean = 0, sd = 1) - pnorm(q = -3, mean = 0, sd = 1)
 # [1] 0.9973002
 
+# What is the probability that out of a sample size of 1,000 individuals who have taken a new experimental drug, we observe 0.38 or more experiencing significant side effects? 
+# Use a normal approximation to the binomial to estimate this probability and compare it to the exact probability from a binomial distribution.
+1 - pnorm(0.379, mean = pi_true, sd = sqrt(pi_true * (1 - pi_true) / 1000))
+
 # Estimate the kurtosis
 library(haven)
 library(e1071)
