@@ -47,3 +47,6 @@ ginv(t(x) %*% x)
 # Fit the generalized models
 mdl.fit <- pscl::zeroinfl(count~1|1, link = "logit", dist = "negbin", data = test.dat)
 mdl.fit <- VGAM::vglm(count~1, negbinomial, data = test.dat)
+
+# Build the Lasso and Elastic-Net regularized generalized linear models
+# https://glmnet.stanford.edu/articles/glmnet.html
