@@ -13,11 +13,12 @@ theme_BMA <- function(
     )
 }
 
-# Contrast color
+# Pretty contrast color
 # steelblue vs indianred
 # #99CCFF (lightblue) vs #FFCCCC (lightpink)
 # green vs grey
 # lightblue vs lightgreen
 
-# Single color
+# Pretty single color
 # olivedrab4
+# navyblue
