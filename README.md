@@ -18,6 +18,8 @@ One of the fundamental research problems in bulk or single-cell transcriptomic s
 - [CompleteAnalysis.Rmd](BMARNASeq/CompleteAnalysis.Rmd)
 - [GenerateCheck_TrainingTestData.Rmd](BMARNASeq/GenerateCheck_TrainingTestData.Rmd)
 
+## **Predict chemical perturbation response in the single cell omics space**
+
 ## **Statistical analysis for breast cancer surgery data**
 **Multidisciplinary breast program in New York City** - This project uses the descriptive statistics, hypothesis tests, and multivariable regression modeling to delve deepper into the distributions of diverse factors such as demographics of the communities, insurance type, mammographic density, T and N stages, and tumor subtype in two hospitals, and to detect the predictors related to presenting at an early stage of breast cancer. By examining both aggregated and disaggregated racial/ethnic and hospital site data, we are interested in identifying the disparities in breast cancer diagnosis and treatment.
 - [MDC_v1.Rmd](MDC/MDC_v1.Rmd)
