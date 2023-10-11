@@ -39,6 +39,15 @@ library(e1071)
 acath_data <- read_dta("acath.dta")
 kurtosis(acath_data$cad_dur)
 
+# Calculate the log-likelihood of a binomial parameter
+# Method 1:
+n <- 100
+x <- 30
+pi <- seq(0, 1, by = 0.01)
+log_likelihood <- log(choose(n, x)) + x * log(pi) + (n - x) * log(1 - pi)
+# Method 2:
+dbinom(30, 100, prob = seq(0, 1, by = 0.01), log = TRUE)
+
 # **Matrix**
 # Calculate the Moore-Penrose generalized inverse of a matrix X
 ginv(t(x) %*% x)
