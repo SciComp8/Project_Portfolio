@@ -7,6 +7,7 @@ This repository compiles my programming work affiliated with collaborative and i
 ## Table of contents
 
 * [Bayesian model averaging for RNA-Seq count data](#Bayesian-model-averaging-for-RNA-Seq-count-data)
+* [Chemical perturbation response in the single cell omics space](#Predict-chemical-perturbation-response-in-the-single-cell-omics-space)
 * [Statistical analysis for breast cancer surgery data](#Statistical-analysis-for-breast-cancer-surgery-data)
 * [Differential expression analysis pipeline for single cell data](#Differential-expression-analysis-pipeline-for-single-cell-data)
 * [Bayesian integrative clustering for multi-omics data](#Bayesian-integrative-clustering-for-multi-omics-data)
