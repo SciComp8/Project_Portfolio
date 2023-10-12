@@ -1,6 +1,5 @@
-# pip install pyarrow
 import numpy as np 
-import pandas as pd
+import pandas as pd # pip install pyarrow
 import scanpy as sc # pip install numpy==1.25
 import anndata as ad
 from scipy.sparse import csr_matrix
