@@ -18,6 +18,7 @@ theme_BMA <- function(
 # #99CCFF (lightblue) vs #FFCCCC (lightpink)
 # green vs grey
 # lightblue vs lightgreen
+# forestgreen vs maroon
 
 # Pretty single color
 # olivedrab4
