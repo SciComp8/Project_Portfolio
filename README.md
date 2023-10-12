@@ -6,22 +6,22 @@ This repository compiles my programming work affiliated with collaborative and i
 
 ## Table of contents
 
-* [Bayesian model averaging for RNA-Seq count data](#Bayesian-model-averaging-for-RNA-Seq-count-data)
 * [Chemical perturbation response in the single cell omics space](#Predict-chemical-perturbation-response-in-the-single-cell-omics-space)
+* [Bayesian model averaging for RNA-Seq count data](#Bayesian-model-averaging-for-RNA-Seq-count-data)
 * [Statistical analysis for breast cancer surgery data](#Statistical-analysis-for-breast-cancer-surgery-data)
 * [Differential expression analysis pipeline for single cell data](#Differential-expression-analysis-pipeline-for-single-cell-data)
 * [Bayesian integrative clustering for multi-omics data](#Bayesian-integrative-clustering-for-multi-omics-data)
 * [Lipidomics and transcriptomics analysis](#Lipidomics-and-transcriptomics-analysis)
+
+## **Predict chemical perturbation response in the single cell omics space**
+- [Preprocess_Data.py](ChemicalPerturbation/Preprocess_Data.py)
+- [Cluster_Compound.py](ChemicalPerturbation/Cluster_Compound.py)
 
 ## **Bayesian model averaging for RNA-Seq count data**
 One of the fundamental research problems in bulk or single-cell transcriptomic studies is the identification of reliable differentially expressed genes (DEGs) between distinct sample groups (e.g., healthy and disease). Accurately identifying DEGs can offer reliable insights into biological processes underlying specific conditions, and further aid in developing diagnostic biomarkers and targeted therapeutics. We develop a Bayesian model averaging approach for RNA-seq count data that leverages a large model space to make robust inferences on DEGs. We then evaluate the performance of our novel multi-model `BMAseq` and other existing single-model approaches: `DESeq2`, `edgeR`, and `limma` on inferring replicable DEGs under the univariable, multivaribles, and multivaribles with interaction terms model designs. The RNA-seq count and phenotypic data from GTEx are randomly divided into 50% training set and 50% test set. For evaluation, we focus on measures that are of practical interest to researchers when making decisions about selecting the appropriate model design to analyze their datasets. We investigate 1) replicability of DEGs at different ranking thresholds detected with different approaches; 2) consistency of replicable DEG detections between different approaches; 3) uniqueness of replicable DEG detections between different approaches; 4) major consistent detection ways of replicable DEGs; 5) biological insights of replicable DEGs that are uniquely and consistently identified by different approaches.
 
 - [CompleteAnalysis.Rmd](BMARNASeq/CompleteAnalysis.Rmd)
 - [GenerateCheck_TrainingTestData.Rmd](BMARNASeq/GenerateCheck_TrainingTestData.Rmd)
-
-## **Predict chemical perturbation response in the single cell omics space**
-- [Preprocess_Data.py](ChemicalPerturbation/Preprocess_Data.py)
-- [Cluster_Compound.py](ChemicalPerturbation/Cluster_Compound.py)
 
 ## **Statistical analysis for breast cancer surgery data**
 **Multidisciplinary breast program in New York City** - This project uses the descriptive statistics, hypothesis tests, and multivariable regression modeling to delve deepper into the distributions of diverse factors such as demographics of the communities, insurance type, mammographic density, T and N stages, and tumor subtype in two hospitals, and to detect the predictors related to presenting at an early stage of breast cancer. By examining both aggregated and disaggregated racial/ethnic and hospital site data, we are interested in identifying the disparities in breast cancer diagnosis and treatment.
