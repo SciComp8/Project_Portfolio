@@ -48,6 +48,10 @@ log_likelihood <- log(choose(n, x)) + x * log(pi) + (n - x) * log(1 - pi)
 # Method 2:
 dbinom(30, 100, prob = seq(0, 1, by = 0.01), log = TRUE)
 
+# Product of the vector elements
+prod(1:7)
+# [1] 5040
+
 # **Matrix**
 # Calculate the Moore-Penrose generalized inverse of a matrix X
 ginv(t(x) %*% x)
