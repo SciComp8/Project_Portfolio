@@ -9,6 +9,7 @@ theme_BMA <- function(
       axis.text.x = element_text(size = 9, angle = 90, hjust = 1, color = "black", vjust = 0.5),
       strip.background = element_rect(fill = "white", color = "black", linewidth = 0.6), # Customize the box border in the strip
       # strip.background = element_blank() # This is gonna remove the strip background
+      # strip.background = element_rect(fill = "transparent")
       strip.placement = "inside"
     )
 }
