@@ -46,7 +46,7 @@ x <- 30
 pi <- seq(0, 1, by = 0.01)
 log_likelihood <- log(choose(n, x)) + x * log(pi) + (n - x) * log(1 - pi)
 # Method 2:
-dbinom(30, 100, prob = seq(0, 1, by = 0.01), log = TRUE)
+dbinom(30, 100, prob = seq(0, 1, by = 0.01), log = TRUE) # log = F -> estimate the likelihood
 
 # Product of the vector elements
 prod(1:7)
