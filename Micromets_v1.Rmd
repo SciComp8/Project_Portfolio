@@ -20,7 +20,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r shorcut, include=FALSE}
+```{r shortcut, include=FALSE}
 #################################################################
 ##                  RStudio keyboard shortcut                  ##
 #################################################################
@@ -1156,7 +1156,5 @@ sessionInfo()
 ##################################################################
 ##        Future analysis plan of this micromets project        ##
 ##################################################################
-## Investigate if the proportional hazards assumption of univariate log-rank test and Cox-proportional hazards model is satisfied
-## Think about the possibility to incorporate the proportional hazards assumption test into fplot.surv() in BTKR package
 ## Try the component-wise weighting schemes that overcome the limitation by treating recurrence and death events on equal footing
 ```
