@@ -40,8 +40,9 @@ One of the fundamental research problems in bulk or single-cell transcriptomic s
 **Micrometastatic axillary nodal disease** - Most analytical work centers on the descriptive analysis, for example, estimate the number of patients undergoing completion axillary lymph node dissection (ALND), number of cases with additional positive nodes if completion ALND, and frequency of axillary recurrence stratified by whether ALND was performed and by whether radiation was delivered. The univariate survival analysis using the Cox-proportional hazards model is performed to interrogate the factors associated with the recurrence-free survival. Specially, recurrence-free survival time is defined as a composite endpoint which combines the time to recurrence, time to death, and time to last follow-up into a univariate time to the first event or censoring. 
 
 - [Micromets_v1.Rmd](Micromets/Micromets_v1.Rmd)
+- [Micromets_v2.Rmd](Micromets/Micromets_v2.Rmd)
 
-#### Note: The coding work related to other clinical projects can be found [here](https://github.com/anniliu7/Projectcoding/tree/main/Otherclinicalproject).
+#### Note: The coding work related to other clinical projects can be found [here](https://github.com/ScienceComputing/Projectcoding/tree/main/Otherclinicalproject).
   
 ## **Differential expression analysis pipeline for single cell data**
 The bioinformatics pipeline using the next-generation single cell data from the mouse B lymphocytes is developed to streamline the fundamental procedures of differentially expressed genes detection in single cell RNA-seq data. This includes the initial trimming of reads from raw FASTQ files using `Trim Galore`, quantifying the abundance of transcripts using `kallisto`, and performing the differential gene expression analysis using `DESeq2`. The pipeline is designed to be efficient in the command-line interface, enabling researchers to analyze and interpret large datasets of single cell gene expression data with the desirable speed, accuracy, and reproducibility.
