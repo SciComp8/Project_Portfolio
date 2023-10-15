@@ -101,3 +101,59 @@ with plt.rc_context():
 """
 Cluster cells by chemical compound group
 """
+df = pd.read_csv(file_path + 'single_cell_data/adata_obs_meta_new.csv')
+[df['sm_cluster_' + str(i)].value_counts() for i in [3, 5, 7, 9]]
+
+for i in [3, 5, 7, 9]:
+  sc.tl.paga(adata, groups='sm_cluster_' + str(i))
+  sc.tl.umap(adata, init_pos='paga', min_dist=0)
+  with plt.rc_context():
+    sc.pl.paga(adata, plot=True, show=False)
+    plt.savefig(file_path + '/analysis_result/PAGA_sm_cluster_' + str(i) + '.png', bbox_inches='tight')
+    sc.pl.umap(adata, color=['sm_cluster_' + str(i)], show=False)
+    plt.savefig(file_path + '/analysis_result/UMAP_sm_cluster_' + str(i) + '.png', bbox_inches='tight')
+
+"""
+Cluster cells by library
+"""
+sc.tl.paga(adata, groups='library_id')
+with plt.rc_context():
+  sc.pl.paga(adata, plot=True, show=False)
+  plt.savefig(file_path + '/analysis_result/PAGA_library.png', bbox_inches='tight')
+
+sc.tl.umap(adata, init_pos='paga', min_dist=0)
+with plt.rc_context():
+  sc.pl.umap(adata, color=['library_id'], show=False)
+  plt.savefig(file_path + '/analysis_result/UMAP_library.png', bbox_inches='tight')
+
+"""
+Cluster cells by donor
+"""
+sc.tl.paga(adata, groups='donor_id')
+with plt.rc_context():
+  sc.pl.paga(adata, plot=True, show=False)
+  plt.savefig(file_path + '/analysis_result/PAGA_donor.png', bbox_inches='tight')
+
+sc.tl.umap(adata, init_pos='paga', min_dist=0)
+with plt.rc_context():
+  sc.pl.umap(adata, color=['donor_id'], show=False)
+  plt.savefig(file_path + '/analysis_result/UMAP_donor.png', bbox_inches='tight')
+
+"""
+Cluster cells by plate
+"""
+sc.tl.paga(adata, groups='plate_name')
+with plt.rc_context():
+  sc.pl.paga(adata, plot=True, show=False)
+  plt.savefig(file_path + '/analysis_result/PAGA_plate.png', bbox_inches='tight')
+
+sc.tl.umap(adata, init_pos='paga', min_dist=0.1)
+with plt.rc_context():
+  sc.pl.umap(adata, color=['plate_name'], show=False)
+  plt.savefig(file_path + '/analysis_result/UMAP_plate.png', bbox_inches='tight')
+
+adata.write(file_path + 'single_cell_data/adata_result.h5ad')
+adata
+
+
+
