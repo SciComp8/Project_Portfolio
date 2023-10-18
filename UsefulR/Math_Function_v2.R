@@ -14,3 +14,15 @@
 
 # Global Sensitivity Analysis of Model Outputs
 https://cran.r-project.org/web/packages/sensitivity/index.html
+
+# The replicate function is used to perform bootstrapping B times.
+# In each iteration, it samples n observations with replacement from the 'var' variable and calculates the proportion of "Yes" values in the sample.
+# The results are stored in the bootstrap_prop vector, which contains the proportions for each bootstrap sample.
+
+set.seed(008)
+B <- 200
+n <- nrow(df)
+bootstrap_prop <- replicate(B, {
+  x <- sample(df$var, size = n, replace = TRUE)
+  sum(x == "Yes") / n
+})
