@@ -26,3 +26,11 @@ bootstrap_prop <- replicate(B, {
   x <- sample(df$var, size = n, replace = TRUE)
   sum(x == "Yes") / n
 })
+
+library(boot)
+data$age_group <- ifelse(data$AGE >= 20 & data$AGE <= 30, 1, 0)
+calc_proportion <- function(data, indices) {
+  data_resample <- data[indices, ]
+  return(sum(data_resample$age_group) / nrow(data_resample))
+}
+results <- boot(data = data, statistic = calc_prop, 500)
