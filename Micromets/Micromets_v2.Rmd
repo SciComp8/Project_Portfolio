@@ -910,7 +910,7 @@ knitr::kable(out[[1]], row.names = F)
 ```
 
 # Univariate analysis for recurrence free survival
-Note that patients without time to axillary/local/distant recurrence data were not included in the analysis. The association between each variable and axillary/local/distant recurrence free survival was assessed using the log rank test. The Cox-proportional hazards model was used to estimate the HR and corresponding 95% CI for each unit increase of a continuous variable, or with respect to the reference category for a categorical variable. For each variable, if there were missing values, the association between missingness and axillary/local/distant recurrence free survival was also examined.
+Note that patients without time to axillary/local/locoregional/distant recurrence data were not included in the analysis. The association between each variable and axillary/local/locoregional/distant recurrence free survival was assessed using the log rank test. The Cox-proportional hazards model was used to estimate the HR and corresponding 95% CI for each unit increase of a continuous variable, or with respect to the reference category for a categorical variable. For each variable, if there were missing values, the association between missingness and axillary/local/locoregional/distant recurrence free survival was also examined.
 
 ## Associations between variables and axillary recurrence
 ```{r, results="hide"}
@@ -1007,7 +1007,6 @@ row.names(out.tbl) <- NULL
 knitr::kable(out.tbl)
 ```
 
-
 ## [New] Associations between variables and locoregional recurrence
 ```{r, results="hide"}
 out <- uni.coxph(surv.time = "T2LRRDeath", surv.event = "LRRDeath")
@@ -1060,6 +1059,45 @@ plot.i <- ggsurvfit(
 plot.i
 ```
 
+### Kaplan-Meier curve of locoregional recurrence free survival by axillary lymph node dissection and post-mastectomy radiation therapy
+```{r echo=FALSE, results="asis", fig.height=5, fig.width=7, out.height=479.2, out.width=671.4}
+var.grp <- 'ALND_adjuvantXRT' # Add
+fit.i <- survfit2(formula(paste0("Surv(T2LRRDeath, LRRDeath) ~ ", var.grp)), data = dat.work) 
+plot.i <- ggsurvfit(
+  x = fit.i,
+  type = "survival",
+  linetype_aes = T,
+  theme = list(theme.list),
+  color = "maroon"
+) +
+  add_risktable(
+    risktable_height = 0.4,
+    size = 4.5,
+    theme = list(
+      theme_risktable_default(axis.text.y.size = 12, plot.title.size = 12),
+      theme(plot.title = element_text(face = "bold"))
+    )
+  ) +
+  add_confidence_interval() +
+  add_quantile(y_value = 0.5,
+               color = "gray50",
+               linewidth = 0.75) +
+  add_pvalue(location  = "annotation", x = 2*365.25, y = 0.15, size = 5, pvalue_fun = format_p2) + # Add
+  scale_x_continuous(
+    limits = c(0, 365.25 * 12),
+    breaks = c(seq(0, 365.25 * 12, 365.25 * 3)),
+    labels = c(seq(0, 12, 3))
+  ) +
+  scale_y_continuous(
+    limits = c(0, 1),
+    labels = scales::label_number(accuracy = 0.01),
+    breaks = seq(0, 1, 0.25)
+  ) +
+  scale_color_manual(values = c("#A73030FF", "#0073C2FF", "#82AC7C", "#868686FF")) + # Add
+  scale_fill_manual(values = c("#A73030FF", "#0073C2FF", "#82AC7C", "#868686FF")) + # Add
+  labs(x = "Follow-up time, months", y = "Survival probability") 
+plot.i
+```
 
 ## Associations between variables and distant recurrence
 ```{r, results="hide"}
@@ -1081,4 +1119,12 @@ knitr::kable(out.tbl)
 # Session info
 ```{r}
 sessionInfo()
+```
+
+
+```{r analysis_plan_future, include=FALSE}
+##################################################################
+##        Future analysis plan of this micromets project        ##
+##################################################################
+## Try the component-wise weighting schemes that overcome the limitation by treating recurrence and death events on equal footing
 ```
