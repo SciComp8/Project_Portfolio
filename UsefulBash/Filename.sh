@@ -16,12 +16,13 @@ files=relative_path/*.fastq
 for f in $files; do echo $f; head -n 2 $f | tail -n 1; done
 
 # Batch view the line numbers of all fastq files
-# inside the .sh
+# Inside the file_length.sh
 wc -l $@ | grep -v total
-
 wc -l $@ | grep -v total | sort -n
-
 wc -l $@ | grep -v total | sort -n -r # Longest file is in the first order
+# Outside the file_length.sh
+bash file_length.sh relative_path/*.fastq > file_length.out
+cat file_length.out
 
 # Extract the base filenames (without the .tsv.gz extension) of the input files specified by the first and second arguments 
 r1=$(basename $1 .tsv.gz)
