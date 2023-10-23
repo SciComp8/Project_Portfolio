@@ -4,10 +4,12 @@ for filename in relative_path/*.fastq.gz; do echo $filename; done
 files=relative_path/*.fastq.gz
 for f in $files; do echo $f; done
 
-# Batch view the second row of multiple files
-files=relative_path/*.fastq.gz
+# Batch view the second row of multiple fastq files
+files=relative_path/*.fastq
 for f in $files; do head -n 2 $f | tail -n 1; done
 
+# Batch view the last entry of ATAAC in every fastq file
+for f in $files; do grep ATAAC $f | tail -n 1; done
 
 # Extract the base filenames (without the .tsv.gz extension) of the input files specified by the first and second arguments 
 r1=$(basename $1 .tsv.gz)
