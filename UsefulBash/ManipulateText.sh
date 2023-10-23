@@ -1,3 +1,7 @@
+cut -d , -f 2 relative_path/file.csv | grep -v City | sort -r
+# Select all the city names (excluding the line containing the word City) from column 2 of file.csv
+# Then sort the names of the city in file.csv in descending alphabetical order
+
 data=$1
 cat  $data | grep non-missing | awk '{if ($2=="Asian") print $6, $7}' | sed 's/"//g' | sed 's/://g' |sort -u > newdata.csv
 
