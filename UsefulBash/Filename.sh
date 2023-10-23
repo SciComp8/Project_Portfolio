@@ -4,6 +4,11 @@ for filename in relative_path/*.fastq.gz; do echo $filename; done
 files=relative_path/*.fastq.gz
 for f in $files; do echo $f; done
 
+# Batch view the second row of multiple files
+files=relative_path/*.fastq.gz
+for f in $files; do head -n 2 $f | tail -n 1; done
+
+
 # Extract the base filenames (without the .tsv.gz extension) of the input files specified by the first and second arguments 
 r1=$(basename $1 .tsv.gz)
 r2=$(basename $2 .tsv.gz)
