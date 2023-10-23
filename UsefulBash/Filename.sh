@@ -21,6 +21,8 @@ wc -l $@ | grep -v total
 
 wc -l $@ | grep -v total | sort -n
 
+wc -l $@ | grep -v total | sort -n -r # Longest file is in the first order
+
 # Extract the base filenames (without the .tsv.gz extension) of the input files specified by the first and second arguments 
 r1=$(basename $1 .tsv.gz)
 r2=$(basename $2 .tsv.gz)
