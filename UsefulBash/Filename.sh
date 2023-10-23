@@ -1,3 +1,6 @@
+# Batch view the filenames
+for filename in relative_path/*.fastq.gz; do echo $filename; done
+
 # Extract the base filenames (without the .tsv.gz extension) of the input files specified by the first and second arguments 
 r1=$(basename $1 .tsv.gz)
 r2=$(basename $2 .tsv.gz)
