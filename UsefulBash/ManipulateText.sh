@@ -1,6 +1,7 @@
-cut -d , -f 2 relative_path/file.csv | grep -v City | sort -r
+cut -d , -f 2 relative_path/file.csv | grep -v City | sort -r | uniq -c
 # Select all the city names (excluding the line containing the word City) from column 2 of file.csv
-# Then sort the names of the city in file.csv in descending alphabetical order
+# Sort the names of the city in file.csv in descending alphabetical order
+# Show each city name once, along with a count of how often it occurs
 
 data=$1
 cat  $data | grep non-missing | awk '{if ($2=="Asian") print $6, $7}' | sed 's/"//g' | sed 's/://g' |sort -u > newdata.csv
