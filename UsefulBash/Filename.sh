@@ -34,7 +34,7 @@ echo $r1 $r2
 # More info: https://unix.stackexchange.com/questions/306940/what-is-the-purpose-of-the-do-keyword-in-bash-for-loops
 for i in `ls | grep .fastq`
 do
-  basename=$(echo $i | sed 's/\50K_2_bowtie2//g')
+  basename=$(echo $i | sed 's/\50K_2_bowtie2//g') # Remove all strings "50K_2_bowtie2" 
   rm $basename.sam
 done
 
