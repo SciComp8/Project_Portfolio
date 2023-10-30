@@ -1,6 +1,6 @@
 # Batch view the filenames
 for filename in relative_path/*.fastq.gz; do echo $filename; done
-# The folowing saves typing and makes errors less likely
+# The following code saves typing and makes errors less likely
 files=relative_path/*.fastq.gz
 for f in $files; do echo $f; done
 
