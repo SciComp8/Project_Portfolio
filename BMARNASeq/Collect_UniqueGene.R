@@ -4,7 +4,6 @@ var.vec <- c("BMI", "AGE", "SEX", "MHABNWBC")
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 var.name <- "BMI"
 
-
 cDEGs.type.vec <- c("BMAseq.cDEGs", 
                     "DESeq2.UVM.cDEGs",
                     "edgeR.UVM.cDEGs",
