@@ -25,4 +25,4 @@ sbatch scRNAseq_job.sh
 
 # Monitor the job status
 squeue -u user_ID
-squeue -u ali4006 -l # Give more advanced output
+squeue -u user_ID -l # Give more advanced output
