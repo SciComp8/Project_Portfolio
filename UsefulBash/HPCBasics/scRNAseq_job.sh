@@ -11,7 +11,7 @@
 #SBATCH --time=24:00:00
 
 # Load software modules
-module load R/4.0.2
+module load R/4.3.1
 
 # Run the R script
 Rscript scRNAseq_analysis.R
