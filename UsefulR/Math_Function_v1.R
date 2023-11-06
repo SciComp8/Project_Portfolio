@@ -39,7 +39,7 @@ library(e1071)
 acath_data <- read_dta("acath.dta")
 kurtosis(acath_data$cad_dur)
 
-# Test if the mean is equal to the 280
+# Test if the sample mean is equal to 280 (population mean)
 library(BSDA)
 z.test(x = rep(275, 50), 
        alternative = "two.sided", 
