@@ -39,6 +39,15 @@ library(e1071)
 acath_data <- read_dta("acath.dta")
 kurtosis(acath_data$cad_dur)
 
+# Test if the mean is equal to the 280
+library(BSDA)
+z.test(x = rep(275, 50), 
+       alternative = "two.sided", 
+       mu = 280, 
+       sigma.x = 10, 
+       conf.level = 0.95)
+p_val = 2*pnorm(275, 280, 10/sqrt(50))
+
 # Calculate the log-likelihood of a binomial parameter
 # Method 1:
 n <- 100
