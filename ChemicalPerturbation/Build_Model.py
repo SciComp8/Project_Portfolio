@@ -80,6 +80,15 @@ onx0912_model = scgen.SCGEN(adata_train, n_hidden=800, n_latent=100, n_layers=2)
 onx0912_model.train(
     max_epochs=100, batch_size=32, early_stopping=True, early_stopping_patience=25
 )
+# INFO:pytorch_lightning.utilities.rank_zero:GPU available: True (cuda), used: True
+# INFO:pytorch_lightning.utilities.rank_zero:TPU available: False, using: 0 TPU cores
+# INFO:pytorch_lightning.utilities.rank_zero:IPU available: False, using: 0 IPUs
+# INFO:pytorch_lightning.utilities.rank_zero:HPU available: False, using: 0 HPUs
+# INFO: LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+# INFO:lightning.pytorch.accelerators.cuda:LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+# Epoch 26/100:  26%|██▌       | 26/100 [06:38<18:54, 15.33s/it, v_num=1, train_loss_step=615, train_loss_epoch=468]
+# Monitored metric elbo_validation did not improve in the last 25 records. Best score: 1902.328. Signaling Trainer to stop.
+    
 adata_train.obsm['scgen'] = onx0912_model.get_latent_representation()
 
 sc.pp.neighbors(adata_train, use_rep='scgen')
