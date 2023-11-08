@@ -68,23 +68,41 @@ adata.obs.cell_type.value_counts()
 # Remove all perturbated CD4+T and CD8+T cells from the training data
 adata_train = adata[
     ~(
-        (adata.obs[adata.obs["cell_type"].isin(["T cells CD4+", "T cells CD8+"])])
-        & (adata.obs["condition"] == "perturbated")
+        (adata.obs['cell_type'] == 'T cells CD4+')
+        & (adata.obs['condition'] == 'perturbated')
     )
 ].copy()
 adata_train.obs.cell_type.value_counts()
 
 # Keep all perturbated CD4+T and CD8+T cells as the training set
-cd48_perturb = adata[
+cd4_perturb = adata[
     (
-        (adata.obs[adata.obs["cell_type"].isin(["T cells CD4+", "T cells CD8+"])])
-        & (adata.obs["condition"] == "perturbated")
+        (adata.obs['cell_type'] == 'T cells CD4+')
+        & (adata.obs['condition'] == 'perturbated')
     )
 ].copy()
-cd48_perturb.obs.cell_type.value_counts()
+cd4_perturb.obs.cell_type.value_counts()
 
-scgen.SCGEN.setup_anndata(adata_train, batch_key="condition", labels_key="cell_type")
+scgen.SCGEN.setup_anndata(adata_train, batch_key='condition', labels_key='cell_type')
 
 # Save the data
 adata_train.write(file_path + 'single_cell_data/adata_train.h5ad')
-cd48_perturb.write(file_path + 'single_cell_data/cd48_perturb.h5ad')
+cd4_perturb.write(file_path + 'single_cell_data/cd4_perturb.h5ad')
+
+# Train the model
+onx0912_model = scgen.SCGEN(adata_train, n_hidden=800, n_latent=100, n_layers=2)
+onx0912_model.train(
+    max_epochs=100, batch_size=32, early_stopping=True, early_stopping_patience=25
+)
+adata_train.obsm['scgen'] = onx0912_model.get_latent_representation()
+
+sc.pp.neighbors(adata_train, use_rep='scgen')
+sc.tl.umap(adata_train)
+sc.pl.umap(adata_train, color=['condition', 'cell_type'], wspace=0.4, frameon=False)
+
+# Predict the CD4+T responses to ONX 0912
+pred, delta = onx0912_model.predict(
+    ctrl_key='control', stim_key='perturbated', celltype_to_predict='T cells CD4+'
+)
+
+pred.obs['condition'] = 'predicted perturbated'
