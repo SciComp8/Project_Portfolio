@@ -94,9 +94,11 @@ onx0912_model.train(
 # INFO:lightning.pytorch.accelerators.cuda:LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 # Epoch 26/100:  26%|██▌       | 26/100 [06:38<18:54, 15.33s/it, v_num=1, train_loss_step=615, train_loss_epoch=468]
 # Monitored metric elbo_validation did not improve in the last 25 records. Best score: 1902.328. Signaling Trainer to stop.
-    
+
+# Get the 100-dimensional vector for each cell
 adata_train.obsm['scgen'] = onx0912_model.get_latent_representation()
 
+# Visualize the new embedding from the latent representation in a UMAP plot
 sc.pp.neighbors(adata_train, use_rep='scgen')
 sc.tl.umap(adata_train)
 sc.pl.umap(adata_train, color=['condition', 'cell_type'], wspace=0.4, frameon=False)
