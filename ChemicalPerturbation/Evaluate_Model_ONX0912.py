@@ -48,7 +48,7 @@ plt.ylabel('True mean gene expression in the CD4+T perturbated cells')
 plt.title('Scatter plot of the mean gene expression between prediction and ground truth')
 plt.show()
 
-# Visualize the distribution of the top differentially expressed genes between control CD4+T cells and condition CD4+T cells
+# Visualize the distribution of the top differentially expressed genes between control CD4+T cells, truly perturbated CD4+T cells, and predicted perturbated CD4+T cells
 for gene in deg_list[:10]:
     sc.pl.violin(adata_evaluate, gene, groupby='condition')
 
