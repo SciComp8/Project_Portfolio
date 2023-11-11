@@ -57,7 +57,7 @@ print(condition_count)
 # Count the cell types
 adata.obs.cell_type.value_counts()
 
-# Remove all perturbated CD4+T and CD8+T cells from the training data
+# Remove all perturbated CD4+T from the training data
 adata_train = adata[
     ~(
         (adata.obs['cell_type'] == 'T cells CD4+')
@@ -66,7 +66,7 @@ adata_train = adata[
 ].copy()
 adata_train.obs.cell_type.value_counts()
 
-# Keep all perturbated CD4+T and CD8+T cells as the training set
+# Keep all perturbated CD4+T cells as the training set
 cd4_perturb = adata[
     (
         (adata.obs['cell_type'] == 'T cells CD4+')
