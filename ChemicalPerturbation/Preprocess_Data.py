@@ -103,7 +103,7 @@ sc.pl.scatter(adata, "total_counts", "n_genes_by_counts", color="pct_counts_mt")
 adata_2.write(file_path + 'adata_v2.h5ad')
 
 """
-Normallize the count matrix
+Normalize the count matrix
 """
 adata = ad.read_h5ad(file_path + 'adata_v2.h5ad')
 sc.pp.normalize_total(adata, target_sum=1e4)
