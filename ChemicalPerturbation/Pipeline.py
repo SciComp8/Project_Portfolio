@@ -65,3 +65,13 @@ def visualize_results(adata_evaluate, deg):
     # Visualize the distribution of the top differentially expressed genes
     for gene in deg_list[:10]:  # Adjust the number of genes as needed
         sc.pl.violin(adata_evaluate, gene, groupby='condition')
+
+# Use the pipeline
+file_path = 'gdrive/MyDrive/Perturbation/'
+drug_name = 'Belinostat'  # Replace with the name of the drug we want to analyze
+
+adata = load_data(file_path)
+adata_train, cd4_perturb = preprocess_data(adata, drug_name)
+model = train_model(adata_train, file_path)
+adata_evaluate, deg = predict_and_evaluate(model, adata, adata_train, cd4_perturb)
+visualize_results(adata_evaluate, deg)
