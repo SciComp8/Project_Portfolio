@@ -18,6 +18,8 @@ class DrugEffectPredictor:
         self.model = None
         self.adata_evaluate = None
         self.deg = None
+        self.pred = None
+        self.delta = None
 
     def load_data(self):
         drive.mount('/content/gdrive')
@@ -36,8 +38,8 @@ class DrugEffectPredictor:
         self.adata_train.write(self.file_path + 'single_cell_data/adata_train.h5ad')
 
     def predict_and_evaluate(self):
-        pred, delta = self.model.predict(ctrl_key='control', stim_key='perturbated', celltype_to_predict='T cells CD4+')
-        pred.obs['condition'] = 'predicted perturbated'
+        self.pred, self.delta = self.model.predict(ctrl_key='control', stim_key='perturbated', celltype_to_predict='T cells CD4+')
+        self.pred.obs['condition'] = 'predicted perturbated'
         adata_control = self.adata[((self.adata.obs['cell_type'] == 'T cells CD4+') & (self.adata.obs['condition'] == 'control'))]
         self.adata_evaluate = adata_control.concatenate(self.cd4_perturb, pred)
         sc.tl.pca(self.adata_evaluate)
@@ -47,11 +49,11 @@ class DrugEffectPredictor:
         self.deg = self.adata_cd4.uns['rank_genes_groups']['names']['perturbated']
 
     def visualize_results(self):
-        deg_list = np.intersect1d(deg, adata_evaluate.var_names)
+        deg_list = np.intersect1d(deg, self.adata_evaluate.var_names)
     
         # Calculate the R² correlation between mean gene expression of predicted and existing CD4+T cells
-        pred_deg = pred[:, deg_list]
-        true_deg = cd4_perturb[:, deg_list]
+        pred_deg = self.pred[:, deg_list]
+        true_deg = self.cd4_perturb[:, deg_list]
         x_deg = np.asarray(np.mean(pred_deg.X, axis=0)).ravel()
         y_deg = np.asarray(np.mean(true_deg.X, axis=0)).ravel()
         slope, intercept, r_value_deg, p_value_deg, std_err_deg = stats.linregress(x_deg, y_deg)
@@ -72,7 +74,7 @@ class DrugEffectPredictor:
     
         # Visualize the distribution of the top differentially expressed genes
         for gene in deg_list[:10]:  # Adjust the number of genes as needed
-            sc.pl.violin(adata_evaluate, gene, groupby='condition')
+            sc.pl.violin(self.adata_evaluate, gene, groupby='condition')
 
 # Use the class
 file_path = 'gdrive/MyDrive/Perturbation/'
