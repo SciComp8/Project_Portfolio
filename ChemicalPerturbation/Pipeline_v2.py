@@ -36,7 +36,7 @@ class DrugEffectPredictor:
         self.adata_train.write(self.file_path + 'single_cell_data/adata_train.h5ad')
 
     def predict_and_evaluate(self):
-        pred, _ = self.model.predict(ctrl_key='control', stim_key='perturbated', celltype_to_predict='T cells CD4+')
+        pred, delta = self.model.predict(ctrl_key='control', stim_key='perturbated', celltype_to_predict='T cells CD4+')
         pred.obs['condition'] = 'predicted perturbated'
         adata_control = self.adata[((self.adata.obs['cell_type'] == 'T cells CD4+') & (self.adata.obs['condition'] == 'control'))]
         self.adata_evaluate = adata_control.concatenate(self.cd4_perturb, pred)
@@ -67,7 +67,7 @@ class DrugEffectPredictor:
         plt.xlabel('Predicted mean gene expression in CD4+T control cells')
         plt.ylabel('True mean gene expression in CD4+T perturbated cells')
         plt.title('Scatter plot of the mean gene expression between prediction and ground truth')
-        plt.legend()
+        # plt.legend()
         plt.show()
     
         # Visualize the distribution of the top differentially expressed genes
