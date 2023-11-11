@@ -18,7 +18,6 @@ T cells play a vital role in our immune system, and we harness them through ther
 - [Preprocess_Data.py](ChemicalPerturbation/Preprocess_Data.py)
 - [Cluster_Compound.py](ChemicalPerturbation/Cluster_Compound.py)
 - [Explorative_Data_Analysis.py](ChemicalPerturbation/Explorative_Data_Analysis.py)
-- [Build_Model.py](ChemicalPerturbation/Build_Model.py)
 - [Pipeline - load the preprocessed scRNAseq data, build the variational autoencoder, evaluate the model performance](ChemicalPerturbation/Pipeline.py)
 
 ## **Bayesian model averaging for RNA-Seq count data**
