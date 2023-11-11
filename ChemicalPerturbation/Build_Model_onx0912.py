@@ -1,3 +1,7 @@
+"""
+Predict the perturbation effect of onx0912 
+"""
+
 pip install anndata==0.9.2
 pip install git+https://github.com/theislab/scgen.git
 pip install pertpy
@@ -9,6 +13,7 @@ import scanpy as sc
 import pertpy as pt
 import scgen
 import anndata as ad
+import numpy as np
 
 # Load the data
 from google.colab import drive
@@ -18,6 +23,7 @@ file_path = 'gdrive/MyDrive/Perturbation/'
 adata = ad.read_h5ad(file_path + 'single_cell_data/adata_v3_filter.h5ad')
 adata
 
+# Count per categorical level
 def count_entries(df, *args):
     """Return a dictionary with counts of occurrences as value for each key."""
     cols_count = {}
