@@ -36,7 +36,7 @@ def predict_and_evaluate(model, adata, adata_train, cd4_perturb):
     adata_cd4 = adata[adata.obs['cell_type'] == 'T cells CD4+']
     sc.tl.rank_genes_groups(adata_cd4, groupby='condition', method='wilcoxon')
     deg = adata_cd4.uns['rank_genes_groups']['names']['perturbated']
-    return adata_evaluate, deg
+    return adata_evaluate, deg, pred
 
 def visualize_results(adata_evaluate, deg):
     deg_list = np.intersect1d(deg, adata_evaluate.var_names)
@@ -59,7 +59,7 @@ def visualize_results(adata_evaluate, deg):
     plt.xlabel('Predicted mean gene expression in CD4+T control cells')
     plt.ylabel('True mean gene expression in CD4+T perturbated cells')
     plt.title('Scatter plot of the mean gene expression between prediction and ground truth')
-    plt.legend()
+    # plt.legend()
     plt.show()
 
     # Visualize the distribution of the top differentially expressed genes
@@ -73,5 +73,5 @@ drug_name = 'Belinostat'  # Replace with the name of the drug we want to analyze
 adata = load_data(file_path)
 adata_train, cd4_perturb = preprocess_data(adata, drug_name)
 model = train_model(adata_train, file_path)
-adata_evaluate, deg = predict_and_evaluate(model, adata, adata_train, cd4_perturb)
+adata_evaluate, deg, pred = predict_and_evaluate(model, adata, adata_train, cd4_perturb)
 visualize_results(adata_evaluate, deg)
