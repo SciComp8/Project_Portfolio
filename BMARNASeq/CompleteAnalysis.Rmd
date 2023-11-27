@@ -74,9 +74,9 @@ var_focus_2 <- var_focus[-var_remove]; var_cat_2 <- var_cat[-var_remove]
 row_count_minus_one <- nrow(pheno_data_filter) - 1
 idx_identity <- vector()
 for (col in var_focus_2) {
-  sum_dup <- sum(duplicated(pheno_data_filter[, col])) # Calculate the sum of duplicated elements in the column
-  if (sum_dup == row_count_minus_one) { # Check if the sum of duplicates is equal to the threshold
-    idx_identity <- c(idx_identity, which(names(pheno_data_filter) == col)) # Store the index if condition is met
+  sum_dup <- sum(duplicated(pheno_data_filter[, col])) 
+  if (sum_dup == row_count_minus_one) { 
+    idx_identity <- c(idx_identity, which(names(pheno_data_filter) == col))
   }
 }
 idx_identity
