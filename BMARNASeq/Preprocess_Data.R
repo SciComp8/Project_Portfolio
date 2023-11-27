@@ -149,3 +149,75 @@ pheatmap(assay(vsd)[select_top30,],
 data_dir <- '../data/'
 pheno_data <- readRDS(paste0(data_dir, 'pheno_data.RDS'))
 expr_data <- readRDS(paste0(data_dir, 'expr_data.RDS'))
+
+#----Remove missing values in the phenotype data---- 
+data_dir <- '../data/'
+pheno_data <- readRDS(paste0(data_dir, 'pheno_data.RDS'))
+expr_data <- readRDS(paste0(data_dir, 'expr_data.RDS'))
+
+var_13 <- c('SEX', 'AGE', 'BMI', 'MHABNWBC', 'MHARTHTS', 
+            'MHASTHMA', 'MHBCTINF', 'MHBLDDND', 'MHCOCAINE5', 
+            'MHCOPD', 'MHCVD', 'MHDRNKSTS', 'SMTSPAX')
+
+# MHABNWBC: normal or abnormal white blood cell
+# MHARTHTS: has arthritis or not
+# MHASTHMA: has asthma or not 
+# MHBCTINF: has bacterial infections or not
+# MHBLDDND: has blood donation been denied in the past or not
+# MHCOCAINE5: use cocaine in the past 5 years or not
+# MHCOPD: has chronic respiratory disease or not
+# MHCVD: has cerebrovascular disease disorder or not
+# MHDRNKSTS: drink or not
+# SMTSPAX: time a sample spent in the PAXgene fixative
+
+pheno_data_13 <- pheno_data[, var_13]
+all_char_var <- sapply(names(pheno_data_13)[sapply(pheno_data_13, is.character)], function(x) with(pheno_data_13, table(get(x), useNA = "ifany"))) 
+all_num_var <- sapply(names(pheno_data_13)[sapply(pheno_data_13, is.numeric)], function(x) with(pheno_data_13, table(get(x), useNA = "ifany"))) 
+idx_exclude <- c(which(pheno_data_13$MHABNWBC==99), 
+                 which(pheno_data_13$MHBCTINF==99), 
+                 which(pheno_data_13$MHBLDDND==99), 
+                 which(pheno_data_13$MHCOCAINE5==99), 
+                 which(pheno_data_13$MHCOPD==99),
+                 which(pheno_data_13$MHCVD==99),
+                 which(is.na(pheno_data_13$MHDRNKSTS))) |> unique()
+length(idx_exclude) # 31
+
+pheno_data_13 <- pheno_data_13[-idx_exclude, ]  
+expr_data_13 <- expr_data[, -idx_exclude]    
+dim(pheno_data_13) 
+dim(expr_data_13) 
+sum(is.na(pheno_data_13)) # 0
+
+#----Exclude genes from the RNA-seq data which have Counts per Million greater than 0.2 but appear in 10 or fewer samples---- 
+num_0.2 <- rowSums(cpm(expr_data_13) > 0.2)
+# expr_cpm <- cpm(expr_data_13); num_0.2 <- apply(expr_cpm, 1, function(x) sum(x > 0.2))
+expr_data_13 <- expr_data_13[num_0.2 > 10, ]
+length(which(num_0.2 <= 10)) 
+dim(expr_data_13) 
+
+#----Recode values in the phenotype data----
+for (col in var_13) {
+  if (col %in% c("SEX", "AGE", "SMTSPAX", "MHDRNKSTS")) {
+    # Handle special cases
+    if (col == "SEX") {
+      pheno_data_13[[col]] <- factor(ifelse(pheno_data_13[[col]] == 1, "male", "female"), levels = c("female", "male"))
+    } else if (col == "AGE") {
+      age_median <- median(pheno_data_13[[col]])
+      pheno_data_13[[col]] <- factor(ifelse(pheno_data_13[[col]] < age_median, "young", "old"), levels = c("young", "old"))
+    } else if (col == "SMTSPAX") {
+      smtspax_median <- median(pheno_data_13[[col]])
+      pheno_data_13[[col]] <- factor(ifelse(pheno_data_13[[col]] < smtspax_median, "low", "high"), levels = c("low", "high"))
+    } else if (col == "MHDRNKSTS") {
+      pheno_data_13[[col]] <- factor(ifelse(pheno_data_13[[col]] == "No", "no", "yes"), levels = c("no", "yes"))
+    }
+  } else {
+    # Handle general cases
+    pheno_data_13[[col]] <- factor(ifelse(pheno_data_13[[col]] == 0, "no", "yes"), levels = c("no", "yes"))
+  }
+}
+
+all_factor_var <- sapply(names(pheno_data_13)[sapply(pheno_data_13, is.factor)], function(x) with(pheno_data_13, table(get(x), useNA = "ifany")), simplify = F) 
+all_num_var <- sapply(names(pheno_data_13)[sapply(pheno_data_13, is.numeric)], function(x) with(pheno_data_13, table(get(x), useNA = "ifany"))) 
+
+saveRDS(pheno_data_13, file=paste0(data_dir, 'dat.pheno.Subcutaneous'))
+saveRDS(expr_data_13, file=paste0(data_dir, 'dat.expr.Subcutaneous'))
