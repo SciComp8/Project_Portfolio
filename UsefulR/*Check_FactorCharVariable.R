@@ -1,5 +1,5 @@
 ##------Check the structure and distribution of factor/character variables------
-all.fac <- sapply(names(dat.work)[sapply(dat.work, is.factor)], function(x) with(dat.work, table(get(x), useNA = "ifany")))  
+all.fac <- sapply(names(dat.work)[sapply(dat.work, is.factor)], function(x) with(dat.work, table(get(x), useNA = "ifany")), simplify = F)  
 View(all.fac)
 # Note: variable `Surgery` only have one factor level with non-zero patients.
 
