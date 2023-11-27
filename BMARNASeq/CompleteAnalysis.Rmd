@@ -22,10 +22,11 @@ knitr::opts_chunk$set(
 # Attach libraries and functions
 ```{r}
 # devtools::install("/Library/Frameworks/R.framework/Versions/4.2/Resources/library/BMAseq") {BMAseq} (2023Apr1 version)  
-easypackages::libraries("BMAseq", "limma", "qvalue", "parallel", "tidyverse", 
-                        "edgeR", "DESeq2", "data.table", "ggVennDiagram", "gridExtra", 
-                        "openxlsx", "grDevices", "viridis", "cowplot", "clusterProfiler",
-                        "org.Hs.eg.db", "latex2exp", "enrichplot", "patchwork") |> suppressPackageStartupMessages()
+easypackages::libraries("BMAseq", "limma", "qvalue", "parallel", "tidyverse",                         
+                        "edgeR", "DESeq2", "data.table", "ggVennDiagram", "gridExtra",                         
+                        "openxlsx", "grDevices", "viridis", "cowplot", "clusterProfiler",                        
+                        "org.Hs.eg.db", "latex2exp", "enrichplot", "patchwork",
+                        "readxl", "pheatmap", "RColorBrewer", "gtsummary") |> suppressPackageStartupMessages()
 
 Bayesfactor <- BMAseq:::Bayesfactor
 source("theme_BMA.R")
@@ -36,15 +37,6 @@ date.analysis <- format(Sys.Date(), "%Y%b%d")
 # Process data
 ```{r}
 #----Load data files----
-library(readxl)
-library(tidyverse)
-library(gtsummary)
-# BiocManager::install(version = "3.18")
-library(DESeq2)
-library(RColorBrewer)
-library(pheatmap)
-library(edgeR)
-
 data_dir <- '../data/' 
 file_names <- c(
   paste0(data_dir, 'pheno_data.xlsx'),
@@ -75,7 +67,7 @@ sum(var_str) # Number of string variables
 var_focus <- c('COHORT', as.character(dict_full$name[!var_str]))
 var_cat <- c(1, as.numeric(dict_full$type[!var_str] == 'integer, encoded value'))
 colSums(is.na(pheno_data_filter[, var_focus]))
-var_remove <- which(colSums(is.na(pheno_data_filter[, var_focus])) > 70) # ? 70
+var_remove <- which(colSums(is.na(pheno_data_filter[, var_focus])) > 70) 
 var_focus_2 <- var_focus[-var_remove]; var_cat_2 <- var_cat[-var_remove]
 # duplicated(c(2, 2, 2))
 # [1] FALSE  TRUE  TRUE
@@ -172,16 +164,8 @@ for (i in 1:num_blocks) {
 plotPCA(vsd, intgroup=c('BMI')) +
   labs(color='BMI')
 
-# > TD: https://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#principal-component-plot-of-the-samples
-select_top30 <- order(rowMeans(counts(dds,normalized=T)), decreasing=T)[1:30]
-pheatmap(assay(vsd)[select_top30,], 
-         cluster_rows=F, show_rownames=F, cluster_cols=F, 
-         annotation_col=as.data.frame(pheno_data_filter[,'BMI']),
-         annotation_colors = list(BMI = c("Low" = "blue", "High" = "red")))
-
 saveRDS(pheno_data_final, file=paste0(data_dir, 'pheno_data.RDS'))
 saveRDS(expr_data_filter, file=paste0(data_dir, 'expr_data.RDS'))
-
 
 #----Remove missing values in the phenotype data---- 
 data_dir <- '../data/'
