@@ -57,6 +57,7 @@ dict_full <- rbind(dict_data1, dict_data2)
 names(pheno_data)
 table(pheno_data$SMTSD, useNA='ifany') # View the distribution of tissue type
 idx_sub_fat <- which(pheno_data$SMTSD=='Adipose - Subcutaneous')
+pheno_data <- pheno_data[idx_sub_fat, ]
 dict_name <- dict_full$name
 length(dict_name); ncol(pheno_data)
 colnames(pheno_data)[!colnames(pheno_data) %in% dict_name]
@@ -66,8 +67,9 @@ var_str <- dict_full$type=='string'
 sum(var_str) # Number of string variables
 var_focus <- c('COHORT', as.character(dict_full$name[!var_str]))
 var_cat <- c(1, as.numeric(dict_full$type[!var_str] == 'integer, encoded value'))
-colSums(is.na(pheno_data_filter[, var_focus]))
-var_remove <- which(colSums(is.na(pheno_data_filter[, var_focus])) > 70) 
+miss_freq_per_var <- colSums(is.na(pheno_data_filter[, var_focus])) 
+mean(miss_freq_per_var) 
+var_remove <- which(colSums(is.na(pheno_data_filter[, var_focus])) > floor(mean(miss_freq_per_var))) 
 var_focus_2 <- var_focus[-var_remove]; var_cat_2 <- var_cat[-var_remove]
 
 # Identify columns in the pheno_data_filter dataframe where all elements are repetitive 
