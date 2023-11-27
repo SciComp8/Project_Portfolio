@@ -367,7 +367,6 @@ lipid_mean_cv <- lipid_data_cv %>%
 
 
 # Make a line plot (JCI supplementary figure 3)
-# 稍后改
 lipid_mean_cv$group <- c(rep("SIL standard", 5), 
                          rep("LPC", 8), 
                          rep("LPE", 7),
