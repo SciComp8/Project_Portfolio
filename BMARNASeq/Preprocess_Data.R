@@ -28,6 +28,7 @@ dict_full <- rbind(dict_data1, dict_data2)
 names(pheno_data)
 table(pheno_data$SMTSD, useNA='ifany') # View the distribution of tissue type
 idx_sub_fat <- which(pheno_data$SMTSD=='Adipose - Subcutaneous')
+pheno_data <- pheno_data[idx_sub_fat, ]
 dict_name <- dict_full$name
 length(dict_name); ncol(pheno_data)
 colnames(pheno_data)[!colnames(pheno_data) %in% dict_name]
@@ -37,8 +38,9 @@ var_str <- dict_full$type=='string'
 sum(var_str) # Number of string variables
 var_focus <- c('COHORT', as.character(dict_full$name[!var_str]))
 var_cat <- c(1, as.numeric(dict_full$type[!var_str] == 'integer, encoded value'))
-colSums(is.na(pheno_data_filter[, var_focus]))
-var_remove <- which(colSums(is.na(pheno_data_filter[, var_focus])) > 70) # ? 70
+miss_freq_per_var <- colSums(is.na(pheno_data_filter[, var_focus])) 
+mean(miss_freq_per_var)
+var_remove <- which(colSums(is.na(pheno_data_filter[, var_focus])) > floor(mean(miss_freq_per_var))) 
 var_focus_2 <- var_focus[-var_remove]; var_cat_2 <- var_cat[-var_remove]
 # duplicated(c(2, 2, 2))
 # [1] FALSE  TRUE  TRUE
@@ -52,7 +54,7 @@ for (col in var_focus_2) {
     idx_identity <- c(idx_identity, which(names(pheno_data_filter) == col)) # Store the index if condition is met
   }
 }
-idx_identity # [1] 222 225 227 228 229 230 233 239 242 243 244 261 262
+idx_identity 
 var_focus_3 <- var_focus_2[-idx_identity]; var_cat_3 <- var_cat_2[-idx_identity]
 taget_col <- colnames(pheno_data_filter[var_focus_3[!as.logical(var_cat_3)]])
 pheno_data_filter <- pheno_data_filter |> 
@@ -93,7 +95,7 @@ if (identical(rownames(pheno_data_final), colnames(expr_data))) {
   expr_data_filter <- expr_data[, idx_sample]
 }
 
-# The following 2 code lines are equivalent
+# The following 2 code lines are equivalent in checking if the elements in one vector are in the same order as they appear in another vector
 # identical(rownames(pheno_data_final), colnames(expr_data_filter))
 # all(match(rownames(pheno_data_final), colnames(expr_data)) == 1:nrow(pheno_data_final))
 
