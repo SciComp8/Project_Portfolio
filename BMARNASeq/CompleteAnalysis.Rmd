@@ -145,7 +145,6 @@ dds
 dds <- DESeq(dds)
 dds
 vsd <- vst(dds, blind=FALSE)
-# The running times are shorter when using blind=FALSE and if the function DESeq has already been run, because then it is not necessary to re-estimate the dispersion values. 
 
 #----Evaluate the data quality by sample clustering and visualization----
 sample_distance <- dist(t(assay(vsd)), method='euclidean') 
