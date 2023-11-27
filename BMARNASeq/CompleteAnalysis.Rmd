@@ -185,7 +185,6 @@ sum(is.na(pheno_data_13)) # 0
 
 #----Exclude genes from the RNA-seq data which have Counts per Million greater than 0.2 but appear in 10 or fewer samples---- 
 num_0.2 <- rowSums(cpm(expr_data_13) > 0.2)
-# expr_cpm <- cpm(expr_data_13); num_0.2 <- apply(expr_cpm, 1, function(x) sum(x > 0.2))
 expr_data_13 <- expr_data_13[num_0.2 > 10, ]
 length(which(num_0.2 <= 10)) 
 dim(expr_data_13) 
