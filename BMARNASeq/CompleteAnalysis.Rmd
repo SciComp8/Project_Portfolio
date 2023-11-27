@@ -176,17 +176,6 @@ var_13 <- c('SEX', 'AGE', 'BMI', 'MHABNWBC', 'MHARTHTS',
             'MHASTHMA', 'MHBCTINF', 'MHBLDDND', 'MHCOCAINE5', 
             'MHCOPD', 'MHCVD', 'MHDRNKSTS', 'SMTSPAX')
 
-# MHABNWBC: normal or abnormal white blood cell
-# MHARTHTS: has arthritis or not
-# MHASTHMA: has asthma or not 
-# MHBCTINF: has bacterial infections or not
-# MHBLDDND: has blood donation been denied in the past or not
-# MHCOCAINE5: use cocaine in the past 5 years or not
-# MHCOPD: has chronic respiratory disease or not
-# MHCVD: has cerebrovascular disease disorder or not
-# MHDRNKSTS: drink or not
-# SMTSPAX: time a sample spent in the PAXgene fixative
-
 pheno_data_13 <- pheno_data[, var_13]
 all_char_var <- sapply(names(pheno_data_13)[sapply(pheno_data_13, is.character)], function(x) with(pheno_data_13, table(get(x), useNA = "ifany"))) 
 all_num_var <- sapply(names(pheno_data_13)[sapply(pheno_data_13, is.numeric)], function(x) with(pheno_data_13, table(get(x), useNA = "ifany"))) 
@@ -197,7 +186,7 @@ idx_exclude <- c(which(pheno_data_13$MHABNWBC==99),
                  which(pheno_data_13$MHCOPD==99),
                  which(pheno_data_13$MHCVD==99),
                  which(is.na(pheno_data_13$MHDRNKSTS))) |> unique()
-length(idx_exclude) # 31
+length(idx_exclude) 
 
 pheno_data_13 <- pheno_data_13[-idx_exclude, ]  
 expr_data_13 <- expr_data[, -idx_exclude]    
@@ -243,8 +232,8 @@ saveRDS(expr_data_13, file=paste0(data_dir, 'dat.expr.Subcutaneous'))
 ```{r}
 dat.expr <- dget("../ApplicationData/derived/dat.expr.Subcutaneous") 
 dat.pheno <- dget("../ApplicationData/derived/dat.pheno.Subcutaneous") 
-dim(dat.expr) # 24660 genes and 404 subjects
-dim(dat.pheno) # 404 subjects and 13 phenotypes
+dim(dat.expr) 
+dim(dat.pheno) 
 dat.pheno[1:5, ]
 dat.expr[1:5, 1:5]
 paste0("The column names of gene expression data", ifelse(all(colnames(dat.expr) == rownames(dat.pheno)), " MATCH ", "NOT MATCH"), "the row names of phenotype data.")
