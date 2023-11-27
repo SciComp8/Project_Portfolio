@@ -1,6 +1,7 @@
 #----Load data files----
 library(readxl)
 library(tidyverse)
+library(gtsummary)
 # BiocManager::install(version = "3.18")
 library(DESeq2)
 library(RColorBrewer)
@@ -59,7 +60,6 @@ pheno_data_filter <- pheno_data_filter |>
 pheno_data_filter$BMI <- ifelse(pheno_data_filter$BMI >= 25, "High", "Low")
 
 #----Take a view at the distribution of the phenotypes---
-library(gtsummary)
 tbl_summary(data = pheno_data_filter |>
               dplyr::select(all_of(var_focus_3)),
             by = "BMI",
@@ -84,8 +84,9 @@ rownames(pheno_data_final) <- gsub(pattern = "-", replacement = ".", x = rowname
 expr_data <- read.csv(paste0(data_dir, 'expr_data.csv'))
 ensg_id <- rownames(expr_data)
 dim(expr_data)
-if (identical(rownames(pheno_data_final), colnames(expr_data_filter))) {
+if (identical(rownames(pheno_data_final), colnames(expr_data))) {
   print('The elements in one vector are in the same order as they appear in another vector!')
+  expr_data_filter <- expr_data
 } else {
   idx_sample <- match(rownames(pheno_data_final), colnames(expr_data))
   # match returns a vector of the positions of (first) matches of its first argument in its second.
@@ -125,9 +126,21 @@ colors <- colorRampPalette(rev(brewer.pal(9, "Reds")))(255)
 #          clustering_distance_cols=sample_distance,
 #          col=colors)
 
+# >
 num_blocks <- nrow(sample_distance_mat) %/% 6
 for (i in 1:num_blocks) {
   print(paste0('Plotting ', i, ' heatmap'))
   pheatmap(mat=sample_distance_mat_2[((i-1)*6+1):(i*6), ((i-1)*6+1):(i*6)],
            col=colors)
 }
+
+# >
+plotPCA(vsd, intgroup=c('BMI')) +
+  labs(color='BMI')
+
+# > TD
+select_top30 <- order(rowMeans(counts(dds,normalized=T)), decreasing=T)[1:30]
+pheatmap(assay(vsd)[select_top30,], 
+         cluster_rows=F, show_rownames=F, cluster_cols=F, 
+         annotation_col=as.data.frame(pheno_data_filter[,'BMI']),
+         annotation_colors = list(BMI = c("Low" = "blue", "High" = "red")))
