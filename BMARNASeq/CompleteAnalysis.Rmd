@@ -43,7 +43,7 @@ file_names <- c(
   paste0(data_dir, 'dict_data1.xlsx'),
   paste0(data_dir, 'dict_data2.xlsx')
 )
-loaded_data <- lapply(file_names, read_xlsx, na = c('NA')) # Load xlsx files into a list
+loaded_data <- lapply(file_names, read_xlsx, na = c('NA'))
 names(loaded_data) <- c('pheno_data', 'dict_data1', 'dict_data2')
 saveRDS(loaded_data, file=paste0(data_dir, 'loaded_data.RDS'))
 
@@ -69,8 +69,6 @@ var_cat <- c(1, as.numeric(dict_full$type[!var_str] == 'integer, encoded value')
 colSums(is.na(pheno_data_filter[, var_focus]))
 var_remove <- which(colSums(is.na(pheno_data_filter[, var_focus])) > 70) 
 var_focus_2 <- var_focus[-var_remove]; var_cat_2 <- var_cat[-var_remove]
-# duplicated(c(2, 2, 2))
-# [1] FALSE  TRUE  TRUE
 
 # Identify columns in the pheno_data_filter dataframe where all elements are repetitive 
 row_count_minus_one <- nrow(pheno_data_filter) - 1
@@ -81,7 +79,7 @@ for (col in var_focus_2) {
     idx_identity <- c(idx_identity, which(names(pheno_data_filter) == col)) # Store the index if condition is met
   }
 }
-idx_identity # [1] 222 225 227 228 229 230 233 239 242 243 244 261 262
+idx_identity
 var_focus_3 <- var_focus_2[-idx_identity]; var_cat_3 <- var_cat_2[-idx_identity]
 taget_col <- colnames(pheno_data_filter[var_focus_3[!as.logical(var_cat_3)]])
 pheno_data_filter <- pheno_data_filter |> 
@@ -117,15 +115,11 @@ if (identical(rownames(pheno_data_final), colnames(expr_data))) {
   expr_data_filter <- expr_data
 } else {
   idx_sample <- match(rownames(pheno_data_final), colnames(expr_data))
-  # match returns a vector of the positions of (first) matches of its first argument in its second.
   expr_data_filter <- expr_data[, idx_sample]
 }
 
-# The following 2 code lines are equivalent
-# identical(rownames(pheno_data_final), colnames(expr_data_filter))
-# all(match(rownames(pheno_data_final), colnames(expr_data)) == 1:nrow(pheno_data_final))
-
-colnames(expr_data_filter) # These are sample IDs
+1:nrow(pheno_data_final))
+colnames(expr_data_filter)
 dim(expr_data_filter) 
 
 # Build the DESeqDataSet
@@ -140,7 +134,6 @@ vsd <- vst(dds, blind=FALSE)
 
 #----Evaluate the data quality by sample clustering and visualization----
 sample_distance <- dist(t(assay(vsd)), method='euclidean') 
-# dist: This function computes and returns the distances between the rows of a data matrix.
 sample_distance_mat <- as.matrix(sample_distance)
 row_order <- order(paste0(vsd$BMI, '-', rownames(sample_distance_mat)), decreasing=T)
 column_order <- order(paste0(vsd$BMI, '-', colnames(sample_distance_mat)), decreasing=T)
@@ -149,12 +142,8 @@ new_columnnames <- colnames(sample_distance_mat)[column_order]
 sample_distance_mat_2 <- sample_distance_mat[match(new_rownames, rownames(sample_distance_mat)), match(new_columnnames, colnames(sample_distance_mat))] 
 
 colors <- colorRampPalette(rev(brewer.pal(9, "Reds")))(255)
-# pheatmap(mat=sample_distance_mat,
-#          clustering_distance_rows=sample_distance,
-#          clustering_distance_cols=sample_distance,
-#          col=colors)
-
 num_blocks <- nrow(sample_distance_mat) %/% 6
+
 for (i in 1:num_blocks) {
   print(paste0('Plotting ', i, ' heatmap'))
   pheatmap(mat=sample_distance_mat_2[((i-1)*6+1):(i*6), ((i-1)*6+1):(i*6)],
@@ -204,7 +193,6 @@ dim(expr_data_13)
 #----Recode values in the phenotype data----
 for (col in var_13) {
   if (col %in% c("SEX", "AGE", "SMTSPAX", "MHDRNKSTS")) {
-    # Handle special cases
     if (col == "SEX") {
       pheno_data_13[[col]] <- factor(ifelse(pheno_data_13[[col]] == 1, "male", "female"), levels = c("female", "male"))
     } else if (col == "AGE") {
@@ -217,7 +205,6 @@ for (col in var_13) {
       pheno_data_13[[col]] <- factor(ifelse(pheno_data_13[[col]] == "No", "no", "yes"), levels = c("no", "yes"))
     }
   } else {
-    # Handle general cases
     pheno_data_13[[col]] <- factor(ifelse(pheno_data_13[[col]] == 0, "no", "yes"), levels = c("no", "yes"))
   }
 }
