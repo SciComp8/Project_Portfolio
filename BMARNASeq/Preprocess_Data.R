@@ -144,3 +144,8 @@ pheatmap(assay(vsd)[select_top30,],
          cluster_rows=F, show_rownames=F, cluster_cols=F, 
          annotation_col=as.data.frame(pheno_data_filter[,'BMI']),
          annotation_colors = list(BMI = c("Low" = "blue", "High" = "red")))
+
+# > 
+data_dir <- '../data/'
+pheno_data <- readRDS(paste0(data_dir, 'pheno_data.RDS'))
+expr_data <- readRDS(paste0(data_dir, 'expr_data.RDS'))
