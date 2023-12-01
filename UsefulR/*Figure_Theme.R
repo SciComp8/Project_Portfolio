@@ -1,3 +1,5 @@
+# Reference: https://cran.r-project.org/web/packages/ggplot2/index.html
+
 theme_BMA <- function(
     base_size = 12,
     base_family = "Arial"
