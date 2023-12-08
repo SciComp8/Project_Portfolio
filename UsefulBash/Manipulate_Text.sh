@@ -1,4 +1,4 @@
-cut -d , -f 2 relative_path/file.csv | grep -v City | sort -r | uniq -c
+cut -d , -f 2 relative_path/file.csv | grep -v City | sort -r | uniq -c 
 # Select all the city names (excluding the line containing the word City) from column 2 of file.csv
 # Sort the names of the city in file.csv in descending alphabetical order
 # Show each city name once, along with a count of how often it occurs
