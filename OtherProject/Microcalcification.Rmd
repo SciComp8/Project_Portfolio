@@ -543,6 +543,40 @@ knitr::kable(out[[1]], row.names = F)
 ```
 
 
+## Patients characteristics by initial lumpectomy margins (`Initial.margin.2`) for patients who underwent PLM revealing the residual microcalcifications, then re-excision surgery revealing the residual cancer (defined as DCIS/Carcinoma)
+```{r, results="hide"}
+dat.work.4.1 <- dat.work[which(dat.work$PLM.2 == "Yes" & dat.work$PLM.calcs.2 == "Yes" & dat.work$Reexcision.2 == "Yes" & dat.work$Pathology.reex.3 == "DCIS/Carcinoma"), ]
+
+vars.cat.rm <- which(vars.all %in% c("Initial.margin.2", "Initial.margin.3", "Reexcision.2", "PLM.calcs.2", "PLM.2"))
+out <- fsmry.dmgrph(
+  dat = dat.work.4.1,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "Initial.margin.2")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
+## Patients characteristics by initial lumpectomy margins (`Initial.margin.3`) for patients who underwent PLM revealing the residual microcalcifications, then re-excision surgery revealing the residual cancer (defined as DCIS/Carcinoma)
+```{r, results="hide"}
+dat.work.4.2 <- dat.work[which(dat.work$PLM.2 == "Yes" & dat.work$PLM.calcs.2 == "Yes" & dat.work$Reexcision.2 == "Yes" & dat.work$Pathology.reex.3 == "DCIS/Carcinoma"), ]
+
+vars.cat.rm <- which(vars.all %in% c("Initial.margin.2", "Initial.margin.3", "Reexcision.2", "PLM.calcs.2", "PLM.2"))
+out <- fsmry.dmgrph(
+  dat = dat.work.4.2,
+  vars = vars.all[-vars.cat.rm],
+  vars.cat = vars.cat[-vars.cat.rm],
+  by = "Initial.margin.3")
+```
+
+```{r, results="asis"}
+knitr::kable(out[[1]], row.names = F)
+```
+
+
 ## Addition: patients characteristics by residual microcalcification (`PLM.calcs.2`) for patients who complete PLM but do not receive chemotherapy before radiation
 ```{r, results="hide"}
 dat.work.5 <- dat.work[which(dat.work$Timing.CTX.2 != "Before radiation" & dat.work$PLM.2 == "Yes"), ]
