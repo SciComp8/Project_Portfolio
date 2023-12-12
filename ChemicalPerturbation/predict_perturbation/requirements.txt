@@ -1,9 +1,0 @@
-adjustText
-google
-matplotlib
-numpy
-anndata
-pertpy
-scanpy
-scgen
-scipy
