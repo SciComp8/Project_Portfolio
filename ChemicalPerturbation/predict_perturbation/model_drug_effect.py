@@ -1,13 +1,3 @@
-import scanpy as sc
-import pertpy as pt
-import scgen
-import anndata as ad
-import numpy as np
-from scipy import stats
-import matplotlib.pyplot as plt
-from adjustText import adjust_text
-from google.colab import drive
-
 class DrugEffectPredictor:
     def __init__(self, file_path, drug_name):
         self.file_path = file_path
