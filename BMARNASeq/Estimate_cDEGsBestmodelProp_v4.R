@@ -3,7 +3,7 @@
 load("../ApplicationData/derived/RandomSeed/Top5000/MultiModel/BMAseqMulti120FDR1.RData") 
 
 # Step 2: Extract BMI-related index.DEG/name.DEG/best.model results using the training/test set in the random seed trial 120
-temp.train <- output.multi.train.s2[["DEG.bestmodel"]][["BMI"]]
+temp.train <- output.multi.train.s2[["DEG.bestmodel"]][["BMI"]] # `DEG.bestmodel` the best model used to identify each DE gene
 temp.test <- output.multi.test.s2[["DEG.bestmodel"]][["BMI"]]
 
 # Step3: Identify BMI-related cDEGs among top 2000 ranked genes in both the training and test sets in the random seed trial 120
