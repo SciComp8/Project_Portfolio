@@ -1,5 +1,5 @@
 # Notes about how to determine which method(s) achieve substantially consistent detections of cDEGs
-# 1) estimate the top 10 most frequent cDEGs detection ways either solely with 1 method or in conjunction with at least 2 methods in any random seed trial. 
+# 1) estimate the top 10 most frequent cDEGs detection ways either solely with 1 method or in conjunction with at least 2 methods in any random seed trial
 # 2) selecte the top detection ways that occur in at least half number of random seed trials 
 
 library(data.table)
