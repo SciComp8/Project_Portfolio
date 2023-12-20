@@ -155,6 +155,7 @@ theme_BMA <- function(base_size = 14,
     )
 }
 
+
 ##------Make a boxplot function------
 make_boxplot <- function(gene.symbol = "MTHFS", 
                          data.type = "train", 
@@ -201,6 +202,60 @@ make_boxplot <- function(gene.symbol = "MTHFS",
   }
 }
 
+
+make_boxplot_2 <- function(gene.symbol = "MTHFS", 
+                         data.type = "train", 
+                         var.x = "BMI", 
+                         test.type = "wilcox.test",
+                         paired_comparisons_list = NULL,
+                         y_transform = c("origin", "log2", "vst"),
+                         test_label_show = TRUE) {
+  
+  data_set <- get(paste0(gene.symbol, ".", data.type))
+  data_set[["expr"]] <- data_set[["expr"]] + 0.5
+  
+  y_transform <- match.arg(y_transform, c("origin", "log2", "vst"))
+  if (y_transform == "origin") {
+    y_lab_name <- paste0(gene.symbol, " count + 0.5")
+  } else if (y_transform == "log2") {
+    data_set[["expr"]] <- log2(data_set[["expr"]]) 
+    y_lab_name <- bquote(paste("log"[2]*" (", .(gene.symbol), " count + 0.5)"))
+  } else if (y_transform == "vst") {
+    data_set <- get(paste0(gene.symbol, ".", data.type, ".deseq2"))
+    y_lab_name <- paste0("*", gene.symbol, "* ", " transformed count") 
+  }
+  
+  p <- ggplot(data = data_set,
+              mapping = aes(x = get(var.x), y = expr)) +
+    geom_boxplot(aes(group = get(var.x), color = get(var.x)),
+                 lwd = 1,
+                 outlier.shape = NA) + 
+    geom_jitter(aes(color = get(var.x)), size = 0.8) + 
+    theme_BMA() + 
+    theme(axis.title.y = ggtext::element_markdown()) + 
+    scale_color_viridis(discrete = T) + 
+    ylab(y_lab_name)
+  
+  if (grepl("_", var.x)) {
+    p <- p + xlab(paste0(gsub(pattern = "_", replacement = "/", x = var.x), " categories"))
+  } else {
+    p <- p + xlab(var.x)
+  }
+  
+  if (isTRUE(test_label_show)) {
+    p <- p + stat_compare_means(method = test.type, label.x.npc = 0.2, size = 4)
+  } else {
+    p
+  }
+  
+  if (is.null(paired_comparisons_list)) {
+    p
+  } else {
+    p <- p + stat_compare_means(label.x.npc = "middle",
+                                comparisons = paired_comparisons_list,
+                                method = "wilcox.test")
+  }
+}
 
 ##------Make a function to extract multiple comparisons------
 extract_all_comparisons <- function(obj) {
