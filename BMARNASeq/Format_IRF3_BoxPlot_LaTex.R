@@ -10,7 +10,8 @@ library(clusterProfiler)
 library(org.Hs.eg.db)
 library(tidyverse)
 library(readxl)
-options(scipen = 999) # Remove scientific notation
+options(scipen = 999) # Remove scientific notation globally
+# options(scipen = 0) Revert to scientific notation globally
 
 ##------Map gene symbols to ENSEMBL IDs------
 ensembl.id <- bitr("IRF3", 
@@ -81,7 +82,7 @@ IRF3.all$MHABNWBC <- factor(IRF3.all$MHABNWBC, levels = c("no", "yes"))
 IRF3.all$BMI_AGE_SEX_MHABNWBC <- paste(paste0("AGE", IRF3.all$AGE), 
                                        paste0("SEX", IRF3.all$SEX), 
                                        paste0("WBC", IRF3.all$MHABNWBC),
-                                       paste0("BMI", IRF3.all$BMI), sep = " + ")
+                                       paste0("BMI", IRF3.all$BMI), sep = " ") # + -> whitespace
 combs <- table(IRF3.all$BMI_AGE_SEX_MHABNWBC) |> names()
 combs <- combs[c(9:16, 1:8)] 
 combs_new <- c()
@@ -92,7 +93,7 @@ IRF3.all$BMI_AGE_SEX_MHABNWBC <- factor(IRF3.all$BMI_AGE_SEX_MHABNWBC,
 
 
 IRF3.all$BMI_MHABNWBC <- paste(paste0("WBC", IRF3.all$MHABNWBC), 
-                               paste0("BMI", IRF3.all$BMI), sep = " + ")
+                               paste0("BMI", IRF3.all$BMI), sep = " ") # + -> whitespace
 combs <- table(IRF3.all$BMI_MHABNWBC) |> names()
 combs_new <- c()
 combs_new[seq(1, length(combs), by = 2)] <- combs[c(F, T)]
@@ -102,7 +103,7 @@ IRF3.all$BMI_MHABNWBC <- factor(IRF3.all$BMI_MHABNWBC,
 
 
 IRF3.all$AGE_MHABNWBC <- paste(paste0("AGE", IRF3.all$AGE), 
-                               paste0("WBC", IRF3.all$MHABNWBC), sep = " + ")
+                               paste0("WBC", IRF3.all$MHABNWBC), sep = " ") # + -> whitespace
 combs <- table(IRF3.all$AGE_MHABNWBC) |> names()
 IRF3.all$AGE_MHABNWBC <- factor(IRF3.all$AGE_MHABNWBC,
                                 levels = c(combs[grep(pattern = "WBCno", x = combs)],
@@ -118,7 +119,7 @@ IRF3.all.deseq2$MHABNWBC <- factor(IRF3.all.deseq2$MHABNWBC, levels = c("no", "y
 IRF3.all.deseq2$BMI_AGE_SEX_MHABNWBC <- paste(paste0("AGE", IRF3.all.deseq2$AGE), 
                                               paste0("SEX", IRF3.all.deseq2$SEX), 
                                               paste0("WBC", IRF3.all.deseq2$MHABNWBC),
-                                              paste0("BMI", IRF3.all.deseq2$BMI), sep = " + ")
+                                              paste0("BMI", IRF3.all.deseq2$BMI), sep = " ") # + -> whitespace
 combs <- table(IRF3.all.deseq2$BMI_AGE_SEX_MHABNWBC) |> names()
 combs <- combs[c(9:16, 1:8)] 
 combs_new <- c()
@@ -128,7 +129,7 @@ IRF3.all.deseq2$BMI_AGE_SEX_MHABNWBC <- factor(IRF3.all.deseq2$BMI_AGE_SEX_MHABN
                                                levels = combs_new)
 
 IRF3.all.deseq2$BMI_MHABNWBC <- paste(paste0("WBC", IRF3.all.deseq2$MHABNWBC), 
-                                      paste0("BMI", IRF3.all.deseq2$BMI), sep = " + ")
+                                      paste0("BMI", IRF3.all.deseq2$BMI), sep = " ") # + -> whitespace
 combs <- table(IRF3.all.deseq2$BMI_MHABNWBC) |> names()
 combs_new <- c()
 combs_new[seq(1, length(combs), by = 2)] <- combs[c(F, T)]
@@ -138,7 +139,7 @@ IRF3.all.deseq2$BMI_MHABNWBC <- factor(IRF3.all.deseq2$BMI_MHABNWBC,
 
 
 IRF3.all.deseq2$AGE_MHABNWBC <- paste(paste0("AGE", IRF3.all.deseq2$AGE), 
-                                      paste0("WBC", IRF3.all.deseq2$MHABNWBC), sep = " + ")
+                                      paste0("WBC", IRF3.all.deseq2$MHABNWBC), sep = " ") # + -> whitespace
 combs <- table(IRF3.all.deseq2$AGE_MHABNWBC) |> names()
 IRF3.all.deseq2$AGE_MHABNWBC <- factor(IRF3.all.deseq2$AGE_MHABNWBC,
                                        levels = c(combs[grep(pattern = "WBCno", x = combs)],
@@ -164,7 +165,8 @@ make_boxplot <- function(gene.symbol = "MTHFS",
                          var.x = "BMI", 
                          test.type = "wilcox.test",
                          paired_comparisons_list = NULL,
-                         y_transform = c("origin", "log2", "vst")) {
+                         y_transform = c("origin", "log2", "vst"),
+                         test_label_show = TRUE) {
   
   data_set <- get(paste0(gene.symbol, ".", data.type))
   data_set[["expr"]] <- data_set[["expr"]] + 0.5
@@ -173,11 +175,11 @@ make_boxplot <- function(gene.symbol = "MTHFS",
   if (y_transform == "origin") {
     y_lab_name <- paste0(gene.symbol, " count + 0.5")
   } else if (y_transform == "log2") {
-    data_set[["expr"]] <- log2(data_set[["expr"]]) # Log2 transformed gene expression
+    data_set[["expr"]] <- log2(data_set[["expr"]]) 
     y_lab_name <- bquote(paste("log"[2]*" (", .(gene.symbol), " count + 0.5)"))
   } else if (y_transform == "vst") {
     data_set <- get(paste0(gene.symbol, ".", data.type, ".deseq2"))
-    y_lab_name <- paste0("*", gene.symbol, "* ", " transformed count") # Italicize the gene symbol
+    y_lab_name <- paste0("*", gene.symbol, "* ", " transformed count") 
   }
   
   p <- ggplot(data = data_set,
@@ -186,14 +188,22 @@ make_boxplot <- function(gene.symbol = "MTHFS",
                  lwd = 1,
                  outlier.shape = NA) + 
     geom_jitter(aes(color = get(var.x)), size = 0.8) + 
-    stat_compare_means(method = test.type, # This is the overall comparison
-                       label.x.npc = 0.2,
-                       size = 4) + 
     theme_BMA() + 
     theme(axis.title.y = ggtext::element_markdown()) + 
     scale_color_viridis(discrete = T) + 
-    xlab(gsub(pattern = "_", replacement = " + ", x = var.x)) + 
     ylab(y_lab_name)
+  
+  if (grepl("_", var.x)) {
+    p <- p + xlab(paste0(gsub(pattern = "_", replacement = "/", x = var.x), " categories"))
+  } else {
+    p <- p + xlab(var.x)
+  }
+  
+  if (isTRUE(test_label_show)) {
+    p <- p + stat_compare_means(method = test.type, label.x.npc = 0.2, size = 4)
+  } else {
+    p
+  }
   
   if (is.null(paired_comparisons_list)) {
     p
@@ -205,11 +215,11 @@ make_boxplot <- function(gene.symbol = "MTHFS",
 }
 
 ##------Make boxplots------
-p1 <- make_boxplot(gene.symbol = "IRF3", data.type = "all", var.x = "BMI", test.type = "wilcox.test", y_transform = "vst")
-p2 <- make_boxplot(gene.symbol = "IRF3", data.type = "all", var.x = "BMI_AGE_SEX_MHABNWBC", test.type = "kruskal.test", y_transform = "vst")
-p3 <- make_boxplot(gene.symbol = "IRF3", data.type = "all", var.x = "MHABNWBC", test.type = "wilcox.test", y_transform = "vst")
+p1 <- make_boxplot(gene.symbol = "IRF3", data.type = "all", var.x = "BMI", test.type = "wilcox.test", y_transform = "vst", test_label_show = F)
+p2 <- make_boxplot(gene.symbol = "IRF3", data.type = "all", var.x = "BMI_AGE_SEX_MHABNWBC", test.type = "kruskal.test", y_transform = "vst", test_label_show = F)
+p3 <- make_boxplot(gene.symbol = "IRF3", data.type = "all", var.x = "MHABNWBC", test.type = "wilcox.test", y_transform = "vst", test_label_show = F)
 p4 <- make_boxplot(gene.symbol = "IRF3", data.type = "all", var.x = "BMI_MHABNWBC", 
-                   test.type = "kruskal.test", y_transform = "vst")
+                   test.type = "kruskal.test", y_transform = "vst", test_label_show = F)
 g1 <- plot_grid(p1, p2, ncol = 2, labels = LETTERS[1:2])
 g2 <- plot_grid(p3, p4, ncol = 2, labels = LETTERS[3:4])
 
