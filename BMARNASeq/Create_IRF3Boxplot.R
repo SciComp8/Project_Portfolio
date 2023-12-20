@@ -8,6 +8,7 @@ library(org.Hs.eg.db)
 library(tidyverse)
 library(readxl)
 options(scipen = 999) # Remove scientific notation
+# options(scipen = 0) # Revert to scientific notation
 
 ##------Map gene symbols to ENSEMBL IDs------
 ensembl.id <- bitr("IRF3", 
@@ -204,12 +205,12 @@ make_boxplot <- function(gene.symbol = "MTHFS",
 
 
 make_boxplot_2 <- function(gene.symbol = "MTHFS", 
-                         data.type = "train", 
-                         var.x = "BMI", 
-                         test.type = "wilcox.test",
-                         paired_comparisons_list = NULL,
-                         y_transform = c("origin", "log2", "vst"),
-                         test_label_show = TRUE) {
+                           data.type = "train", 
+                           var.x = "BMI", 
+                           test.type = "wilcox.test",
+                           paired_comparisons_list = NULL,
+                           y_transform = c("origin", "log2", "vst"),
+                           test_label_show = TRUE) {
   
   data_set <- get(paste0(gene.symbol, ".", data.type))
   data_set[["expr"]] <- data_set[["expr"]] + 0.5
