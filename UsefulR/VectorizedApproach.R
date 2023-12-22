@@ -4,6 +4,8 @@ cDEGs.mat <- matrix(0, nrow = no.cDEGs, ncol = 10)
 rownames(cDEGs.mat) <- cDEGs.all
 colnames(cDEGs.mat) <- c("BMAseq", "DESeq2_UVM", "DESeq2_MVM", "edgeR_UVM", "edgeR_MVM",
                          "eBayes_UVM", "eBayes_MVM", "voom.limma_UVM", "voom.limma_MVM", "Class")
+
+# Conventional for loop
 for (i in 1:no.cDEGs) { 
   if (cDEGs.all[i] %in% BMAseq.cDEGs) { 
     cDEGs.mat[i, 1] <- 1
@@ -37,7 +39,7 @@ for (i in 1:no.cDEGs) {
 t1 <- microbenchmark::get_nanotime()
 t1 - t0
 
-# 2x faster
+# 2x faster using vectorization
 t0 <- microbenchmark::get_nanotime()
 no.cDEGs <- length(cDEGs.all)
 cDEGs.mat.2 <- matrix(0, nrow = no.cDEGs, ncol = 10) 
