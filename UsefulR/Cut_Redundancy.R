@@ -115,6 +115,7 @@ multi_TMM_top_DESeq2_old <- function(seed.val = 999, threshold = 2000, use_train
 }
 
 # Concise code with 63 lines
+name.formula <- c("BMI_high_vs_low", "AGE_old_vs_young", "SEX_male_vs_female", "MHABNWBC_yes_vs_no") 
 run_DESeq2 <- function(cts, coldata, threshold) {
   lib.size <- colSums(cts)
   norm.factor <- calcNormFactors(cts, method = "TMM")
