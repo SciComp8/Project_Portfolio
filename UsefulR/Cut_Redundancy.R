@@ -154,11 +154,11 @@ run_DESeq2 <- function(cts, coldata, threshold) {
   return(list(res = res, eFDR = eFDR, eFDR2 = eFDR2, GeneName = GeneName))
 }
 
-multi_TMM_top_DESeq2_new <- function(seed.val = 999, threshold = 2000, use_train = TRUE) {
+multi_TMM_top_DESeq2_new <- function(seed.val = 999, threshold = 2000, use.train = TRUE) {
   results_train <- eFDR_train <- eFDR2_train <- GeneName_train <- NULL
   results_test <- eFDR_test <- eFDR2_test <- GeneName_test <- NULL
   
-  if (use_train) {
+  if (use.train) {
     result_train <- run_DESeq2(as.matrix(dat.expr.train), dat.pheno.train, threshold)
     results_train <- result_train$res
     eFDR_train <- result_train$eFDR
