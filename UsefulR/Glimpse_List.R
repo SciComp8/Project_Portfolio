@@ -1,3 +1,5 @@
+lapply(1:length(peak_all), function (i) peak_all[[i]] |> head(3))
+       
 for (i in 1:length(peak_all)) { print(peak_all[[i]] |> head(3)) }
 # GRanges object with 3 ranges and 0 metadata columns:
 #       seqnames          ranges strand
