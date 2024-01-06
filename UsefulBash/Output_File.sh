@@ -1,14 +1,17 @@
 #!/bin/bash
 
 fitdir="mdl-fits" 
-fitoutputdir="$fitdir/output" 
+output_dir="$fitdir/output" 
 
-mkdir -p "$fitdir" 
-mkdir -p "$fitoutputdir"
+mkdir -p "$fitdir/$fitoutputdir"
 
-i = $JOBINDEX
+i="$JOBINDEX"
+filename_base=".mdl-$i"
+output_file="$output_dir/$filename_base"
+error_file="$output_dir/.err.$filename_base"
 
-Rscript --vanilla mdl.fit.R $i >"$fitoutputdir/.mdl-$i" 2>"$fitoutputdir/.err.mdl-$i"
+Rscript --vanilla mdl.fit.R $i >"$output_file" 2>"$error_file"
+# >: redirect standard output; 2>: redirect standard error
 
 # in mdl.fit.R
 # args <- commandArgs(trailingOnly=T) 
