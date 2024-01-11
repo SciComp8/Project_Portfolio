@@ -1,4 +1,5 @@
-ssh aphrodite
+ssh username@aphrodite # On-campus login
+ssh username@aphrodite.med.cornell.edu # Off-camput login
 ssh curie.pbtech
 exit
 
