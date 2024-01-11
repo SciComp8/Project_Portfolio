@@ -1,5 +1,11 @@
 ssh aphrodite
 ssh curie.pbtech
+exit
+
+# Start an interactive session
+ssh curie.pbtech
+srun -n1 --pty --partition=panda --mem=16G bash -i
+exit
 
 # Create a job
 touch scRNAseq_job.sh
