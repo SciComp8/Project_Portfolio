@@ -47,5 +47,16 @@ spack load python@3.8.12%gcc@8.2.0
 #   Use a more specific spec (e.g., prepend '/' to the hash).
 spack load /kbqv5ik
 spack unload /kbqv5ik
+
+spack load bowtie2@2.3.5.1%gcc@8.2.0
+# ==> Error: bowtie2@2.3.5.1%gcc@8.2.0 matches multiple packages.
+#   Matching packages:
+#     tlj7iop bowtie2@2.3.5.1%gcc@8.2.0 arch=linux-centos7-broadwell
+#     ztcq4ql bowtie2@2.3.5.1%gcc@8.2.0 arch=linux-centos7-sandybridge
+#   Use a more specific spec (e.g., prepend '/' to the hash).
+spack load /ztcq4ql
+bowtie2
+
 spack unload # Unload all packages
 spack find --loaded # ==> 0 loaded packages
+
