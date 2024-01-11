@@ -2,18 +2,16 @@ ssh username@aphrodite.med.cornell.edu
 ssh curie.pbtech
 
 # Show the information of installed packages
-spack find 
+spack find # x
+spack find | less -R # Useful
+spack --color always find | less -R # Useful
+# SPACE: forward | b: backward | g: beginning | G: end | q: quit
 spack find python # x spack find py
 # -- linux-centos7-x86_64 / gcc@4.8.5 -----------------------------
 # python@3.5.0  python@3.8.12
 # -- linux-centos7-x86_64 / gcc@8.2.0 -----------------------------
 # python@3.8.12  python@3.8.12  python@3.9.12  python@3.9.15
 # x86_64
-
-spack list
-spack list | grep "^py-"
-spack list | grep "python"
-spack list | grep "bowtie"
 echo $PATH
 vim ~/.bashrc
 spack_target_find () {
@@ -27,6 +25,12 @@ spack_target_find py
 # py-six@1.12.0
 # python@3.7.6
 spack find -v -l python@3.7.6 # Varied hashes indicate the differences between installations of the same-version python
+
+# Show the information of available packages (packages.spack.io)
+spack list
+spack list | grep "^py-"
+spack list | grep "python"
+spack list | grep "bowtie"
 
 # Load/unload the python package
 spack load python@3.9.15%gcc@8.2.0 # version number: 3.9.15, compiler: gcc@8.2.0
