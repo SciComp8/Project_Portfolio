@@ -4,7 +4,16 @@ ssh curie.pbtech
 # Show the information of installed packages
 spack find 
 spack find python # x spack find py
+# -- linux-centos7-x86_64 / gcc@4.8.5 -----------------------------
+# python@3.5.0  python@3.8.12
+# -- linux-centos7-x86_64 / gcc@8.2.0 -----------------------------
+# python@3.8.12  python@3.8.12  python@3.9.12  python@3.9.15
+# x86_64
+
 spack list
+spack list | grep "^py-"
+spack list | grep "python"
+spack list | grep "bowtie"
 echo $PATH
 vim ~/.bashrc
 spack_target_find () {
@@ -20,10 +29,23 @@ spack_target_find py
 spack find -v -l python@3.7.6 # Varied hashes indicate the differences between installations of the same-version python
 
 # Load/unload the python package
-spack load python@3.9.15%gcc@8.2.0
+spack load python@3.9.15%gcc@8.2.0 # version number: 3.9.15, compiler: gcc@8.2.0
+spack find --loaded # View the loaded packages
 which python
 # /pbtech_mounts/software/spack/centos7/opt/spack/linux-centos7-x86_64/gcc-8.2.0/python-3.9.15-t253edbrqg3xsv3olujo5utfeb6ctade/bin/python
 python -V
 python help
-
 spack unload python@3.9.15%gcc@8.2.0
+
+spack load python@3.8.12%gcc@8.2.0
+# ==> Error: python@3.8.12%gcc@8.2.0 matches multiple packages.
+#   Matching packages:
+#     rern7pd python@3.8.12%gcc@8.2.0 arch=linux-centos7-haswell
+#     4mo5tkb python@3.8.12%gcc@8.2.0 arch=linux-centos7-haswell
+#     kbqv5ik python@3.8.12%gcc@8.2.0 arch=linux-centos7-x86_64
+#     qefl54h python@3.8.12%gcc@8.2.0 arch=linux-centos7-x86_64
+#   Use a more specific spec (e.g., prepend '/' to the hash).
+spack load /kbqv5ik
+spack unload /kbqv5ik
+spack unload # Unload all packages
+spack find --loaded # ==> 0 loaded packages
