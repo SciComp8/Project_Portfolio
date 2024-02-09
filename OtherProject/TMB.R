@@ -5,6 +5,12 @@ names(data_patient) <-
   sapply(strsplit(names(data_patient), split = "\\."), function(x)
     paste(x[x != ""], collapse = "."))
 
+names(data_patient) <- 
+  sapply(strsplit(names(data_patient), split = "\\."), "[", 2)
+
+names(data_patient) <- 
+  sapply(strsplit(names(data_patient), split = "\\."), "[", 3)
+
 data_sample <- read.delim("../data/raw/data_clinical_sample.txt")
 data_sample <- data_sample[-c(1:4), ]
 names(data_sample) <- 
