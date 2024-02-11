@@ -9,7 +9,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
 # Save and load images
 ```{r saveimage, eval=FALSE}
 image.date <- format(Sys.Date(), "%Y%b%d")
