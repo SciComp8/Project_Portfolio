@@ -54,5 +54,5 @@ if (is.null(file_path)) {
   all.cat
 }
 
-# Test optparse in the command line
-# anniliu@Angela-Excelsior-MacBook Desktop % Rscript optparse.R -f "/Users/Documents/data/derived/TNBC.RData
+# Test optparse in the terminal 2
+# Rscript optparse.R -f "/Users/Documents/data/derived/TNBC.RData
