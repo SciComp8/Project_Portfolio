@@ -12,6 +12,13 @@ opt_parser = OptionParser(option_list = option_list)
 # Use `parse_args()` to parse the command-line arguments
 opt = parse_args(opt_parser)
 
+# ! Ensure optparse is correctly parsing arguments
+if(exists("opt")) {
+  print("opt exists")
+} else {
+  print("opt does not exist")
+}
+
 # Extract the option values
 file_path = opt$file
 
@@ -55,4 +62,6 @@ if (is.null(file_path)) {
 }
 
 # Test optparse in the terminal 2
-# Rscript optparse.R -f "/Users/Documents/data/derived/TNBC.RData
+# Rscript optparse.R -f /Users/Documents/data/derived/TNBC.RData
+
+                    
