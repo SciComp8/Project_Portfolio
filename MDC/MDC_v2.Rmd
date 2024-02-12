@@ -91,9 +91,9 @@ data_full <- rbind(wcm_data, nypq_data)
 ## Recode variables
 ##------RaceEthnicity.1------
 # table(data_full$RaceEthnicity.1, useNA = "always")
-data_full$RaceEthnicity.1 <- gsub("Nhw|NHw", "NHW", 
-                                  gsub("Asian/Indian/ Pakistani", "Asian/Indian/Pakistani",
-                                       gsub("Afghan$", "Afghani",
+data_full$RaceEthnicity.1 <- gsub("Nhw|NHw", "NHW", # 3rd gsub run
+                                  gsub("Asian/Indian/ Pakistani", "Asian/Indian/Pakistani", # 2nd gsub run
+                                       gsub("Afghan$", "Afghani", # 1st gsub run
                                             data_full$RaceEthnicity.1)))
 
 ##------RaceEthnicity.2------
