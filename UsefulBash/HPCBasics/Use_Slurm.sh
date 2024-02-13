@@ -8,6 +8,9 @@ ssh curie.pbtech
 srun -n1 --pty --partition=panda --mem=16G bash -i
 exit
 
+# View the files and directories
+ls -alFhR 
+
 # Create a job
 touch scRNAseq_job.sh
 vim scRNAseq_job.sh
