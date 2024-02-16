@@ -12,8 +12,9 @@ squeue -u username -p=panda
 sacct 
 sacct -j 11114265
 sacct -r panda
+scontrol show job 53362163
 
 # Cancel/pause/resume jobs
-scancel 11114268
+scancel 11114268 # !
 scontrol hold 11114269
 scontrol release 11114269
