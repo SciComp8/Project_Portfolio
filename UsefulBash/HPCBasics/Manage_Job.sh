@@ -2,7 +2,7 @@
 squeue --help
 squeue -u username -l #!
 # JOBID PARTITION     NAME     USER    STATE       TIME TIME_LIMI  NODES NODELIST(REASON)
-squeue -u username --states=COMPLETED
+squeue -u username --states=COMPLETED # !
 squeue -u username --states=RUNNING # !
 squeue -u username --states=PENDING # !
 squeue -u username --states=SUSPENDED
