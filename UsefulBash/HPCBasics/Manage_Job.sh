@@ -1,6 +1,6 @@
-# Show the info of current jobs
+# View the information of CURRENT jobs
 squeue --help
-squeue -u username -l #!
+squeue -u username -l # ! 
 # JOBID PARTITION     NAME     USER    STATE       TIME TIME_LIMI  NODES NODELIST(REASON)
 squeue -u username --states=COMPLETED # !
 squeue -u username --states=RUNNING # !
@@ -8,7 +8,7 @@ squeue -u username --states=PENDING # !
 squeue -u username --states=SUSPENDED
 squeue -u username -p=panda
 
-# Show the info of past jobs
+# View the information of PAST jobs
 sacct 
 sacct -j 11114265
 # JobID    JobName  Partition    Account  AllocCPUS      State ExitCode
@@ -22,5 +22,6 @@ scontrol show job 53362163
 
 # Cancel/pause/resume jobs
 scancel 11114268 # !
+scancel 53367475 53367476 
 scontrol hold 11114269
 scontrol release 11114269
