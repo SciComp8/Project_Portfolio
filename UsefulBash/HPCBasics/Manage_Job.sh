@@ -11,7 +11,10 @@ squeue -u username --states=SUSPENDED
 squeue -u username -p=panda
 
 # View the information of PAST jobs
-sacct 
+sacct # ! 
+#       JobID    JobName  Partition    Account  AllocCPUS      State ExitCode
+# ------------ ---------- ---------- ---------- ---------- ---------- --------
+# 53370733_100 scRNA_seq   panda       mdhpc         16       COMPLETED      0:0
 sacct -j 11114265
 # JobID    JobName  Partition    Account  AllocCPUS      State ExitCode
 sacct -r panda
