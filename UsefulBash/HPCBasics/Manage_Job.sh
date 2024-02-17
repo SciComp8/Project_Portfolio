@@ -1,7 +1,8 @@
 # View the information of CURRENT jobs
 squeue --help
 squeue -u username -l # ! 
-# JOBID PARTITION     NAME     USER    STATE       TIME TIME_LIMI  NODES NODELIST(REASON)
+# JOBID      PARTITION     NAME        USER      STATE       TIME   TIME_LIMI    NODES  NODELIST(REASON)
+# 53370733_9  panda      scRNA_seq   your_name  RUNNING       6:30   UNLIMITED      1    node212
 
 squeue -u username --states=COMPLETED # !
 squeue -u username --states=RUNNING # !
