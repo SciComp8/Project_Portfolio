@@ -1,10 +1,10 @@
 bio_pkgs <- c("GenomicRanges", "Rsamtools", "rtracklayer", "GenomicAlignments", "ShortRead")
 gen_pkgs <- c("ggplot2")
 for (pkg in c(bio_pkgs, gen_pkgs)) {
-  if (!require(pkg, character.only = T) & (pkg %in% bio_pkgs)) {
+  if (!require(pkg, character.only = T, quietly = T) & (pkg %in% bio_pkgs)) {
     BiocManager::install(pkg)
     library(pkg, character.only = T)
-  } else if (!require(pkg, character.only = T) & (pkg %in% gen_pkgs)) {
+  } else if (!require(pkg, character.only = T, quietly = T) & (pkg %in% gen_pkgs)) {
     install.packages(pkg)
     library(pkg, character.only = T)
   } else {
