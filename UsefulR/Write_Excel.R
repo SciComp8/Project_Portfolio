@@ -1,0 +1,8 @@
+wb <- createWorkbook()
+addWorksheet(wb, "A")
+addWorksheet(wb, "B")
+writeData(wb, sheet = 1, data_A1,  startRow = 1, startCol = 1)
+writeData(wb, sheet = 1, data_A2, startRow = 1, startCol = 17)
+writeData(wb, sheet = 2, data_B1,  startRow = 1, startCol = 1)
+writeData(wb, sheet = 2, data_B2, startRow = 1, startCol = 17)
+saveWorkbook(wb, "../result/outcome.xlsx", overwrite = TRUE)
