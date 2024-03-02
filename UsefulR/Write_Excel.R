@@ -1,3 +1,6 @@
+# https://ycphs.github.io/openxlsx/articles/Introduction.html
+# https://ycphs.github.io/openxlsx/articles/Formatting.html
+
 wb <- createWorkbook()
 addWorksheet(wb, "data_A1")
 addWorksheet(wb, "data_A2")
