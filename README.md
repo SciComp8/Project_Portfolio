@@ -9,7 +9,7 @@ This repository compiles my programming work affiliated with collaborative and i
 * [Chemical perturbation response in the single cell omics space](#Predict-chemical-perturbation-response-in-the-single-cell-omics-space)
 * [Bayesian model averaging for RNA-Seq count data](#Bayesian-model-averaging-for-RNA-Seq-count-data)
 * [Statistical analysis for breast cancer surgery data](#Statistical-analysis-for-breast-cancer-surgery-data)
-* [Differential expression analysis pipeline for single cell data](#Differential-expression-analysis-pipeline-for-single-cell-data)
+* [Differential expression analysis pipeline for B cell data](#Differential-expression-analysis-pipeline-for-B-cell-data)
 * [Bayesian integrative clustering for multi-omics data](#Bayesian-integrative-clustering-for-multi-omics-data)
 * [Lipidomics and transcriptomics analysis](#Lipidomics-and-transcriptomics-analysis)
 
