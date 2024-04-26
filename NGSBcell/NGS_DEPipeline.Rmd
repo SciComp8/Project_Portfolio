@@ -6,7 +6,7 @@ output:
   rmdformats::downcute:
     downcute_theme: "chaos"
     fig_height: 4.5
-    fig_width: 4.5
+    fig_width: 4.5 
 ---
 
 ```{r setup, include=FALSE}
