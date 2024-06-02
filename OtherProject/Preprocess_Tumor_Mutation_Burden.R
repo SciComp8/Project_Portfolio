@@ -17,7 +17,7 @@ names(data_sample) <-
   sapply(strsplit(names(data_sample), split = "\\."), function(x)
     paste(x[x != ""], collapse = "."))
 
-data_genepanel <- read.delim("../data/raw/data_gene_panel_matrix.txt") # not valuable
+data_genepanel <- read.delim("../data/raw/data_gene_panel_matrix.txt") 
 
 data_mutation <- read.delim("../data/raw/data_mutations.txt") # tumor sample barbode = sample identifier 
 
