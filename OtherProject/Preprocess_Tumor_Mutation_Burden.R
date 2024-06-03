@@ -1,5 +1,5 @@
 ## Load all data
-data_patient <- read.delim("../data/raw/data_clinical_patient.txt")
+data_patient <- read.delim("../data/raw/data_clinical_patient.txt") # Clinical phenotypic data
 data_patient <- data_patient[-c(1:4), ]
 names(data_patient) <- 
   sapply(strsplit(names(data_patient), split = "\\."), function(x)
@@ -11,7 +11,7 @@ names(data_patient) <-
 names(data_patient) <- 
   sapply(strsplit(names(data_patient), split = "\\."), "[", 3)
 
-data_sample <- read.delim("../data/raw/data_clinical_sample.txt")
+data_sample <- read.delim("../data/raw/data_clinical_sample.txt") # Sequencing meta data
 data_sample <- data_sample[-c(1:4), ]
 names(data_sample) <- 
   sapply(strsplit(names(data_sample), split = "\\."), function(x)
@@ -19,9 +19,9 @@ names(data_sample) <-
 
 data_genepanel <- read.delim("../data/raw/data_gene_panel_matrix.txt") 
 
-data_mutation <- read.delim("../data/raw/data_mutations.txt") # tumor sample barbode = sample identifier 
+data_mutation <- read.delim("../data/raw/data_mutations.txt") # Mutation datatumor; sample barbode = sample identifier 
 
-data_sv <- read.delim("../data/raw/data_sv.txt") # sample identifier
+data_sv <- read.delim("../data/raw/data_sv.txt") # Structural variation data; sample identifier
 # unique(data_sv$Sample_Id) # 285 unique samples 
 
 ## Merge all necessary data
