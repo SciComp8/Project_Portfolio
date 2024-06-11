@@ -1,3 +1,7 @@
+# Ref:
+# https://scanpy.readthedocs.io/en/latest/generated/scanpy.pp.calculate_qc_metrics.html
+# https://scanpy.readthedocs.io/en/stable/generated/scanpy.pp.log1p.html
+
 import numpy as np 
 import pandas as pd # pip install pyarrow
 import scanpy as sc # pip install numpy==1.25
