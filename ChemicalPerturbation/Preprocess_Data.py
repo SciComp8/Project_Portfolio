@@ -64,7 +64,10 @@ adata
 
 adata.var['mt'] = adata.var_names.str.startswith('MT-')
 np.count_nonzero(adata.var['mt']) # 37
-sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=[20], log1p=True, inplace=True)
+sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=[20], log1p=True, inplace=True) 
+# Percentage of counts in mitochondrial genes
+# percent_top=[20]: finds cumulative proportion to the 20th most expressed mitochondrial genes
+# log1p: Computes log(x + 1) where log denotes the natural logarithm unless a different base is given
 adata
 
 sc.pl.violin(adata, keys='n_genes_by_counts', jitter=0.5)
