@@ -39,7 +39,7 @@ easypackages::libraries("tidyverse", "ggpubr", "gridExtra", "broom", "circlize",
 ```
 
 ```{r}
-lipid_structure <- readRDS("lipid_structure.RDS")
+lipid_structure <- readRDS("lipid_structure.RDS") 
 ```
 
 # Data preprocess for lipidomics
