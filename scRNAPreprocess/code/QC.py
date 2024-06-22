@@ -114,7 +114,7 @@ for sra_id, color_i in zip(sra_list, color):
     mtx = mtx_dic[sra_id]
     knee = np.sort((np.array(mtx.sum(axis=1))).flatten())[::-1]
     cell_set = np.arange(len(knee))
-    num_cells = cell_set[knee > cutoff][::-1][0]
+    num_cells = cell_set[knee > cutoff][::-1][0] # Select cells passint the count depth threshold
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))    
     
