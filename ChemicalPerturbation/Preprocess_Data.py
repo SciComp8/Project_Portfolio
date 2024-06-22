@@ -80,15 +80,13 @@ sc.pl.violin(adata, keys='pct_counts_mt', jitter=0.5)
 sc.pl.scatter(adata, x='total_counts', y='pct_counts_mt')
 sc.pl.scatter(adata, x='total_counts', y='n_genes_by_counts')
 
-def is_outlier(adata, metric: str, nmads: int):
+def is_outlier(adata, metric: str, n_mads: int):
     M = adata.obs[metric]
-    outlier = (M < np.median(M) - nmads * median_abs_deviation(M)) | (
-        np.median(M) + nmads * median_abs_deviation(M) < M
-    )
+    outlier = (M < np.median(M) - n_mads * median_abs_deviation(M)) | (M > np.median(M) + nmads * median_abs_deviation(M))
     return outlier
 
 adata.obs["outlier"] = (
-    is_outlier(adata, "log1p_total_counts", 5)
+    is_outlier(adata, "log1p_total_counts", 5) # Differing by 5 MADs is a relatively lenient filtering criterion
     | is_outlier(adata, "log1p_n_genes_by_counts", 5)
     | is_outlier(adata, "pct_counts_in_top_20_genes", 5)
 )
