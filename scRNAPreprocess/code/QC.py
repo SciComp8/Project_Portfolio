@@ -44,7 +44,7 @@ warnings.filterwarnings("ignore")
 color = itertools.cycle(sns.color_palette("rocket", 5))
 mtx_dic = {}
 
-print("\n~~~Visulizing the low-dimensional representation of cells...~~~")
+print("\n~~~Visualizing the low-dimensional representation of cells...~~~")
 for sra_id, color_i in zip(sra_list, color):
 
     # Import cells x genes matrix
@@ -91,7 +91,7 @@ for sra_id, color_i in zip(sra_list, color):
     print("\n")
 
 
-print("\n~~~Visulizing the genes detected as a function of UMI counts...~~~")
+print("\n~~~Visualizing the genes detected as a function of UMI counts...~~~")
 for sra_id, color_i in zip(sra_list, color):
     fig, ax = plt.subplots(figsize=(4, 4))
     mtx = mtx_dic[sra_id]
@@ -108,7 +108,7 @@ for sra_id, color_i in zip(sra_list, color):
     plt.savefig("../result_b/figure/gene_UMIcount_{}.png".format(sra_id))
     print("Complete the plotting for: " + sra_id + "\n")
 
-print("\n~~~Visulizing the knee plot...~~~")
+print("\n~~~Visualizing the knee plot...~~~")
 cutoff = 200
 for sra_id, color_i in zip(sra_list, color):
     mtx = mtx_dic[sra_id]
