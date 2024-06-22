@@ -114,7 +114,7 @@ for sra_id, color_i in zip(sra_list, color):
     mtx = mtx_dic[sra_id]
     knee = np.sort((np.array(mtx.sum(axis=1))).flatten())[::-1]
     cell_set = np.arange(len(knee))
-    num_cells = cell_set[knee > cutoff][::-1][0] # Select cells passint the count depth threshold
+    num_cells = cell_set[knee > cutoff][::-1][0] # Select cells passint the count depth (UMI) threshold
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))    
     
@@ -139,10 +139,12 @@ for sra_id, color_i in zip(sra_list, color):
 
 mtx_filtered_dic = {}
 for sra_id in sra_list:
-    mtx = mtx_dic[sra_id]
-    row_mask = np.asarray(mtx.sum(axis=1)>30).reshape(-1)
-    col_mask = np.asarray(mtx.sum(axis=0)>0).reshape(-1)
+    mtx = mtx_dic[sra_id] # Retrieve the count matrix
+    row_mask = np.asarray(mtx.sum(axis=1)>30).reshape(-1) # Remove cells with <=30 UMI counts
+    col_mask = np.asarray(mtx.sum(axis=0)>0).reshape(-1) # Remove genes with 0 expression
     mtx_filtered_dic[sra_id] = mtx[row_mask,:][:,col_mask]
+    # Succinct code: 
+    # mtx_filtered_dic[sra_id] = mtx[np.asarray(mtx.sum(axis=1)).reshape(-1) > 30, np.asarray(mtx.X.sum(axis=0)).reshape(-1) > 0]
     print("\n~~~Filtering the cells x genes count by a threshold for: " + sra_id + "...~~~")
     print("Before filtering ... ")
     print(mtx_dic)
