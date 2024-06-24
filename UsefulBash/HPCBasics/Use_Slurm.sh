@@ -1,3 +1,7 @@
+# References: 
+# https://www.maths.cam.ac.uk/computing/minimal-slurm-faq-maths-users
+# https://slurm.schedmd.com/documentation.html
+
 ssh username@aphrodite # On-campus login
 ssh username@aphrodite.med.cornell.edu # Off-camput login
 ssh curie.pbtech
