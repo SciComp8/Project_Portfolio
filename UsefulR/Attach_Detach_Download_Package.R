@@ -16,3 +16,5 @@ a = "GenomicRanges"
 library(a)
 # Error in library(a) : there is no package called ‘a’
 library(a, character.only = T)
+
+detach('package:clusterProfiler', unload = T)
