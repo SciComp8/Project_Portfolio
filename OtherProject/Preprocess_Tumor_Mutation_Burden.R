@@ -27,7 +27,7 @@ data_sv <- read.delim("../data/raw/data_sv.txt") # Structural variation data; sa
 ## Merge all necessary data
 data_full <- merge(x = data_patient, 
                    y = data_sample, 
-                   by.x = "X.Patient.Identifier", 
+                   by.x = "X.Patient.Identifier",  
                    by.y = "X.Patient.Identifier")
 
 data_full <- merge(x = data_full,
