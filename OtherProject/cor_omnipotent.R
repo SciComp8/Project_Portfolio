@@ -1,6 +1,6 @@
 easypackages::libraries("tidyverse", "readxl", "gtsummary", "flextable", "stringi", "fst", "broom", "labelled", "data.table", "BTKR", "corrr", "multcomp", "survival", "GGally") |> suppressPackageStartupMessages() |> suppressPackageStartupMessages()
 
-cor_omnipotent <- function(var_y = "BMI",
+cor_omnipotent <- function(var_y = "BMI", 
                            y_label = "Body mass index",
                            data_set = data_set,
                            var_focus = c("BMI",
