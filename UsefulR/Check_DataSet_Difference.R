@@ -1,3 +1,7 @@
+# Check differences in 2 R dataframe objects
+any(df_1 != df_2)
+
+# Check differences in 2 spreadsheets
 library(daff)
 Microcalcs.v5 <- readxl::read_xlsx(
   "../data/raw/Coded Microcalcs v5 offline.xlsx",
