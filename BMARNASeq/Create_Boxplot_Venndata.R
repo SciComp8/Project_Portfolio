@@ -1,7 +1,7 @@
 easypackages::libraries("BMAseq", "limma", "qvalue", "parallel", "tidyverse", "edgeR", "DESeq2", "data.table", "ggVennDiagram", "gridExtra", "openxlsx", "cowplot") |> 
   suppressPackageStartupMessages()
 Bayesfactor <- BMAseq:::Bayesfactor
-
+ 
 threshold.vec <- 5000
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
 var.vec <- c("BMI", "AGE", "SEX", "MHABNWBC")
