@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set path variables
-dir=/path/to/working/directory
+dir=/path/to/working/directory 
 fastq_dir=$dir/data/samples
 trim_dir=$dir/trimmed_reads
 kallisto_dir=$dir/kallisto_results
