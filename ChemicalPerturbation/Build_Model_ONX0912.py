@@ -1,5 +1,5 @@
 """
-Predict the perturbation effect of onx0912 
+Predict the perturbation effect of the chemical compound onx0912 
 """
 
 pip install anndata==0.9.2
