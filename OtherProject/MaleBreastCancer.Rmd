@@ -170,8 +170,6 @@ if (params$results.folder) { # Suitable when the results need to be stored outsi
     dir.create(dir.result)
   }
 }
-
-loc.perl <- "C:/cygwin64/bin/perl"
 ```
 
 
