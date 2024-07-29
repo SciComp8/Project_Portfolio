@@ -1,8 +1,8 @@
 ---
-title: "Multidisciplinary breast program in New York City - Predictive Modeling"
+title: "Multidisciplinary breast program in New York City - Predictive Modeling" 
 author: "Anni Liu"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
-knit: knitautomator::knit_filename
+knit: knitautomator::knit_filename 
 output:
   word_document:
     fig_caption: no
