@@ -3,7 +3,7 @@ title: "Triple Negative Breast Cancer Data Analysis"
 author: "Anni Liu"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 knit: knitautomator::knit_filename
-output:
+output: 
   word_document:
     fig_caption: no
     highlight: null
