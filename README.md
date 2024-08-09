@@ -40,6 +40,7 @@ One of the fundamental research problems in bulk or single-cell transcriptomic s
 
 - [TNBC_v1.Rmd](TNBC/TNBC_v1.Rmd)
 - [TNBC_v2.Rmd](TNBC/TNBC_v2.Rmd)
+- [TNBC_v3.Rmd](TNBC/TNBC_v3.Rmd)
 - [MachineLearningPipeline.py](TNBC/MachineLearningPipeline.py)
 - [TNBC_StatisticalPlan.md](TNBC/TNBC_StatisticalPlan.md)
 
