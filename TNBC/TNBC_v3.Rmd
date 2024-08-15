@@ -84,9 +84,21 @@ if (params$results.folder) { # Suitable when the results need to be stored outsi
 ```
 
 
-```{r check_data, include=F}
+```{r fast_check_data, include=F}
 ##------Load preprocessed data------
-dat.work <- read_fst(path = "../data/derived/2023Mar26_dat_TNBC.RData")
+dat.work <- read_fst(path = "../data/derived/2024Aug15_dat_TNBC.RData")
+
+a <- subset(dat.work, SBE.event == 1)
+table(a$Any.Attempt.at.Lumpectomy, useNA = "ifany")
+table(a$Mastectomy.Surgery, a$CPM, useNA = "ifany")
+table(a$Mammo.Screen.Detected, useNA = "ifany")
+table(a$MRI.Screen.Detected, useNA = "ifany")
+table(a$Histology.Subsequent, useNA = "ifany")
+
+b <- subset(dat.work, Genetic.Testing.Results %in% c("BRCA1", "BRCA2", "BRCA1/2", "BRCA"))
+table(b$SBE.event, useNA = "ifany")
+c <- subset(dat.work, Genetic.Testing.Results == "BRCA1/2 negative")
+table(c$SBE.event, useNA = "ifany")
 ```
 
 
@@ -134,12 +146,80 @@ dat0[,Genetic.Testing.Results:=Genetic.Testing.Result.s]
 dat0[,Overall.Subsequent.BC:=Any.Subsequent.BC.event]
 
 
-##------Recode Tumor.Size.by.Path------
+##------Recode variables------
 dat0[,Tumor.Size.by.Path:=case_when(Tumor.Size.by.Path == "<0.1" ~ "0.05", Tumor.Size.by.Path == "<1" ~ "0.9", TRUE ~ Tumor.Size.by.Path) |> as.numeric()]
 # typeof(dat0$Tumor.Size.by.Path)
 
+dat0[, Genetic.Testing.Results:=case_when(Genetic.Testing.Results == "BRCA positive" ~ "BRCA",
+                                          ###BRCA1
+                                          Genetic.Testing.Results == "5385incC BRCA1 deleterious" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA 1 +" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA 1 del exons 21-24" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA 1 positive" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA 1 positive  182 del AG" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA 1 positive  187 dell AG mutation" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA 1 postitive" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA 1 postitive." ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA 1+   4160 DelAG" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA1 gene mutation" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA1 positive" ~ "BRCA1",
+                                          Genetic.Testing.Results == "BRCA1 positive (187delAG)" ~ "BRCA1",
+                                          Genetic.Testing.Results == "Negative for BRCA1 and BRCA2 in 2007 - retested in 2017 and found to be positive for BRCA1" ~ "BRCA1",
+                                          Genetic.Testing.Results == "Positive for BRCA1" ~ "BRCA1",
+                                          Genetic.Testing.Results == "Positive for BRCA1 mutation" ~ "BRCA1",
+                                          ###BRCA1 VUS
+                                          Genetic.Testing.Results == "Genetic variant of BRCA 1 of unknown significance" ~ "BRCA1 VUS",
+                                          ###BRCA1/2
+                                          Genetic.Testing.Results == "BRCA 1/2 positive" ~ "BRCA1/2",
+                                          ###BRCA1/2 negative
+                                          Genetic.Testing.Results == "BRCA 1-2, ATM, CDH1, CHEK2, PALB2, PTEN, TP53 were all negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA 1/2 and BART negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "brca 1/2 negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA 1/2 negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA 1/2 Negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA 1/2 NEGATIVE" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA 1/2 Negative  25 gene susceptibility mutations negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA 1/2 negative  Negative 40 genes" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA 1/2 negative  PTEN variant of unknown significance" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "brca negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA negative but (+)APC mutation" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA. negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA1 mutation carrier" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA1 negative; BRCA2 polymorphism" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA1 PMUS" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA1/2 and CHEK2 negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "BRCA1/2 negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "MYD88 not detected" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "Negative" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "Negative for BRCA1 and BRCA2" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "Negative for BRCA1/2" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "Negative per patient" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "no BRCA detected" ~ "BRCA1/2 negative",
+                                          Genetic.Testing.Results == "No mutation detected" ~ "BRCA1/2 negative",
+                                          ###BRCA2
+                                          Genetic.Testing.Results == "BRCA 2 mutation" ~ "BRCA2",
+                                          Genetic.Testing.Results == "BRCA 2 mutation c.1854delCinsAA" ~ "BRCA2",
+                                          Genetic.Testing.Results == "BRCA 2 positive" ~ "BRCA2",
+                                          Genetic.Testing.Results == "BRCA2 mutation (6174 del T)" ~ "BRCA2",
+                                          ###BRCA2 VUS
+                                          Genetic.Testing.Results == "BRCA 2 mutation of unknown significance" ~ "BRCA2 VUS",
+                                          Genetic.Testing.Results == "BRCA 2 of unknown significance" ~ "BRCA2 VUS",
+                                          Genetic.Testing.Results == "BRCA 2 VUS" ~ "BRCA2 VUS",
+                                          Genetic.Testing.Results == "Variant in BRCA2 known as I2285V" ~ "BRCA2 VUS",
+                                          Genetic.Testing.Results == "VUS in BRCA2" ~ "BRCA2 VUS",
+                                          ###CHEK VUS
+                                          Genetic.Testing.Results == "Low penetrance CHEK  Variants of uncertain significance RB1, SMAD4, TSC2" ~ "CHEK VUS",
+                                          ###CHEK2
+                                          Genetic.Testing.Results == "positive for a mutation of low penetrance in the CHEK2 gene" ~ "CHEK2",
+                                          ###CHEK2 VUS
+                                          Genetic.Testing.Results == "26 genes on 10/25/18 revealed possibly mosaic, likely pathogenic variant identified in CHEK2. Variants of Uncertain Significance were identified in the genes APC and MSH6 (APC gene c.2110G>A and MSH6 gene c.965C>A)." ~ "CHEK2 VUS",
+                                          ###Unknown
+                                          Genetic.Testing.Results == "Ashkenazi Jewish, no breast, ovarian, or colorectal cancers, mat cousin leukemia, father prostate ca" ~ "Unknown",
+                                          TRUE ~ Genetic.Testing.Results)]
 
-##------Reorder the variables------
+
+##------Reorder variables------
 dat0[,First.Treatment.Modality:=factor(First.Treatment.Modality, levels=c("Surgery", "CTX", "XRT", "Declined All Tx", "Deemed Untreatable"))]
 dat0[,Postop.Adjuvant.XRT:=factor(Postop.Adjuvant.XRT, levels=c("Breast XRT", "Breast/Regional XRT", "PMRT", "No"))]
 # sapply(c("First.Treatment.Modality", "Postop.Adjuvant.XRT"), function(x) levels(dat0[[x]]))
