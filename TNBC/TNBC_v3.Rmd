@@ -90,7 +90,8 @@ dat.work <- read_fst(path = "../data/derived/2024Aug15_dat_TNBC.RData")
 
 a <- subset(dat.work, SBE.event == 1)
 table(a$Any.Attempt.at.Lumpectomy, useNA = "ifany")
-table(a$Mastectomy.Surgery, a$CPM, useNA = "ifany")
+table(Mastectomy=a$Mastectomy.Surgery, CPM=a$CPM, useNA = "ifany")
+
 table(a$Mammo.Screen.Detected, useNA = "ifany")
 table(a$MRI.Screen.Detected, useNA = "ifany")
 table(a$Histology.Subsequent, useNA = "ifany")
@@ -99,6 +100,16 @@ b <- subset(dat.work, Genetic.Testing.Results %in% c("BRCA1", "BRCA2", "BRCA1/2"
 table(b$SBE.event, useNA = "ifany")
 c <- subset(dat.work, Genetic.Testing.Results == "BRCA1/2 negative")
 table(c$SBE.event, useNA = "ifany")
+
+d <- subset(a, Mastectomy.Surgery %in% c("No", "Yes") & CPM == "No")
+table(Ipsilateral=d$Past.Ipsilateral.Br.CA, Contralateral=d$Past.Contralateral.Br.CA, useNA = "ifany")
+d[which(d$Past.Ipsilateral.Br.CA=="Yes" & d$Past.Contralateral.Br.CA=="Yes"), ]$ID
+
+e <- subset(a, CPM == "Yes")
+table(e$SBE.HR, useNA ="ifany")
+table(e$SBE.ER, e$SBE.PR, e$SBE.HER2, useNA ="ifany")
+subset(e, SBE.ER=="SBEYesERNeg" & SBE.PR=="SBEYesPRNeg" & SBE.HER2=="SBEYesHER2Neg") |> nrow()
+subset(e, SBE.HR=="SBEYesHRPos") |> nrow()
 ```
 
 
