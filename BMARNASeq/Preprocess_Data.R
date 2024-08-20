@@ -161,7 +161,7 @@ var_13 <- c('SEX', 'AGE', 'BMI', 'MHABNWBC', 'MHARTHTS',
             'MHASTHMA', 'MHBCTINF', 'MHBLDDND', 'MHCOCAINE5', 
             'MHCOPD', 'MHCVD', 'MHDRNKSTS', 'SMTSPAX')
 
-# MHABNWBC: normal or abnormal white blood cell
+# MHABNWBC: has normal or abnormal white blood cells
 # MHARTHTS: has arthritis or not
 # MHASTHMA: has asthma or not 
 # MHBCTINF: has bacterial infections or not
