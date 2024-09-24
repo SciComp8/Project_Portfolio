@@ -1,7 +1,7 @@
 # Statistical Analysis Plan for Triple Negative Breast Cancer Project
 
 
-We will include 604 patients of 24-92 years of age who were diagnosed with the triple negative breast cancer (TNBC) at Weill Cornell Medicine between 1981 and 2017. 
+We will include 604 patients of 24-92 years of age who were diagnosed with the triple negative breast cancer (TNBC) at Institute XYZ between 1981 and 2017. 
 
 The **primary goal** for this study is to estimate the percentage of patients manifesting the estrogen receptor (ER)-positive, progesterone receptor (PR)-positive, or human epidermal growth factor receptor 2 (HER2)-positive among the patients who are diagnosed with a subsequent breast cancer event during the entire follow-up time, as well as the cumulative incidence rates of ER, PR, or HER2-specific subsequent breast cancer events in 1, 2, 3, 5, 6, and 10 years, respectively. We will also estimate the median of follow-up time in the entire cohort; the median time to the overall subsequent breast cancer events from the initial diagnosis of TNBC; the frequency of the overall subsequent breast cancer events; and the incidence rates of the overall subsequent breast cancer events in 1, 2, 3, 5, 6, and 10 years, respectively.
 
