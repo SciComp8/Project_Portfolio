@@ -1,0 +1,218 @@
+---
+title: "HER2 Survival Analysis"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+knit: knitautomator::knit_filename
+output:
+  word_document:
+    fig_caption: no
+    highlight: null
+    toc: yes
+    reference_docx: manuscript_style_V0.docx
+params:
+  date.analysis: !r format(Sys.Date(), "%Y%b%d")
+  plot.fig: TRUE
+  results.folder: FALSE
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r shortcut, include=FALSE}
+#################################################################
+##                  RStudio keyboard shortcut                  ##
+#################################################################
+# Cursor at the beginning of a command line: Ctrl+A
+# Cursor at the end of a command line: Ctrl+E
+# Clear all the code from your console: Ctrl+L
+# Create a pipe operator %>%: Ctrl+Shift+M (Windows) or Cmd+Shift+M (Mac)
+# Knit a document (knitr): Ctrl+Shift+K (Windows) or Cmd+Shift+K (Mac)
+# Comment or uncomment current selection: Ctrl+Shift+C (Windows) or Cmd+Shift+C (Mac)
+```
+
+```{r download_attach_lib_func, include=F}
+##------Download libraries------
+bio_pkgs <- c("DESeq2", "edgeR", "msigdbr", "fgsea", "ComplexHeatmap")
+gen_pkgs <- c("bannerCommenter", "tidycmprsk", "ggsurvfit", "fst")
+for (pkg in c(bio_pkgs, gen_pkgs)) {
+  if (!require(pkg, character.only = T) & (pkg %in% bio_pkgs)) {
+    BiocManager::install(pkg)
+    library(pkg, character.only = T)
+  } else if (!require(pkg, character.only = T) & (pkg %in% gen_pkgs)) {
+    install.packages(pkg)
+    library(pkg, character.only = T)
+  } else {
+    library(pkg, character.only = T)
+  }
+} 
+
+##------Attach libraries & functions------
+easypackages::libraries("multcomp", "BTKR", "readxl", "tidyverse", 
+                        "bannerCommenter", "parallel", "formatR",
+                        "survminer", "tidycmprsk", "ggsurvfit", "survRM2",
+                        "ragg", "magrittr",
+                        "foreach", "future.apply", "fst", "data.table", 
+                        "janitor", "Hmisc") |> suppressPackageStartupMessages()
+"%_%" <- function(m, n) paste0(m, "_", n)
+"%0%" <- function(m, n) paste0(m, n)
+
+walk(c("uni.coxph.R", "fcphuni.stat2.R", "fcphuni.tbl2.R"), source)
+```
+
+# Key variable distribution
+```{r quick_check}
+dat_work <- read_fst(path = "../Data/Derived/2024Oct09_dat_HER2.RData")
+as.data.frame(table(dat0$event_pfs, useNA = "ifany")) |>
+  rename("PFS event (0=no progression/death, 1=progression/death)" = Var1)
+as.data.frame(table(dat0$event_os)) |>
+  rename("OS event (0=no death, 1=death)" = Var1)
+summary(dat0$time_pfs/365.25*12) # in months
+summary(dat0$time_os/365.25*12)
+as.data.frame(table(dat0$dx_grade_f, useNA = "ifany")) |>
+  rename("HER2 group (2=moderate diff, 3=poor diff, 99=miss)" = Var1)
+as.data.frame(table(dat0$category_ish_f, useNA = "ifany")) |>
+  rename("HER2 group (0=homo+highHER2, 1=homo+lowHER2, 2=hetero)" = Var1)
+```
+
+```{r clean_data_start, eval=FALSE, include=FALSE}
+##------Load the original spreadsheet------
+dat0 <- readxl::read_xlsx(
+  "../Data/Raw/Book 77 pts with clinical.xlsx", # \ escape
+  col_names = T,
+  na = c("Unknown", "unknown", "N/A", "n/a")
+) 
+dim(dat0) # 77
+
+##------Clean the column names------
+dat0 <- dat0 |>
+  janitor::clean_names()
+names(dat0)
+names(dat0)[8] <- "1st_line_chemotherapy_used_for_metastatic_disease"
+names(dat0)[12] <- "event"
+names(dat0)[15] <- "tdxd_trastuzumab_deruxtecan_enhertu_received_y_n"
+label(dat0$event) <- "reason_to_stop_1st_line_chemotherapy_1_progression_2_toxicity_3_transition_to_definitive_therapy_4_death_5_other_6_censor_loss_7_censor_due_to_ongoing_therapy_8_transition_to_treatment_break"
+
+##------Recode variables------
+dat0 <- as.data.table(dat0)
+##------PFS variables------
+table(dat0$alive_or_dead_at_last_follow_up, dat0$event, useNA="ifany")
+  #        1  2  3  4  5  6  7  8
+  # Alive  4  1  2  0  0  3  3  0
+  # Dead  38  8  2  4  2  9  0  1
+which(dat0$alive_or_dead_at_last_follow_up=="Dead" & dat0$event==1) |> length()
+
+# as.numeric(as.Date("2012-06-15")-as.Date("2011-10-06")) # MRN=3
+# as.numeric(as.Date("2023-07-11")-as.Date("2022-06-03"))
+
+dat0[,event_pfs:=if_else(condition = (event %in% c(1,4)), 1, 0, missing = NA)]
+table(dat0$event_pfs, dat0$event)
+dat0[,time_pfs:=case_when(
+  event_pfs==0 ~ as.numeric(as.Date(dat0$date_of_stopping_1st_line_chemotherapy_regimen_for_metastatic_disease)-as.Date(dat0$date_of_initiation_of_1st_line_chemotherapy_regimen_for_metastatic_disease)),# Censor
+  event==1 ~ as.numeric(as.Date(dat0$date_of_stopping_1st_line_chemotherapy_regimen_for_metastatic_disease)-as.Date(dat0$date_of_initiation_of_1st_line_chemotherapy_regimen_for_metastatic_disease)), # Progression
+  event==4 ~ as.numeric(as.Date(dat0$date_of_last_follow_up)-as.Date(dat0$date_of_initiation_of_1st_line_chemotherapy_regimen_for_metastatic_disease)))] # Death; better if having date of death
+summary(dat0$time_pfs)
+which(is.na(dat0$time_pfs)) # [1] 11
+
+##------OS variables------
+dat0[,event_os:=if_else(condition = (alive_or_dead_at_last_follow_up=='Dead'), 1, 0, missing = NA)]
+table(dat0$event_os, dat0$alive_or_dead_at_last_follow_up)
+dat0[,time_os:=as.numeric(as.Date(dat0$date_of_last_follow_up)-as.Date(dat0$date_of_initiation_of_1st_line_chemotherapy_regimen_for_metastatic_disease))]
+summary(dat0$time_os)
+which(is.na(dat0$time_os)) 
+which(is.na(dat0$time_pfs)) # [1] 11
+
+any(dat0$`Days between diagnosis and date of last follow up` != dat0$time_os, na.rm = T)
+
+dat0[,sex_f:=as.factor(sex)]
+dat0[,dx_site_new_f:=as.factor(dx_site_new)]
+dat0[,dx_grade_f:=as.factor(dx_grade)]
+dat0[,dx_grade_f2:=if_else(dx_grade==99, NA, dx_grade)]
+sum(is.na(dat0$dx_grade_f)) #9
+dat0[,local_met_dx_f:=as.factor(local_met_dx)]
+dat0[,her2_f:=as.factor(her2)]
+dat0[,tdx_1_f:=as.factor(tdx_1)]
+dat0[,pdl_1_f:=as.factor(pdl_1)]
+table(dat0$tdx_1, dat0$tdxd_trastuzumab_deruxtecan_enhertu_received_y_n)
+table(dat0$pdl_1, dat0$pd1_received_any_line_of_treatment_pembrolizumab_nivolumab_y_n)
+dat0[,category_ish_f:=as.factor(category_ish)] # size of the difference between categories is inconsistent (because the spacing between categories one and two may not be the same as categories two and three)
+dat0[,category_ish_f:=as.factor(category_ish)] # size of the difference between categories may not the same (because the spacing between categories one and two may not be the same as categories two and three)
+
+all_char <- sapply(names(dat0)[sapply(dat0, is.character)], function(x) with(dat0, table(get(x), useNA = "ifany")))
+View(all_char)
+
+all_fact <- sapply(names(dat0)[sapply(dat0, is.factor)], function(x) with(dat0, table(get(x), useNA = "ifany")), simplify = F)
+View(all_fact)
+
+relevel(dat0$local_met_dx_f, ref="1")
+relevel(dat0$her2_f, ref="3")
+
+all_num <- sapply(names(dat0)[sapply(dat0, is.numeric)], function(x) with(dat0, table(get(x), useNA = "ifany")))
+View(all_num)
+
+##------Save the cleaned data------
+date_analysis <- format(Sys.Date(), "%Y%b%d")
+write_fst(dat0, path = paste0("../Data/Derived/", date_analysis, "_dat_HER2.RData"), compress = 50)
+fwrite(dat0, file = paste0("../Data/Derived/", date_analysis, "_dat_HER2.csv"))
+```
+
+```{r include=FALSE}
+dat_work <- read_fst(path = "../Data/Derived/2024Oct08_dat_HER2.RData")
+```
+
+# PH assumption check
+```{r echo=FALSE}
+dat_work$time_pfs_month <- dat_work$time_pfs/365.25*12
+dat_work$time_os_month <- dat_work$time_os/365.25*12
+cox_multi1 <- coxph(Surv(time_pfs_month, event_pfs) ~ category_ish_f+
+                      age+sex_f+dx_site_new_f+dx_grade_f+local_met_dx_f+total_mets_new+her2_f,
+                      data = dat_work)
+# Schoenfeld residuals
+cox.zph(cox_multi1)
+ggcoxzph(cox.zph(cox_multi1))
+cox.zph(cox_multi1)$y
+# scaled Schoenfeld residuals against the transformed time; no systematic departures from a horizontal line
+
+cox_multi1.1 <- coxph(Surv(time_pfs_month, event_pfs) ~ category_ish_f+
+                      age+sex_f+dx_site_new_f+dx_grade_f2+local_met_dx_f+total_mets_new+her2_f,
+                      data = dat_work)
+cox.zph(cox_multi1.1)
+ggcoxzph(cox.zph(cox_multi1.1))
+
+cox_multi2 <- coxph(Surv(time_os_month, event_os) ~ category_ish_f+
+                      age+sex_f+dx_site_new_f+dx_grade_f+local_met_dx_f+total_mets_new+her2_f+tdx_1+pdl_1,
+                      data = dat_work)
+
+summary(cox_multi2)
+cox.zph(cox_multi2)
+
+cox_multi2.1 <- coxph(Surv(time_os_month, event_os) ~ category_ish_f+
+                      age+sex_f+dx_site_new_f+dx_grade_f2+local_met_dx_f+total_mets_new+her2_f+tdx_1+pdl_1,
+                      data = dat_work)
+
+cox_multi2.2 <- coxph(Surv(time_os_month, event_os) ~ category_ish_f+
+                      age+sex_f+dx_site_new_f+local_met_dx_f+total_mets_new+her2_f+tdx_1+pdl_1,
+                      data = dat_work)
+
+
+cox.zph(cox_multi2.1) # dx_grade_f2 不符合cox ph model, remove it
+cox.zph(cox_multi2.2) 
+ggcoxzph(cox.zph(cox_multi2.1)) 
+```
+
+# K-M curve
+```{r}
+# survdiff(Surv(time_pfs, event_pfs) ~ category_ish_f, data = dat_work)
+# median(surv_ob1)
+
+surv_pfs <- survfit(Surv(time_pfs_month, event_pfs) ~ category_ish_f, data = dat_work)
+ggsurvplot(surv_pfs, ggtheme = theme_survminer(), risk.table=T, cumcensor=T, pval = T, surv.median.line = "hv")
+surv_os <- survfit(Surv(time_os_month, event_os) ~ category_ish_f, data = dat_work)
+ggsurvplot(surv_os, ggtheme = theme_survminer(), risk.table=T, cumcensor=T, pval = T, surv.median.line = "hv")
+```
+
+# Adjusted RMST
+```{r}
+time <- dat_work$time_pfs_month
+status <- dat_work$event_pfs
+arm <- dat_work$category_ish_f
+x <- dat_work[, c("age", "sex_f", "dx_site_new_f", "dx_grade_f", "local_met_dx_f", "total_mets_new", "her2_f")]
+rmst2(time, status, arm, tau=10, covariates=x)
+```
