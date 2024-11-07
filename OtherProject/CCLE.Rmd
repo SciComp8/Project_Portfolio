@@ -1,0 +1,166 @@
+---
+title: "CCLE Data Management"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: rmdformats::robobook
+---
+
+```{r shortcut, include=FALSE}
+#################################################################
+##                  RStudio keyboard shortcut                  ##
+#################################################################
+# Cursor at the beginning of a command line: Ctrl+A
+# Cursor at the end of a command line: Ctrl+E
+# Clear all the code from your console: Ctrl+L
+# Create a pipe operator %>%: Ctrl+Shift+M (Windows) or Cmd+Shift+M (Mac)
+# Knit a document (knitr): Ctrl+Shift+K (Windows) or Cmd+Shift+K (Mac)
+# Comment or uncomment current selection: Ctrl+Shift+C (Windows) or Cmd+Shift+C (Mac)
+```
+
+# Our aims
+- Find the metric to define genes with low expression
+- Read RNA gene expression in log transformed TPM
+- Exclude genes with low expression
+- Select top 5000 genes with the highest variance
+- Convert top 5000 genes with the highest variance in log transformed TPM to TPM
+- Read the MAF-like somatic mutation data, and manipulate it into a binary matrix
+- Select the genes of interest *KRAS*, *TP53*, *CDKN2A*, *SMAD4* of the mutation matrix
+
+```{r download_attach_lib_func, eval=TRUE, include=TRUE}
+easypackages::libraries("readxl", "tidyverse", "magrittr", "gridExtra", "janitor") |> suppressPackageStartupMessages()
+
+"%_%" <- function(m, n) paste0(m, "_", n)
+"%0%" <- function(m, n) paste0(m, n)
+```
+
+## Define the metric to indicate genes are lowly expressed
+Steps: read the gene expression in log transformed TPM -> convert it into the original TPM -> set the median value (given the skewed distribution of log2(TPM+1) or TPM in histograms) of TPM=0.5 (equivalent to log2(TPM+1)=``r round(log2(0.5+1),2)`) across samples as the minimum expression level, similarly set by the Expression Atlas in EMBL-EBI. Other considerations of cut-offs of log2(TPM+1) or TPM are also welcomed.
+
+**References**: https://www.ebi.ac.uk/gxa/FAQ.html
+
+## Review the math backbones of TPM
+$$
+TPM = 10^6 \times \frac{reads \ mapped \ to \ transcript \ / \ transcript \ length}{\sum (reads \ mapped \ to \ transcript \ / \ transcript \ length)}
+$$
+
+# Process data
+## Read gene expression in log transformed TPM (stranded mode)
+Compared to unstranded mode, stranded mode reveals which overlapping gene each RNA transcript originates from. This becomes a merit for accurately quantifying these RNA transcripts.
+```{r}
+# rna_tpm_logp1_stranded <- read.csv(file='OmicsExpressionProteinCodingGenesTPMLogp1Stranded.csv')
+# saveRDS(rna_tpm_logp1_stranded, file='rna_tpm_logp1_stranded.RDS')
+rna_tpm_logp1_stranded <- readRDS(file='rna_tpm_logp1_stranded.RDS')
+```
+
+```{r echo=FALSE}
+cat('~~~In this data, we have '%0%dim(rna_tpm_logp1_stranded)[1]%0%' cell models, and '%0%dim(rna_tpm_logp1_stranded)[2]%0%' genes.~~~') 
+```
+
+```{r}
+# Understand and clean what makes up the row and columns
+rownames(rna_tpm_logp1_stranded)[1:6]
+colnames(rna_tpm_logp1_stranded)[1:6]
+rna_tpm_logp1_stranded <- clean_names(rna_tpm_logp1_stranded)
+colnames(rna_tpm_logp1_stranded)[1:6]
+rna_tpm_logp1_stranded <- rna_tpm_logp1_stranded |> column_to_rownames('x')
+colnames(rna_tpm_logp1_stranded)[1:6]
+```
+
+```{r echo=FALSE}
+cat('~~~We observe '%0%as.numeric(any(colSums(is.na(rna_tpm_logp1_stranded))))%0%' missing values in gene expression data.~~~') |> suppressWarnings()
+```
+
+```{r echo=FALSE}
+cat('~~~We take a look at how first 6 genes are expressed across cell models.~~~')
+```
+
+```{r}
+expr_hist <- function(gene_data, gene_id, fill_palette) {
+  ggplot(data=get(gene_data), 
+         mapping=aes(x=get(gene_id))) + 
+    geom_histogram(bins=30, fill=fill_palette) + 
+    theme_bw() +
+    labs(y='Frequency', x='log2(TPM+1)', title='Distribution of '%0%gene_id) + 
+    theme(plot.title=element_text(hjust=0.5, face='bold'))
+}
+
+p <- mapply(FUN=expr_hist, gene_data='rna_tpm_logp1_stranded',
+            gene_id=names(rna_tpm_logp1_stranded)[1:6], 
+            fill_palette=c('#E18727FF', '#EFC000FF', '#868686FF', '#CD534CFF', '#0072B5FF', '#20854EFF'), 
+            SIMPLIFY=F)
+grid.arrange(do.call('arrangeGrob', c(p, ncol=2))) 
+```
+
+## Exclude genes with low expression
+Use the median value of TPM=0.5 (equivalent to log2(TPM+1)=`r round(log2(0.5+1),2)`) across samples as the minimum expression level, similarly set by the Expression Atlas in EMBL-EBI. 
+```{r}
+med_expr_gene <- apply(X=rna_tpm_logp1_stranded|>as.matrix(), MARGIN=2, FUN=median)
+low_expr_gene <- names(med_expr_gene)[med_expr_gene<log2(0.5+1)]
+length(low_expr_gene)
+low_expr_gene[1:6]
+rna_tpm_logp1_stranded <- rna_tpm_logp1_stranded[,!(names(rna_tpm_logp1_stranded)%in%low_expr_gene)]
+dim(rna_tpm_logp1_stranded) # 11908+7919=19827
+```
+
+## Select the top 5000 genes with the highest variance
+```{r echo=FALSE}
+cat('~~~We calculate the variance of expression of each gene across all cell models.~~~')
+```
+
+```{r}
+var_expr <- apply(X=rna_tpm_logp1_stranded|>as.matrix(), MARGIN=2, FUN=var)
+var_expr[1:6]
+```
+
+```{r echo=FALSE}
+cat('~~~We select the top 5000 genes with the highest variance.~~~')
+```
+
+```{r}
+var_expr_5k <- var_expr[order(desc(var_expr))[1:5000]]
+rna_tpm_logp1_stranded_5k <- rna_tpm_logp1_stranded[,names(rna_tpm_logp1_stranded)%in%names(var_expr_5k)]
+summary(var_expr_5k)
+```
+
+## Convert gene expression in log transformed TPM (stranded mode) to TPM (stranded mode)
+```{r}
+rna_tpm_stranded_5k <- 2^(rna_tpm_logp1_stranded_5k)-1
+# saveRDS(rna_tpm_stranded_5k, file='rna_tpm_stranded_5k.RDS')
+rna_tpm_stranded_5k <- readRDS('rna_tpm_stranded_5k.RDS')
+
+cat('~~~We take a look at how the first 6 of top 5000 genes with the highest variance are expressed across models.~~~')
+expr_hist <- function(gene_data, gene_id, fill_palette) {
+  ggplot(data=get(gene_data), 
+         mapping=aes(x=get(gene_id))) + 
+    geom_histogram(bins=30, fill=fill_palette) + 
+    theme_bw() +
+    labs(y='Frequency', x='TPM', title='Distribution of '%0%gene_id) + 
+    theme(plot.title=element_text(hjust=0.5, face='bold'))
+}
+
+p <- mapply(FUN=expr_hist, gene_data='rna_tpm_stranded_5k',
+            gene_id=names(rna_tpm_stranded_5k)[1:6], 
+            fill_palette=c('#E18727FF', '#EFC000FF', '#868686FF', '#CD534CFF', '#0072B5FF', '#20854EFF'), 
+            SIMPLIFY=F)
+grid.arrange(do.call('arrangeGrob', c(p, ncol=2))) 
+```
+
+## Read the MAF-like somatic mutation data, and transform it into a binary matrix
+```{r}
+# maf <- read.csv('OmicsSomaticMutations.csv')
+# saveRDS(maf, file='maf.RDS')
+maf <- readRDS('maf.RDS')
+head(maf)
+
+mutation_mat <- maf |> select(ModelID, HugoSymbol) |> distinct() |> mutate(Mutation_Status=1) |> # Each model-gene pair is unique
+  pivot_wider(names_from=HugoSymbol, values_from=Mutation_Status, values_fill=list(Mutation_Status=0)) # Convert the long format data where each row is a model id-gene pair to a wide format where each row is a model id and each column is a gene)
+head(mutation_mat)
+```
+
+## Select the genes of interest *KRAS*, *TP53*, *CDKN2A*, *SMAD4* in the mutation matrix
+```{r}
+mutatation_mat_target <- mutation_mat[, colnames(mutation_mat)%in%c('KRAS', 'TP53', 'CDKN2A', 'SMAD4')]
+head(mutatation_mat_target)
+```
+
+# Citation
+Current DepMap Release data, including CRISPR Screens, PRISM Drug Screens, Copy Number, Mutation, Expression, and Fusions DepMap, Broad (2024). DepMap 24Q2 Public. Figshare+. Dataset. https://doi.org/10.25452/figshare.plus.25880521.v1
