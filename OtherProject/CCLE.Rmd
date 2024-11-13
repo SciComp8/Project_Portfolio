@@ -1,46 +1,27 @@
 ---
-title: "CCLE Data Management"
+title: "CCLE Data Management and Analysis"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: rmdformats::robobook
 ---
 
-```{r shortcut, include=FALSE}
-#################################################################
-##                  RStudio keyboard shortcut                  ##
-#################################################################
-# Cursor at the beginning of a command line: Ctrl+A
-# Cursor at the end of a command line: Ctrl+E
-# Clear all the code from your console: Ctrl+L
-# Create a pipe operator %>%: Ctrl+Shift+M (Windows) or Cmd+Shift+M (Mac)
-# Knit a document (knitr): Ctrl+Shift+K (Windows) or Cmd+Shift+K (Mac)
-# Comment or uncomment current selection: Ctrl+Shift+C (Windows) or Cmd+Shift+C (Mac)
-```
-
-# Our aims
-- Find the metric to define genes with low expression
-- Read RNA gene expression in log transformed TPM
-- Exclude genes with low expression
-- Select top 5000 genes with the highest variance
-- Convert top 5000 genes with the highest variance in log transformed TPM to TPM
-- Read the MAF-like somatic mutation data, and manipulate it into a binary matrix
-- Select the genes of interest *KRAS*, *TP53*, *CDKN2A*, *SMAD4* of the mutation matrix
+# Citation
+Current DepMap Release data, including CRISPR Screens, PRISM Drug Screens, Copy Number, Mutation, Expression, and Fusions DepMap, Broad (2024). DepMap 24Q2 Public. Figshare+. Dataset. https://doi.org/10.25452/figshare.plus.25880521.v1
 
 ```{r download_attach_lib_func, eval=TRUE, include=TRUE}
-easypackages::libraries("readxl", "tidyverse", "magrittr", "gridExtra", "janitor") |> suppressPackageStartupMessages()
-
-"%_%" <- function(m, n) paste0(m, "_", n)
-"%0%" <- function(m, n) paste0(m, n)
+easypackages::libraries('readxl', 'tidyverse', 'magrittr', 
+                        'gridExtra', 'janitor', 'naniar', 
+                        'glmnet', 'caret', 'randomForest') |> suppressPackageStartupMessages()
+'%0%' <- function(m, n) paste0(m, n)
 ```
 
 ## Define the metric to indicate genes are lowly expressed
-Steps: read the gene expression in log transformed TPM -> convert it into the original TPM -> set the median value (given the skewed distribution of log2(TPM+1) or TPM in histograms) of TPM=0.5 (equivalent to log2(TPM+1)=``r round(log2(0.5+1),2)`) across samples as the minimum expression level, similarly set by the Expression Atlas in EMBL-EBI. Other considerations of cut-offs of log2(TPM+1) or TPM are also welcomed.
-
-**References**: https://www.ebi.ac.uk/gxa/FAQ.html
+The removal of lowly expressed genes may help improve our power to find statistically significant RNA-Seq predictors as it reduces the occurrence of multiple testing. My initial thought was maybe to use the median value (given the skewed distribution of log2(TPM+1) or TPM shown in histograms) of TPM=0.5 (equivalent to log2(TPM+1)=``r round(log2(0.5+1),2)`) across cell model samples as a starting point fo the minimum expression level, which is synchronized with [EMBL-EBI Expression Atlas](https://www.ebi.ac.uk/gxa/FAQ.html). Other considerations of cut-offs of log2(TPM+1) or TPM are also welcomed.
 
 ## Review the math backbones of TPM
 $$
 TPM = 10^6 \times \frac{reads \ mapped \ to \ transcript \ / \ transcript \ length}{\sum (reads \ mapped \ to \ transcript \ / \ transcript \ length)}
 $$
+TPM is a relative measure of transcript expression within each sample. This means the expression level of a transcript in one sample directly affects the TPM values of all other transcripts in that sample. TPM accounts for the sequencing depth and gene length. TPM is a good metric to select meaningful RNA-Seq predictors, as we don't perform the differential gene expression analysis (e.g., simple Wilcoxon test or complicated generalized linear model of negative binomial family) to filter out the genes of which expression values are constant or vary little across samples. 
 
 # Process data
 ## Read gene expression in log transformed TPM (stranded mode)
@@ -49,6 +30,7 @@ Compared to unstranded mode, stranded mode reveals which overlapping gene each R
 # rna_tpm_logp1_stranded <- read.csv(file='OmicsExpressionProteinCodingGenesTPMLogp1Stranded.csv')
 # saveRDS(rna_tpm_logp1_stranded, file='rna_tpm_logp1_stranded.RDS')
 rna_tpm_logp1_stranded <- readRDS(file='rna_tpm_logp1_stranded.RDS')
+head(rna_tpm_logp1_stranded) |> knitr::kable()
 ```
 
 ```{r echo=FALSE}
@@ -56,7 +38,7 @@ cat('~~~In this data, we have '%0%dim(rna_tpm_logp1_stranded)[1]%0%' cell models
 ```
 
 ```{r}
-# Understand and clean what makes up the row and columns
+# Understand what makes up the row and columns and clean rownames and colnames
 rownames(rna_tpm_logp1_stranded)[1:6]
 colnames(rna_tpm_logp1_stranded)[1:6]
 rna_tpm_logp1_stranded <- clean_names(rna_tpm_logp1_stranded)
@@ -119,6 +101,8 @@ cat('~~~We select the top 5000 genes with the highest variance.~~~')
 var_expr_5k <- var_expr[order(desc(var_expr))[1:5000]]
 rna_tpm_logp1_stranded_5k <- rna_tpm_logp1_stranded[,names(rna_tpm_logp1_stranded)%in%names(var_expr_5k)]
 summary(var_expr_5k)
+
+# saveRDS(rna_tpm_logp1_stranded_5k, file='rna_tpm_logp1_stranded_5k.RDS')
 ```
 
 ## Convert gene expression in log transformed TPM (stranded mode) to TPM (stranded mode)
@@ -126,8 +110,14 @@ summary(var_expr_5k)
 rna_tpm_stranded_5k <- 2^(rna_tpm_logp1_stranded_5k)-1
 # saveRDS(rna_tpm_stranded_5k, file='rna_tpm_stranded_5k.RDS')
 rna_tpm_stranded_5k <- readRDS('rna_tpm_stranded_5k.RDS')
+head(rna_tpm_stranded_5k) |> knitr::kable()
+```
 
+```{r echo=FALSE}
 cat('~~~We take a look at how the first 6 of top 5000 genes with the highest variance are expressed across models.~~~')
+```
+
+```{r}
 expr_hist <- function(gene_data, gene_id, fill_palette) {
   ggplot(data=get(gene_data), 
          mapping=aes(x=get(gene_id))) + 
@@ -149,18 +139,270 @@ grid.arrange(do.call('arrangeGrob', c(p, ncol=2)))
 # maf <- read.csv('OmicsSomaticMutations.csv')
 # saveRDS(maf, file='maf.RDS')
 maf <- readRDS('maf.RDS')
-head(maf)
+head(maf) |> knitr::kable()
 
 mutation_mat <- maf |> select(ModelID, HugoSymbol) |> distinct() |> mutate(Mutation_Status=1) |> # Each model-gene pair is unique
-  pivot_wider(names_from=HugoSymbol, values_from=Mutation_Status, values_fill=list(Mutation_Status=0)) # Convert the long format data where each row is a model id-gene pair to a wide format where each row is a model id and each column is a gene)
-head(mutation_mat)
+  pivot_wider(names_from=HugoSymbol, values_from=Mutation_Status, values_fill=list(Mutation_Status=0)) # Convert the long format data where each row is a model id-gene pair to a wide format where each row is a model id and each column is a gene
+head(mutation_mat) |> knitr::kable()
 ```
 
-## Select the genes of interest *KRAS*, *TP53*, *CDKN2A*, *SMAD4* in the mutation matrix
+## Build the binary mutational matrix with the custom genes of interest *KRAS*, *TP53*, *CDKN2A*, *SMAD4*
 ```{r}
-mutatation_mat_target <- mutation_mat[, colnames(mutation_mat)%in%c('KRAS', 'TP53', 'CDKN2A', 'SMAD4')]
-head(mutatation_mat_target)
+mutation_mat_target <- mutation_mat[, colnames(mutation_mat)%in%c('ModelID', 'KRAS', 'TP53', 'CDKN2A', 'SMAD4')]
+head(mutation_mat_target) |> knitr::kable()
+# saveRDS(mutation_mat_target, file='mutation_mat_target.RDS')
 ```
 
-# Citation
-Current DepMap Release data, including CRISPR Screens, PRISM Drug Screens, Copy Number, Mutation, Expression, and Fusions DepMap, Broad (2024). DepMap 24Q2 Public. Figshare+. Dataset. https://doi.org/10.25452/figshare.plus.25880521.v1
+## Read the drug sensitivity AUC data
+The drug sensitivity AUC (CTD^2), drug sensitivity AUC (PRISM Repurposing Secondary Screen), Drug sensitivity AUC (Sanger GDSC1), and Drug sensitivity AUC (Sanger GDSC1) data are obtained from the `Custom Downloads` tab on the [depmap portal](https://depmap.org/portal/data_page/?tab=customDownloads) website.
+
+```{r}
+drug_auc_prism <- read.csv(file='Drug_sensitivity_AUC_(PRISM_Repurposing_Secondary_Screen)_subsetted.csv')
+rna_tpm_logp1_stranded_5k <- rna_tpm_logp1_stranded_5k |> rownames_to_column(var='model_id')
+# sum(rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_prism$X) # There are 7 cell models in prism drug data carrying RNA-Seq data; how many model ids in rna_tpm_logp1_stranded_5k$model_id are found in drug_auc_ctd$depmap_id.
+rna_tpm_logp1_stranded_5k$model_id[rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_prism$X]
+
+drug_auc_ctd <- read.csv(file='Drug_sensitivity_AUC_(CTD^2)_subsetted.csv') 
+# sum(rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_ctd$depmap_id) # There are 11 cell models in CTD drug data carrying RNA-Seq data
+rna_tpm_logp1_stranded_5k$model_id[rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_ctd$depmap_id]
+
+drug_auc_gdsc1 <- read.csv(file='Drug_sensitivity_AUC_(Sanger_GDSC1)_subsetted.csv') 
+# sum(rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_gdsc1$depmap_id) # There are 73 cell models in GDSC1 drug data carrying RNA-Seq data
+rna_tpm_logp1_stranded_5k$model_id[rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_gdsc1$depmap_id]
+
+drug_auc_gdsc2 <- read.csv(file='Drug_sensitivity_AUC_(Sanger_GDSC2)_subsetted.csv') 
+# sum(rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_gdsc2$depmap_id) # There are 60 cell models in GDSC1 drug data carrying RNA-Seq data
+rna_tpm_logp1_stranded_5k$model_id[rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_gdsc2$depmap_id]
+
+drug_rna_model_id <- c(rna_tpm_logp1_stranded_5k$model_id[rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_prism$X],
+                       rna_tpm_logp1_stranded_5k$model_id[rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_ctd$depmap_id],
+                       rna_tpm_logp1_stranded_5k$model_id[rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_gdsc1$depmap_id],
+                       rna_tpm_logp1_stranded_5k$model_id[rna_tpm_logp1_stranded_5k$model_id %in% drug_auc_gdsc2$depmap_id])
+
+sum(drug_rna_model_id %in% mutation_mat_target$ModelID) 
+# There are 150 cell models have available AUC, RNA-Seq, and custome mutation data.
+
+# save(drug_auc_prism, drug_auc_ctd, drug_auc_gdsc1, drug_auc_gdsc2, file='drug_auc.RData')
+# load(file='drug_auc.RData')
+```
+
+```{r}
+# Understand what makes up the row and columns and clean rownames and colnames
+clean_and_show_names <- function(df) {
+  cat("The first 10 row names:\n", rownames(df)[1:10], "\n")
+  cat("The first 10 column names (before cleaning):\n", colnames(df)[1:10], "\n")
+  df <- clean_names(df)
+  cat("The first 10 column names (after cleaning):\n", colnames(df)[1:10], "\n\n")
+  return(df)
+}
+
+drug_auc_prism <- clean_and_show_names(drug_auc_prism)
+drug_auc_ctd <- clean_and_show_names(drug_auc_ctd)
+drug_auc_gdsc1 <- clean_and_show_names(drug_auc_gdsc1)
+drug_auc_gdsc2 <- clean_and_show_names(drug_auc_gdsc2)
+
+drug_auc_ctd <- drug_auc_ctd[, -c(2:8)]
+drug_auc_gdsc1 <- drug_auc_gdsc1[, -c(2:8)]
+drug_auc_gdsc2 <- drug_auc_gdsc2[, -c(2:8)]
+
+# save(drug_auc_prism, drug_auc_ctd, drug_auc_gdsc1, drug_auc_gdsc2, file='drug_auc.RData')
+# load(file='drug_auc.RData')
+```
+
+```{r echo=FALSE}
+cat('~~~We observe '%0%any(colSums(is.na(drug_auc_prism)))%0%' missing values in drug sensitivity AUC PRISM data.~~~') |> suppressWarnings()
+cat('\n')
+cat('~~~We observe '%0%any(colSums(is.na(drug_auc_ctd)))%0%' missing values in drug sensitivity AUC CTD data.~~~') |> suppressWarnings()
+cat('\n')
+cat('~~~We observe '%0%any(colSums(is.na(drug_auc_gdsc1)))%0%' missing values in drug sensitivity AUC GDSC1 data.~~~') |> suppressWarnings()
+cat('\n')
+cat('~~~We observe '%0%any(colSums(is.na(drug_auc_gdsc2)))%0%' missing values in drug sensitivity AUC GDSC2 data.~~~') |> suppressWarnings()
+```
+
+```{r}
+m <- lapply(c('drug_auc_prism', 'drug_auc_ctd', 'drug_auc_gdsc1', 'drug_auc_gdsc2'), function(df_name) {colSums(is.na(get(df_name)))})
+
+for (i in 1:3) {
+  tmp <- m[[i]]
+  tmp[order(desc(tmp))] |> as.data.frame() |> rename(`Missing Count` = `tmp[order(desc(tmp))]`) |> slice_head(n=10) |> knitr::kable() |> print()
+}
+
+ # Show the top 10 AUC missingness patterns
+lapply(c('drug_auc_prism', 'drug_auc_ctd', 'drug_auc_gdsc1', 'drug_auc_gdsc2'), function(df_name) {gg_miss_upset(get(df_name), nsets = 10)})
+```
+Interpret the plots: for example, the first plot suggests drugs METOPROLOL, METOXIBUTROPATE, ETOFYLLINE, POMALIDOMIDE, TILMICOSIN, BAN, RG108, KY02111, SODIUM, and NELARABINE have the highest number of missing values in AUC together. 
+
+```{r eval=FALSE, include=FALSE}
+cat('~~~We take a look at how the AUCs of first 6 drugs are distributed in the PRISM data.~~~')
+```
+
+```{r eval=FALSE, include=FALSE}
+auc_hist <- function(drug_data, drug_id, fill_palette) {
+  ggplot(data=get(drug_data), 
+         mapping=aes(x=get(drug_id))) + 
+    geom_histogram(bins=30, fill=fill_palette) + 
+    theme_bw() +
+    labs(y='Frequency', x='AUC', title='Distribution of '%0%drug_id) + 
+    theme(plot.title=element_text(hjust=0.5, face='bold'))
+}
+
+drug_auc_prism_1st6 <- drug_auc_prism[, 1:6]
+colnames(drug_auc_prism_1st6) <- map_chr(names(drug_auc_prism)[1:6], \(x) gsub('_brd.*', '', x)) # Remove unnecessary strings after brd
+
+p <- mapply(FUN=auc_hist, drug_data='drug_auc_prism_1st6',
+            drug_id=names(drug_auc_prism_1st6),
+            fill_palette=c('#E18727FF', '#EFC000FF', '#868686FF', '#CD534CFF', '#0072B5FF', '#20854EFF'), 
+            SIMPLIFY=F)
+grid.arrange(do.call('arrangeGrob', c(p, ncol=2))) 
+```
+
+# Integrate the drug response, RNA gene expression, and mutation data by matching the cell model id in each dataset
+```{r}
+colnames(drug_auc_prism)[1] <- 'depmap_id'
+# head(drug_auc_prism) |> knitr::kable()
+# head(drug_auc_ctd) |> knitr::kable()
+# head(drug_auc_gdsc1) |> knitr::kable()
+# head(drug_auc_gdsc2) |> knitr::kable()
+
+rna_tpm_logp1_stranded_5k <- readRDS(file='rna_tpm_logp1_stranded_5k.RDS')
+head(rna_tpm_logp1_stranded_5k) |> knitr::kable()
+rna_tpm_logp1_stranded_5k <- rownames_to_column(rna_tpm_logp1_stranded_5k, var='model_id')
+
+drug_auc_prism_slice <- drug_auc_prism |> filter(drug_auc_prism$depmap_id%in%drug_rna_model_id)
+drug_auc_ctd_slice <- drug_auc_ctd |> filter(drug_auc_ctd$depmap_id%in%drug_rna_model_id)
+drug_auc_gdsc1_slice <- drug_auc_gdsc1 |> filter(drug_auc_gdsc1$depmap_id%in%drug_rna_model_id)
+drug_auc_gdsc2_slice <- drug_auc_gdsc2 |> filter(drug_auc_gdsc2$depmap_id%in%drug_rna_model_id)
+
+drug_auc <- full_join(x=drug_auc_prism_slice, y=drug_auc_ctd_slice, by=c('depmap_id'='depmap_id'))
+drug_auc <- full_join(x=drug_auc, y=drug_auc_gdsc1_slice, by=c('depmap_id'='depmap_id'))
+drug_auc <- full_join(x=drug_auc, y=drug_auc_gdsc2_slice, by=c('depmap_id'='depmap_id'))
+
+m <- colSums(is.na(drug_auc))
+m[order(m)][1:6]  # velban_gdsc1_1004
+
+drug_auc_rna <- inner_join(x=drug_auc, y=rna_tpm_logp1_stranded_5k, by=c('depmap_id'='model_id'))
+
+mutation_mat_target <- readRDS(file='mutation_mat_target.RDS')
+drug_rna_mut <- inner_join(x=drug_auc_rna, y=mutation_mat_target, by=c('depmap_id'='ModelID'))
+
+head(drug_rna_mut) |> knitr::kable()
+# saveRDS(drug_rna_mut, file='drug_rna_mut.RDS')
+```
+
+```{r echo=FALSE}
+cat('~~~In this integrative data, we have '%0%dim(drug_rna_mut)[1]%0%' cell models, AUCs of '%0%(dim(drug_auc)[2]-1)%0%' drugs and 5000 RNA-Seq and 4 mutation features.~~~') 
+```
+
+
+# Develop machine learning models to predict the drug response
+## Build the prototype of elastic net regression where the sensitivity of the example drug velban_gdsc1_1004 is treated as the continuous outcome
+```{r}
+full_data <- readRDS(file='drug_rna_mut.RDS')
+full_feature_data <- full_data[-(1:2483)] # Remove drug response data
+full_feature_data_scaled <- scale(full_feature_data |> select_if(is.numeric), center=T, scale=T)
+full_data_scaled <- cbind(full_feature_data_scaled, full_data |> select(velban_gdsc1_1004))
+full_data_scaled <- full_data_scaled[!is.na(full_data_scaled$velban_gdsc1_1004), ]
+
+set.seed(132421) 
+full_data_scaled |> select(velban_gdsc1_1004) |> knitr::kable()
+
+test_index <- sample(nrow(full_data_scaled), ceiling(0.5*nrow(full_data_scaled)))
+test_data <- full_data_scaled[test_index,]
+train_data <- full_data_scaled[-test_index,]
+
+set.seed(888) 
+x <- model.matrix(velban_gdsc1_1004 ~ ., train_data)[, -1] 
+y <- train_data$velban_gdsc1_1004
+
+# Use 10-fold Cross Validation (CV) to choose optimal lambda under particular alpha that produces the minimal CV error 
+set.seed(999)
+foldid <- sample(1:10, size=length(y), replace=T)
+grid <- 10^seq(10, -2, length=100) 
+alpha_range <- seq(0, 1, 0.1)
+model <- list(length=length(alpha_range)) 
+best_lambda <- vector(length=length(alpha_range)) 
+for (i in 1:length(alpha_range)) { 
+  model[[i]] <- cv.glmnet(x, y, lambda=grid, foldid=foldid, alpha=alpha_range[i]) 
+  best_lambda[i] <- model[[i]]$lambda.min 
+}
+
+# Use 10-fold CV to calculate the CV error by building the model with the optimal lambda for a particular alpha
+mse <- vector(length = 10)
+n <- nrow(x)
+n_k <- vector(length = 10)
+cv_mean_error <- vector(length = 11) 
+for (i in 1:length(alpha_range)) { 
+  # Loop for particular alpha 
+  for (m in 1:10) { 
+    # Loop for particular fold 
+    model_opt <- glmnet(x[foldid!=m, ], 
+                        y[foldid!=m], 
+                        family='gaussian', 
+                        alpha=alpha_range[i], 
+                        lambda=best_lambda[i]) 
+    pred_value <- predict(model_opt, x[foldid==m, ], type = 'response') 
+    mse[m] <- mean((y[foldid==m] - pred_value)^2)
+    n_k[m] <- nrow(x[foldid==m, ]) 
+  } 
+cv_mean_error[i] <- sum((n_k/n)*mse) 
+}
+
+# Choose the optimal alpha corresponding to the smallest CV error 
+final_alpha <- alpha_range[which.min(cv_mean_error)] 
+final_lambda <- best_lambda[which.min(cv_mean_error)]
+
+# Refit the model with final lambda and alpha, using all observations in the training data 
+model_opt <- glmnet(x, y, family = 'gaussian', alpha = final_alpha, lambda = final_lambda)
+
+# Obtain the test mean squared error 
+new_x <- model.matrix(velban_gdsc1_1004 ~ ., test_data)[, -1] 
+test_pred_value_glmnet <- predict(model_opt, newx = new_x, type = 'response') 
+mse_elastic <- mean((test_data[, 'velban_gdsc1_1004'] - test_pred_value_glmnet)^2)
+
+# Output variable importance of top 20 predictors from the elastic net model 
+varImp(model_opt, lambda = final_lambda) |> arrange(desc(Overall)) |> slice_head(n = 20) |>  
+  rownames_to_column() |> rename(Factor = rowname) |> filter(Overall > 0) |> mutate(Factor = reorder(Factor, Overall)) |> ggplot(aes(x = Factor, y = Overall)) + geom_col(fill = "forestgreen") + theme_bw() + labs(x = "Absolute coefficient", y = "Factor") + coord_flip()
+```
+
+## Build the prototype of random forest where the sensitivity of the example drug velban_gdsc1_1004 is treated as the categorical outcome
+```{r eval=FALSE, include=TRUE}
+full_data <- readRDS(file='drug_rna_mut.RDS')
+full_feature_data <- full_data[-(1:2483)]
+full_feature_data_scaled <- scale(full_feature_data |> select_if(is.numeric), center=T, scale=T)
+full_data_scaled <- cbind(full_feature_data_scaled, full_data |> select(velban_gdsc1_1004))
+full_data_scaled <- full_data_scaled[!is.na(full_data_scaled$velban_gdsc1_1004), ]
+summary(full_data_scaled$velban_gdsc1_1004)
+
+# Use z-score of AUC < -2 as the sensitive
+# full_data_scaled$velban_gdsc1_1004 <- scale(full_data_scaled$velban_gdsc1_1004, center=T, scale=T)
+# summary(full_data_scaled$velban_gdsc1_1004)
+# full_data_scaled$velban_gdsc1_1004 <- ifelse(full_data_scaled$velban_gdsc1_1004 < -2, 'Sensitive', 'Resistant') |> as.factor()
+# table(full_data_scaled$velban_gdsc1_1004) 
+# Resistant 
+# 71
+
+# Use 0.8 to dichotomize AUC
+full_data_scaled$velban_gdsc1_1004 <- ifelse(full_data_scaled$velban_gdsc1_1004 < 0.8, 'Sensitive', 'Resistant') |> as.factor()
+table(full_data_scaled$velban_gdsc1_1004) 
+
+set.seed(132421) 
+full_data_scaled |> select(velban_gdsc1_1004) |> knitr::kable()
+
+test_index <- sample(nrow(full_data_scaled), ceiling(0.5*nrow(full_data_scaled)))
+test_data <- full_data_scaled[test_index,]
+train_data <- full_data_scaled[-test_index,]
+
+set.seed(888)
+p_rf <- round(sqrt(ncol(train_data) - 1)) 
+error_rate_rf <- vector(length = 2000) 
+for (i in 1:2000) { 
+  rf_tree <- randomForest(velban_gdsc1_1004 ~. -velban_gdsc1_1004, data = train_data, mtry = p_rf, ntree = i) 
+  pred_class <- predict(rf_tree, newdata = test_data[, -match('velban_gdsc1_1004', colnames(test_data))], 
+                        n.tree = i, type = 'response') 
+  error_rate_rf[i] <- mean(pred_class != test_data[, 'velban_gdsc1_1004'])} 
+error_rate_rf_final <- min(error_rate_rf) # Return the test misclassification rate
+```
+
+
+
+
