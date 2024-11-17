@@ -449,9 +449,9 @@ clinical_data <- read_csv("dat_DEXA_qPCR_Blood_20190711.csv") %>%
 
 # Merge the clinical dataset with the final lipid dataset 
 data_full <- merge(x = clinical_data, 
-                             y = lipid_ffa_MM_final, 
-                             by.x = "Sample ID", 
-                             by.y = "Sample ID")
+                   y = lipid_ffa_MM_final, 
+                   by.x = "Sample ID", 
+                   by.y = "Sample ID")
 ```
 
 ## Standardize lipid species names [outdated]
