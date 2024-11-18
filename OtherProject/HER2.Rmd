@@ -75,7 +75,7 @@ as.data.frame(table(dat0$category_ish_f, useNA = "ifany")) |>
 ```{r clean_data_start, eval=FALSE, include=FALSE}
 ##------Load the original spreadsheet------
 dat0 <- readxl::read_xlsx(
-  "../Data/Raw/Book 77 pts with clinical.xlsx", # \ escape
+  "../Data/Raw/HER2_Clinical_Data.xlsx", # \ escape
   col_names = T,
   na = c("Unknown", "unknown", "N/A", "n/a")
 ) 
