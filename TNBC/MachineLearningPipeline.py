@@ -239,4 +239,3 @@ pprint(rf_classifier.get_params())
 from sklearn.model_selection import RandomizedSearchCV
 n_estimators = [int(x) for x in np.linspace(start = 100, stop = 700, num = 50)]
 # [100, 112, 124, 136, 148, 161, 173, 185, 197, 210, 222, 234, 246, 259, 271, 283, 295, 308, 320, 332, 344, 357, 369, 381, 393, 406, 418, 430, 442, 455, 467, 479, 491, 504, 516, 528, 540, 553, 565, 577, 589, 602, 614, 626, 638, 651, 663, 675, 687, 700]
-
