@@ -1,6 +1,6 @@
 ---
 title: "Triple Negative Breast Cancer Data Analysis"
-author: "Anni Liu, DMSc, MS; Xi Kathy Zhou, PhD, MS"
+author: "Anni Liu"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 knit: knitautomator::knit_filename
 output:
