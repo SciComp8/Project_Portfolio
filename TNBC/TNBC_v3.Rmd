@@ -1,6 +1,6 @@
 ---
 title: "Triple Negative Breast Cancer Data Analysis"
-author: "Anni Liu"
+author: "Anni Liu, DMSc, MS; Xi Kathy Zhou, PhD, MS"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 knit: knitautomator::knit_filename
 output:
@@ -41,6 +41,16 @@ easypackages::libraries("multcomp", "BTKR", "readxl", "tidyverse",
 "%0%" <- function(m, n) paste0(m, n)
 
 walk(c("uni.coxph.R", "fcphuni.stat2.R", "fcphuni.tbl2.R"), source)
+
+##------Set the customized theme for all plots------
+theme_set(theme_classic())
+theme_update(
+  legend.position = "bottom",
+  strip.background = element_blank(),
+  axis.text = element_text(size = 10),
+  axis.title = element_text(size = 12),
+  legend.text = element_text(size = 10))
+theme.list <- theme_get()
 ```
 
 
@@ -86,31 +96,9 @@ if (params$results.folder) { # Suitable when the results need to be stored outsi
 
 ```{r fast_check_data, include=F}
 ##------Load preprocessed data------
-dat.work <- read_fst(path = "../data/derived/2024Aug15_dat_TNBC.RData")
-
-a <- subset(dat.work, SBE.event == 1)
-table(a$Any.Attempt.at.Lumpectomy, useNA = "ifany")
-table(Mastectomy=a$Mastectomy.Surgery, CPM=a$CPM, useNA = "ifany")
-
-table(a$Mammo.Screen.Detected, useNA = "ifany")
-table(a$MRI.Screen.Detected, useNA = "ifany")
-table(a$Histology.Subsequent, useNA = "ifany")
-
-b <- subset(dat.work, Genetic.Testing.Results %in% c("BRCA1", "BRCA2", "BRCA1/2", "BRCA"))
-table(b$SBE.event, useNA = "ifany")
-c <- subset(dat.work, Genetic.Testing.Results == "BRCA1/2 negative")
-table(c$SBE.event, useNA = "ifany")
-
-d <- subset(a, Mastectomy.Surgery %in% c("No", "Yes") & CPM == "No")
-table(Ipsilateral=d$Past.Ipsilateral.Br.CA, Contralateral=d$Past.Contralateral.Br.CA, useNA = "ifany")
-d[which(d$Past.Ipsilateral.Br.CA=="Yes" & d$Past.Contralateral.Br.CA=="Yes"), ]$ID
-
-e <- subset(a, CPM == "Yes")
-table(e$SBE.HR, useNA ="ifany")
-table(e$SBE.ER, e$SBE.PR, e$SBE.HER2, useNA ="ifany")
-subset(e, SBE.ER=="SBEYesERNeg" & SBE.PR=="SBEYesPRNeg" & SBE.HER2=="SBEYesHER2Neg") |> nrow()
-subset(e, SBE.HR=="SBEYesHRPos") |> nrow()
+dat.work <- read_fst(path = "../data/derived/2024Nov22_dat_TNBC.RData")
 ```
+
 
 
 # Data preparation
@@ -137,16 +125,19 @@ dat0 <- read_xlsx(
   sheet = "All patients", 
   range = "A1:BQ605",
   na = c("Unknown", "", "NA", "Not applicable ", "Not applicable", "Not aplicable", "n/a", "Unknown grade (not reported or unavailable)", "Unknown (not reported or unavailable)")) %>%
-  select(-c("ER expression (%)", "PR expression (%)", "HER2/neu (IHC)", "HER2/neu (FISH)", "%...62", "%...64")) |>
+  select(-c("ER expression (%)", "PR expression (%)", "HER2/neu (IHC)", "HER2/neu (FISH)")) |>
   data.frame()
+
+
+##------Remove 7 patients------
+id.rm <- 'ID'%0%c(48, 199, 205, 230, 239, 383, 378)
+dat0 <- dat0[!dat0$ID%in%id.rm, ]
 
 
 ##------Fix the column names------
 names(dat0) <- sapply(strsplit(names(dat0), split="\\."), function(x)
   paste(x[x!=""], collapse="."))
-
-
-##------Rename the variables------
+dat0 <- rename(dat0, ER.stain=X.62, PR.stain=X.64)
 dat0 <- as.data.table(dat0)
 dat0[,Tumor.Size.by.Path:=Tumor.Size.best.estimate.By.Path.Primary.surg.case]
 dat0[,Tumor.Size.by.Imaging:=Tumor.Size.best.estimate.By.Breast.Imaging.NACT.case]
@@ -158,6 +149,49 @@ dat0[,Overall.Subsequent.BC:=Any.Subsequent.BC.event]
 
 
 ##------Recode variables------
+dat0[,SBE.ER.cat:=case_when(
+  ER.stain%in%c('<1', '0') ~ '<1%',
+  ER.stain%in%c('5', '<10', '10') ~ '1-10%',
+  ER.stain%in%c('>10', '30', '50') ~ '11-50%', 
+  ER.stain%in%c('88', '95', '100') ~ '51-100%', 
+  TRUE ~ ER.stain)]
+dat0[which(ER.stain=='<10'), ID] # "ID17" "ID31" "ID83"
+dat0[which(ER.stain=='>10'), ID] # "ID453"
+# ? < 10; ? > 10
+
+dat0[,SBE.PR.cat:=case_when(
+  grepl("^<1|^0$", PR.stain) ~ "<1%", 
+  grepl("^>1$|^1-5$|^2$|^<10$|^<5$", PR.stain) ~ "1-10%", 
+  grepl("^>10$|^15$|^45$|^50$", PR.stain) ~ "11-50%",  
+  grepl("^75$|^95$|^>50$", PR.stain) ~ "51-100%",
+  grepl("^unk", PR.stain) ~ NA,
+  TRUE ~ PR.stain)]
+dat0[which(PR.stain=='>1'), ID] # "ID119" "ID2"   "ID85" 
+dat0[which(PR.stain=='>10'), ID] # "ID453" "ID58" 
+# ? > 1; ? > 10
+
+dat0[,SBE.ER.cat.2:=case_when(
+  SBE.ER.cat=='<1%' ~ '1',
+  SBE.ER.cat=='1-10%' ~ '2',
+  SBE.ER.cat=='11-50%' ~ '3', 
+  SBE.ER.cat=='51-100%' ~ '4', 
+  TRUE ~ SBE.ER.cat) |> as.numeric()]
+
+dat0[,SBE.PR.cat.2:=case_when(
+  SBE.PR.cat=='<1%' ~ '1',
+  SBE.PR.cat=='1-10%' ~ '2',
+  SBE.PR.cat=='11-50%' ~ '3', 
+  SBE.PR.cat=='51-100%' ~ '4', 
+  TRUE ~ SBE.PR.cat)|> as.numeric()]
+
+dat0[,SBE.HR.cat:=case_when(
+  (!is.na(SBE.ER.cat)) & !is.na(SBE.PR.cat) & (SBE.ER.cat.2 >= SBE.PR.cat.2) ~ SBE.ER.cat,
+  (!is.na(SBE.ER.cat)) & !is.na(SBE.PR.cat) & (SBE.ER.cat.2 < SBE.PR.cat.2) ~ SBE.PR.cat,
+  (!is.na(SBE.ER.cat)) & is.na(SBE.PR.cat) ~ SBE.ER.cat,
+  is.na(SBE.ER.cat) & (!is.na(SBE.PR.cat)) ~ SBE.PR.cat,
+  is.na(SBE.ER.cat) & is.na(SBE.PR.cat) ~ NA
+)]
+
 dat0[,Tumor.Size.by.Path:=case_when(Tumor.Size.by.Path == "<0.1" ~ "0.05", Tumor.Size.by.Path == "<1" ~ "0.9", TRUE ~ Tumor.Size.by.Path) |> as.numeric()]
 # typeof(dat0$Tumor.Size.by.Path)
 
@@ -229,24 +263,28 @@ dat0[, Genetic.Testing.Results:=case_when(Genetic.Testing.Results == "BRCA posit
                                           Genetic.Testing.Results == "Ashkenazi Jewish, no breast, ovarian, or colorectal cancers, mat cousin leukemia, father prostate ca" ~ "Unknown",
                                           TRUE ~ Genetic.Testing.Results)]
 
-
 ##------Reorder variables------
 dat0[,First.Treatment.Modality:=factor(First.Treatment.Modality, levels=c("Surgery", "CTX", "XRT", "Declined All Tx", "Deemed Untreatable"))]
 dat0[,Postop.Adjuvant.XRT:=factor(Postop.Adjuvant.XRT, levels=c("Breast XRT", "Breast/Regional XRT", "PMRT", "No"))]
 # sapply(c("First.Treatment.Modality", "Postop.Adjuvant.XRT"), function(x) levels(dat0[[x]]))
+```
 
+```{r clean_data_continue, eval=F}
+##------Recode survival related variables------
 ##------Create HR------
-dat0[,HR:=if_else(condition = (ER=='Positive' | PR=='Positive'), 'Positive', 'Negative', missing = NA)]
+dat0[,HR:=if_else(condition=(ER=='Positive'|PR=='Positive'), 'Positive', 'Negative', missing=NA)]
 
 ##------Create T2SBE/T2Death/T2LFU/T2ER/T2PR/T2HER2/T2HR (in years)------
 dat0[,T2SBE:=as.numeric(as.Date(Date.Subsequent.BC.Event)-as.Date(Date.of.Diagnosis))/365.25]
 dat0[,T2Death:=as.numeric(as.Date(Date.Death)-as.Date(Date.of.Diagnosis))/365.25]
+sum(!is.na(dat0$Date.Death))/length(dat0$Date.Death) # 7.54%
 dat0[,T2LFU:=as.numeric(as.Date(Date.Last.Follow.up)-as.Date(Date.of.Diagnosis))/365.25]
 dat0[ER=="Positive",T2ER:=as.numeric(as.Date(Date.Subsequent.BC.Event)-as.Date(Date.of.Diagnosis))/365.25]
 dat0[PR=="Positive",T2PR:=as.numeric(as.Date(Date.Subsequent.BC.Event)-as.Date(Date.of.Diagnosis))/365.25]
 dat0[HER2=="Positive",T2HER2:=as.numeric(as.Date(Date.Subsequent.BC.Event)-as.Date(Date.of.Diagnosis))/365.25]
 dat0[HR=="Positive",T2HR:=as.numeric(as.Date(Date.Subsequent.BC.Event)-as.Date(Date.of.Diagnosis))/365.25]
-# (sapply(c("T2SBE", "T2Death", "T2LFU", "T2ER", "T2PR", "T2HER2", "T2HR"), function(x) with(dat0, summary(get(x)))))
+dat0[HR=="Negative",T2HR_Neg:=as.numeric(as.Date(Date.Subsequent.BC.Event)-as.Date(Date.of.Diagnosis))/365.25]
+# (sapply(c("T2SBE", "T2Death", "T2LFU", "T2ER", "T2PR", "T2HER2", "T2HR", "T2HR_Neg"), function(x) with(dat0, summary(get(x)))))
 #               T2SBE     T2Death     T2LFU       T2ER       T2PR      T2HER2       T2HR
 # Min.      0.1943874   0.2902122  0.000000   1.023956   1.859001   0.9144422   1.023956
 # 1st Qu.   1.3018480   1.4688569  2.224504   2.648871   3.347707   1.5865845   2.785079
@@ -286,12 +324,6 @@ update_SBE_year <- function(year) {
   dat0[Overall.Subsequent.BC == "No" & is.na(T2LFU), paste0("SBE.", year, "year") := NA] #2
   dat0[is.na(Overall.Subsequent.BC), paste0("SBE.", year, "year") := NA] # 2
 }
-
-# Systematic thinking:
-#1: Unsure in which year SBE occurred
-#2: Unsure if SBE occurred in 3 years
-#2: Unsure if SBE occurred in 3 years
-#2: Unknown SBE status
 
 years <- c(3, 5, 10, 15)
 for (year in years) {
@@ -355,12 +387,6 @@ update_SBE_HR_year <- function(year) {
   dat0[is.na(Overall.Subsequent.BC) | is.na(HR), paste0("SBE.HR.", year, "year") := NA] # 2
 }
 
-# Systematic thinking:
-#1: Unsure in which year SBE+HR+ occurred
-#2: Unsure if SBE+HR+ occurred in 3 years
-#2: Unsure if SBE+HR+ occurred in 3 years
-#2: Unknown SBE+HR+ status
-
 years <- c(3, 5, 10, 15)
 for (year in years) {
   update_SBE_HR_year(year)
@@ -404,6 +430,8 @@ dat0[,SBE.time:=case_when(SBE.event==0&is.na(T2Death)&(!is.na(T2LFU)) ~ T2LFU,
                           SBE.event==0&(!is.na(T2Death))&(!is.na(T2LFU))&(T2Death<T2LFU) ~ T2Death,
                           SBE.event==0&(!is.na(T2Death))&(!is.na(T2LFU))&(T2Death>=T2LFU) ~ T2LFU,
                           SBE.event==1 ~ T2SBE)]
+sum(dat0$SBE.time == dat0$T2Death, na.rm = T) # 30
+dat0$ID[which(dat0$SBE.time == dat0$T2Death)]
 # summary(dat0$SBE.time)
 
 
@@ -474,6 +502,7 @@ dat0[,SBE.HR:=case_when(SBE.event==1&HR=="Positive" ~ "SBEYesHRPos",
 # SBEYesERNeg     69     75       82     65
 # <NA>            18     18       27     18
 
+
 ##------Create SBE.ER.time/SBE.PR.time/SBE.HER2.time/SBE.HR.time (for cumulative incidence function)------
 # When to use which()?
 # with(dat0, SBE.event==1&(is.na(ER)))
@@ -497,6 +526,16 @@ dat0[which(SBE.event==1&(is.na(HER2))),SBE.HER2.time:=NA]
 
 dat0[,SBE.HR.time:=SBE.time]
 dat0[which(SBE.event==1&(is.na(HR))),SBE.HR.time:=NA]
+
+dat0$ID[which(dat0$SBE.ER.time == dat0$T2Death)]
+dat0$ID[which(dat0$SBE.PR.time == dat0$T2Death)]
+dat0$ID[which(dat0$SBE.HER2.time == dat0$T2Death)]
+dat0$ID[which(dat0$SBE.HR.time == dat0$T2Death)]
+dat0$ER[which(dat0$SBE.ER.time == dat0$T2Death)]
+dat0$PR[which(dat0$SBE.PR.time == dat0$T2Death)]
+dat0$HER2[which(dat0$SBE.HER2.time == dat0$T2Death)]
+dat0$HR[which(dat0$SBE.HR.time == dat0$T2Death)]
+
 
 sapply(c("SBE.ER", "SBE.ER.time", "SBE.PR", "SBE.PR.time", "SBE.HER2", "SBE.HER2.time", "SBE.HR", "SBE.HR.time"), function(x) with(dat0, sum(!is.na(get(x)))))
 # SBE.ER   SBE.ER.time        SBE.PR   SBE.PR.time      SBE.HER2 SBE.HER2.time        SBE.HR   SBE.HR.time 
@@ -544,8 +583,10 @@ all.char <- sapply(names(dat0)[sapply(dat0, is.character)], function(x) with(dat
 all.fac <- sapply(names(dat0)[sapply(dat0, is.factor)], function(x) with(dat0, table(get(x), useNA = "ifany"))) 
 all.cat <- list(all.char, all.fac)
 View(all.cat)
+```
 
 
+```{r save_data, eval=F}
 ##------Save the cleaned data------
 date.analysis <- format(Sys.Date(), "%Y%b%d")
 write_fst(dat0, path = paste0("../data/derived/", date.analysis, "_dat_TNBC.RData"), compress = 50)
@@ -559,7 +600,7 @@ for (i in 1:2) {
 
 
 ```{r}
-dat.work <- read_fst(path = "../data/derived/2024Aug08_dat_TNBC.RData")
+dat.work <- read_fst(path = "../data/derived/2024Nov22_dat_TNBC.RData")
 ```
 
 
@@ -581,7 +622,7 @@ vars.all <- c(
   ###. Screening/diagnosis/treatment variables
   "Mammo.Screen.Detected", "Mammo.Occult", "MRI.Screen.Detected", 
   "First.Treatment.Modality", "Any.Attempt.at.Lumpectomy", "Mastectomy.Surgery",
-  "CPM", "Any.SLN.Biopsy", "ALND",
+  "CPM", "Any.SLN.Biopsy", "ALND", # CPM: contralateral prophylactic mastectomy
   "If.Primary.Surgery.pT.Stage", "If.Primary.Surgery.pN.Stage",
   "Neoadjuvant.Chemotherapy",
   "In.NACT.did.pt.complete.all.planned.preop.CTX",
@@ -594,13 +635,15 @@ vars.all <- c(
   "Postop.Adjuvant.CTX",
   "If.Postop.Adjuvant.CTX.did.pt.complete.all.planned.postop.CTX",
   "Postop.Adjuvant.XRT",
+  "Genetic.Testing.Results",
   "Genetic.Testing.Done",
   
   ### Outcome-related variables
   "Histology.Subsequent", "Laterality.Subsequent",
   "SBE.event", "SBE.3year", "SBE.5year", "SBE.10year", "SBE.15year",
   "SBE.HR.3year", "SBE.HR.5year", "SBE.HR.10year", "SBE.HR.15year",
-  "ER", "PR", "HER2", "HR", "SBE.ER", "SBE.PR", "SBE.HER2", "SBE.HR",
+  "ER", "PR", "HER2", "HR", "SBE.ER.cat", "SBE.PR.cat", "SBE.HR.cat",
+  "SBE.ER", "SBE.PR", "SBE.HER2", "SBE.HR",
   "T2SBE", "T2ER", "T2PR", "T2HER2", "T2HR", "T2LFU", "T2Death", 
   "SBE.time", "SBE.ER.time", "SBE.PR.time", "SBE.HER2.time", "SBE.HR.time" # Time variables for survival analysis
 )
@@ -683,18 +726,6 @@ var.dat.SBE <- c("dat.SBE.ER", "dat.SBE.PR", "dat.SBE.HER2", "dat.SBE.HR")
 
 ##------Check the distributions of each survival time------
 sapply(var.time.SBE, function(x) with(dat.work, summary(get(x))))
-
-
-##------Set the customized theme for all plots------
-theme_set(theme_classic())
-theme_update(
-  legend.position = "bottom",
-  strip.background = element_blank(),
-  axis.text = element_text(size = 10),
-  axis.title = element_text(size = 12),
-  legend.text = element_text(size = 10))
-theme.list <- theme_get()
-
 
 ##------Estimate CIF and make plots------
 out.i.SBE <- mclapply(1:4,
@@ -858,6 +889,80 @@ future_lapply(1:1, function(i) {
 knitr::kable(out.i[[1]][["out"]])
 cat("\n")
 knitr::include_graphics(dir.fig %0% "SBE" %0% ".tiff")
+```
+
+
+# Distributions of overall survival
+## Probability of the overall survival in 1, 2, 3, 5, 10 and 15 years
+```{r km_os_analysis, results='hide'}
+##------Summarize OS probability estimates and 95%CIs at years 1, 2, 3, 5, 10, and 15------
+# 0=alive, 1=dead
+dat.work$OS.death <- case_when(!is.na(dat.work$T2Death) ~ 1, 
+                               is.na(dat.work$T2Death) & !is.na(dat.work$T2LFU) == 1 ~ 0,
+                               is.na(dat.work$T2LFU) & is.na(dat.work$T2Death) ~ NA) |> as.numeric() 
+dat.work$OS.time <- case_when(dat.work$OS.death==1 ~ dat.work$T2Death, 
+                              dat.work$OS.death==0 ~ dat.work$T2LFU,
+                              is.na(dat.work$OS.death) ~ NA) |> as.numeric() 
+
+var.time <- c('OS.time')
+var.event <- c('OS.death')
+out.i <- mclapply(1:1,
+                  function(i){ 
+                    fit.i <- survfit2(formula(paste0("Surv(", var.time[i], ", ", var.event[i], ") ~ 1")), data = dat.work) 
+                    res.i <- summary(fit.i, times = c(1, 2, 3, 5, 10, 15)) 
+                    out.i <- data.frame(time = res.i$time, 
+                                        n.risk = res.i$n.risk, 
+                                        estimate = res.i$surv, # 
+                                        std.error = res.i$std.err, 
+                                        conf.low = res.i$lower, # 
+                                        conf.high = res.i$upper) %>% #
+                      mutate(across(.cols = c(estimate, std.error, conf.low, conf.high), num, digits = 4))
+                    
+                    ##------Show survival probability up to 24 years------
+                    # out.i[[1]][["fit"]]|>View()
+                    fit.i.enhanced <- fit.i
+                    fit.i.enhanced$time <- c(fit.i.enhanced$time, 24)
+                    fit.i.enhanced$n.risk <- c(fit.i.enhanced$n.risk, fit.i.enhanced$n.risk[length(fit.i.enhanced$n.risk)-1])
+                    fit.i.enhanced$n.event <- c(fit.i.enhanced$n.event, fit.i.enhanced$n.event[length(fit.i.enhanced$n.event)-1])
+                    fit.i.enhanced$n.censor <- c(fit.i.enhanced$n.censor, fit.i.enhanced$n.censor[length(fit.i.enhanced$n.censor)-1])
+                    fit.i.enhanced$surv <- c(fit.i.enhanced$surv, fit.i.enhanced$surv[length(fit.i.enhanced$surv)-1])
+                    fit.i.enhanced$std.err <- c(fit.i.enhanced$std.err, fit.i.enhanced$std.err[length(fit.i.enhanced$std.err)-1])
+                    fit.i.enhanced$cumhaz <- c(fit.i.enhanced$cumhaz, fit.i.enhanced$cumhaz[length(fit.i.enhanced$cumhaz)-1])
+                    fit.i.enhanced$std.chaz <- c(fit.i.enhanced$std.chaz, fit.i.enhanced$std.chaz[length(fit.i.enhanced$std.chaz)-1])
+                    fit.i.enhanced$lower <- c(fit.i.enhanced$lower, fit.i.enhanced$lower[length(fit.i.enhanced$lower)-1])    
+                    fit.i.enhanced$upper <- c(fit.i.enhanced$upper, fit.i.enhanced$upper[length(fit.i.enhanced$upper)-1])
+                    plot.i <- ggsurvfit(x = fit.i.enhanced,
+                                        type = "survival", #
+                                        color = c("#A73030FF"),
+                                        theme = list(theme.list)) +
+                      add_risktable() +
+                      ggplot2::scale_x_continuous(limits = c(0, 24),
+                                                  breaks = c(seq(0, 24, 3), 24), 
+                                                  labels = c(seq(0, 24, 3), 24)) +
+                      ggplot2::scale_y_continuous(labels = scales::label_number(accuracy = 0.01),
+                                                  breaks = seq(0, 1, 0.2),
+                                                  limits = c(0, 1)) + 
+                      ggplot2::labs(x = "Year", y = "Survival probability")
+                    return(list(fit = fit.i, res = res.i, out = out.i, plot = plot.i))},
+                  mc.cores = 4)
+
+dir.fig <- "../report/figs_2024Nov24/"
+fig.name <- c('OS_Death')
+plan(multisession) 
+future_lapply(1:1, function(i) {
+  R.devices::suppressGraphics({
+    ggsave(filename = dir.fig %0% fig.name[i] %0% ".tiff", 
+           plot = out.i[[i]][["plot"]],
+           device = "tiff", # agg_png
+           width = 5, height = 4, units = "in", dpi = 300)})
+})
+```
+
+
+```{r}
+knitr::include_graphics(dir.fig %0% "OS_Death" %0% ".tiff")
+knitr::kable(out.i[[1]][["out"]])
+cat("\n")
 ```
 
 
