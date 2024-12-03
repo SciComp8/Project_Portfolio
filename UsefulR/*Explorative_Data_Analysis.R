@@ -29,3 +29,9 @@ plot(hist_data, freq = TRUE, breaks=50,
      ylab = "log2 (rrequency)",
      xlab = "Peak ratio",
      ylim = c(0, max(hist_data$counts))) # Adjust ylim based on transformed frequencies
+
+# Quick code using base R functions
+airquality #dataset from New York Air Quality Measurements
+attach(airquality) 
+hist(Temp)
+pairs(airquality[, 1:4]) #plot all possible pairwise scatterplots
