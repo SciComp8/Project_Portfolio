@@ -1,4 +1,4 @@
-threshold <- 5000
+threshold <- 5000 
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
 var.vec <- c("BMI", "AGE", "SEX", "MHABNWBC")
 date.analysis <- format(Sys.Date(), "%Y%b%d")
