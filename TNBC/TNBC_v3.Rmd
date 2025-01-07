@@ -47,7 +47,7 @@ theme_set(theme_classic())
 theme_update(
   legend.position = "bottom",
   strip.background = element_blank(),
-  axis.text = element_text(size = 10),
+  axis.text = element_text(size = 10, color = 'black'), # 
   axis.title = element_text(size = 12),
   legend.text = element_text(size = 10))
 theme.list <- theme_get()
@@ -644,7 +644,7 @@ vars.all <- c(
   "SBE.HR.3year", "SBE.HR.5year", "SBE.HR.10year", "SBE.HR.15year",
   "ER", "PR", "HER2", "HR", "SBE.ER.cat", "SBE.PR.cat", "SBE.HR.cat",
   "SBE.ER", "SBE.PR", "SBE.HER2", "SBE.HR",
-  "T2SBE", "T2ER", "T2PR", "T2HER2", "T2HR", "T2HR_Neg", "T2LFU", "T2Death", 
+  "T2SBE", "T2ER", "T2PR", "T2HER2", "T2HR", "T2LFU", "T2Death", 
   "SBE.time", "SBE.ER.time", "SBE.PR.time", "SBE.HER2.time", "SBE.HR.time" # Time variables for survival analysis
 )
 
@@ -751,26 +751,27 @@ out.i.SBE <- mclapply(1:4,
                            outcome = names(table(dat.work[[var.event.SBE[i]]]))[-1],
                            color = c("#A73030FF"),
                            theme = list(theme.list)) +
-                   add_risktable() +
+                  add_risktable(stats_label = c('No. At Risk', 
+                                                'No. Of Events')) + #
                    ggplot2::scale_x_continuous(limits = c(0, 24),
                                                breaks = c(seq(0, 24, 3)), 
                                                labels = c(seq(0, 24, 3))) +
-                   ggplot2::scale_y_continuous(labels = scales::label_number(accuracy = 0.01),
+                   ggplot2::scale_y_continuous(labels = scales::label_number(scale = 100), # Convert to %
                                                breaks = seq(0, 1, 0.2),
                                                limits = c(0, 1)) + 
-                   ggplot2::labs(x = "Year", y = "Probability")
+                   ggplot2::labs(x = "Years Since TNBC Diagnosis", y = "SBE Probability, %")
     return(list(est = est.i.SBE, est.timepoint = est.i.SBE.timepoint, curve = plot.i.SBE)) 
     },
   mc.cores = 4)
 
-dir.fig <- "../report/figs_2024Aug08/"
+dir.fig <- "../report/figs_2025Jan06/"
 fig.name <- c("SBE_ER", "SBE_PR", "SBE_HER2", "SBE_HR")
 plan(multisession)
 future_lapply(1:4, function(i) {
   R.devices::suppressGraphics({
-    ggsave(filename = dir.fig %0% fig.name[i] %0% ".tiff", 
+    ggsave(filename = dir.fig %0% fig.name[i] %0% ".eps", 
     plot = out.i.SBE[[i]][["curve"]],
-    device = "tiff", # agg_png
+    device = "eps", # agg_png
     width = 5, height = 4, units = "in", dpi = 300)})
 })
 ```
@@ -799,7 +800,7 @@ cat("\n")
 knitr::include_graphics(dir.fig %0% "SBE_HER2" %0% ".tiff")
 ```
 
-## Cumulative incidence rates of HR-specific subsequent breast cancer events
+## [Fig2] Cumulative incidence rates of HR-specific subsequent breast cancer events
 ```{r}
 knitr::kable(out.i.SBE[[4]][["est.timepoint"]])
 cat("\n")
@@ -816,11 +817,11 @@ fisher.test(data, conf.level = 0.95, alternative = "two.sided")
 ```
 
 # Distributions of follow-up time, time to overall subsequent breast cancer events, and other time
-The variables `T2LFU` (follow-up time), `T2SBE` (time to the overall subsequent breast cancer events), and `T2Death` (time to the death) are estimated by subtracting the date of diagnosis from the date of last follow-up, from the date of overall subsequent breast cancer events, or from the date of death, respectively. The variables `T2ER` (time to the ER-positive subsequent breast cancer events), `T2PR` (time to the PR-positive subsequent breast cancer events), `T2HER2` (time to the HER2-positive subsequent breast cancer events), `T2HR` (time to the HR-positive subsequent breast cancer events), `T2HR_Neg` (time to the HR-negative subsequent breast cancer events) are estimated by subtracting the date of diagnosis from the date of overall subsequent breast cancer events in the patients with ER-positive, PR-positive, HER2-positive, HR-positive, or HR-negative subsequent breast cancer events, respectively.
+The variables `T2LFU` (follow-up time), `T2SBE` (time to the overall subsequent breast cancer events), and `T2Death` (time to the death) are estimated by subtracting the date of diagnosis from the date of last follow-up, from the date of overall subsequent breast cancer events, or from the date of death, respectively. The variables `T2ER` (time to the ER-positive subsequent breast cancer events), `T2PR` (time to the PR-positive subsequent breast cancer events), `T2HER2` (time to the HER2-positive subsequent breast cancer events), `T2HR` (time to the HR-positive subsequent breast cancer events) are estimated by subtracting the date of diagnosis from the date of overall subsequent breast cancer events in the patients with ER-positive, PR-positive, HER2-positive, or HR-positive subsequent breast cancer events, respectively.
 
 As the following table shows, the median of follow-up time in the entire cohort is `r median(dat.work$T2LFU, na.rm = T) |> round(2)` (in years), and the median time to the overall subsequent breast cancer events from the initial diagnosis of TNBC is `r median(dat.work$T2SBE, na.rm = T) |> round(2)` (in years).
 ```{r}
-sapply(c("T2LFU", "T2SBE", "T2Death", "T2ER", "T2PR", "T2HER2", "T2HR", "T2HR_Neg"), function(x) with(dat.work, c(summary(get(x)), `SD` = sd(get(x), na.rm = T)) |> round(2))) |> knitr::kable()
+sapply(c("T2LFU", "T2SBE", "T2Death", "T2ER", "T2PR", "T2HER2", "T2HR"), function(x) with(dat.work, c(summary(get(x)), `SD` = sd(get(x), na.rm = T)) |> round(2))) |> knitr::kable()
 ```
 
 
@@ -828,7 +829,7 @@ sapply(c("T2LFU", "T2SBE", "T2Death", "T2ER", "T2PR", "T2HER2", "T2HR", "T2HR_Ne
 Among `r nrow(dat.work)` patients, a total of `r sum(dat.work$Overall.Subsequent.BC=="Yes"&(!is.na(dat.work$T2SBE)))` patients manifest the overall subsequent breast cancer events. These patients have both dates of initial TNBC diagnosis and subsequent breast cancer event diagnosis.
 
 
-## Incidence rates of the overall subsequent breast cancer events in 1, 2, 3, 5, 10 and 15 years
+## [Fig1] Incidence rates of the overall subsequent breast cancer events in 1, 2, 3, 5, 10 and 15 years
 ```{r km_analysis_nomarker, results='hide'}
 ##------Estimate the incidence rates of SBE------
 var.time <- c("SBE.time")
@@ -862,24 +863,26 @@ out.i <- mclapply(1:1,
                         type = "risk",
                         color = c("#A73030FF"),
                         theme = list(theme.list)) +
-                add_risktable() +
+                add_risktable(stats_label = c('No. At Risk', 
+                                              'No. Of Events')) + #
                 ggplot2::scale_x_continuous(limits = c(0, 24),
                                             breaks = c(seq(0, 24, 3), 24), 
                                             labels = c(seq(0, 24, 3), 24)) +
-                ggplot2::scale_y_continuous(labels = scales::label_number(accuracy = 0.01),
+                ggplot2::scale_y_continuous(labels = scales::label_number(scale = 100), # Convert to %
                                             breaks = seq(0, 1, 0.2),
                                             limits = c(0, 1)) + 
-                ggplot2::labs(x = "Year", y = "Probability")
+                ggplot2::labs(x = "Years Since TNBC Diagnosis", y = "SBE Probability, %") #
     return(list(fit = fit.i, res = res.i, out = out.i, plot = plot.i))},
   mc.cores = 4)
 
+dir.fig <- "../report/figs_2025Jan06/" #
 fig.name <- c("SBE")
 plan(multisession) 
 future_lapply(1:1, function(i) {
   R.devices::suppressGraphics({
-    ggsave(filename = dir.fig %0% fig.name[i] %0% ".tiff", 
+    ggsave(filename = dir.fig %0% fig.name[i] %0% ".eps", 
     plot = out.i[[i]][["plot"]],
-    device = "tiff", # agg_png
+    device = "eps", # agg_png
     width = 5, height = 4, units = "in", dpi = 300)})
 })
 ```
@@ -939,21 +942,21 @@ out.i <- mclapply(1:1,
                       ggplot2::scale_x_continuous(limits = c(0, 24),
                                                   breaks = c(seq(0, 24, 3), 24), 
                                                   labels = c(seq(0, 24, 3), 24)) +
-                      ggplot2::scale_y_continuous(labels = scales::label_number(accuracy = 0.01),
+                      ggplot2::scale_y_continuous(labels = scales::label_number(scale = 100),
                                                   breaks = seq(0, 1, 0.2),
                                                   limits = c(0, 1)) + 
-                      ggplot2::labs(x = "Year", y = "Survival probability")
+                      ggplot2::labs(x = "Years Since Triple Negative Breast Cancer Diagnosis", y = "Survival probability, %")
                     return(list(fit = fit.i, res = res.i, out = out.i, plot = plot.i))},
                   mc.cores = 4)
 
-dir.fig <- "../report/figs_2024Nov24/"
+dir.fig <- "../report/figs_2025Jan06/"
 fig.name <- c('OS_Death')
 plan(multisession) 
 future_lapply(1:1, function(i) {
   R.devices::suppressGraphics({
-    ggsave(filename = dir.fig %0% fig.name[i] %0% ".tiff", 
+    ggsave(filename = dir.fig %0% fig.name[i] %0% ".eps", 
            plot = out.i[[i]][["plot"]],
-           device = "tiff", # agg_png
+           device = "eps", # agg_png
            width = 5, height = 4, units = "in", dpi = 300)})
 })
 ```
