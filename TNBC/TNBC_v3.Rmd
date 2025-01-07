@@ -111,7 +111,7 @@ The overall subsequent breast cancer events free survival composed of variables 
 
 The overall subsequent breast cancer events at 3, 5, 10, and 15 years represented by the variables `SBE.3year`, `SBE.5year`, `SBE.10year`, and `SBE.15year` are evaluated among patients who develop the event of interest within 3, 5, 10, or 15 years from the diagnosis of TNBC and patients who are at risk at the 3rd, 5th, 10th, or 15th year from the diagnosis of TNBC, respectively.
 
-We use the cumulative incidence function through the Aalen-Johansen estimator, which considers the competing risk between the positive marker and the negative marker (e.g., ER positive vs ER negative), to estimate the cumulative incidence rates of ER-specific, PR-specific, HER2-specific, , HR-specific subsequent breast cancer events in 1, 2, 3, 5, 10, and 15 years, respectively. We use the one minus Kaplan-Meier estimator to estimate the incidence rates of the overall subsequent breast cancer events in 1, 2, 3, 5, 10, and 15 years, respectively. 
+We use the cumulative incidence function, which considers the competing risk between the positive marker and the negative marker (e.g., ER positive vs ER negative), to estimate the cumulative incidence rates of ER-specific, PR-specific, HER2-specific, , HR-specific subsequent breast cancer events in 1, 2, 3, 5, 10, and 15 years, respectively. We use the Kaplan-Meier estimator to estimate the incidence rates of the overall subsequent breast cancer events in 1, 2, 3, 5, 10, and 15 years, respectively. 
 
 The association between a categorical variable and a grouping variable (e.g., `Race.Ethnicity2`) is examined using the Fisher's exact test. The difference in the value of a continuous variable among patients of different groups is examined using the Wilcoxon rank sum test (for two groups comparison) or Kruskal Wallis rank sum test (for more than two groups comparison). Notice that the p-value for the Wilcoxon rank sum test or Kruskal Wallis rank sum test is aligned with the median (IQR) summaries in a summary table. For variable with missing values, the difference in the proportion of missingness across different groups is also examined using the Fisher's exact test. 
 
@@ -644,7 +644,7 @@ vars.all <- c(
   "SBE.HR.3year", "SBE.HR.5year", "SBE.HR.10year", "SBE.HR.15year",
   "ER", "PR", "HER2", "HR", "SBE.ER.cat", "SBE.PR.cat", "SBE.HR.cat",
   "SBE.ER", "SBE.PR", "SBE.HER2", "SBE.HR",
-  "T2SBE", "T2ER", "T2PR", "T2HER2", "T2HR", "T2LFU", "T2Death", 
+  "T2SBE", "T2ER", "T2PR", "T2HER2", "T2HR", "T2HR_Neg", "T2LFU", "T2Death", 
   "SBE.time", "SBE.ER.time", "SBE.PR.time", "SBE.HER2.time", "SBE.HR.time" # Time variables for survival analysis
 )
 
@@ -730,7 +730,7 @@ sapply(var.time.SBE, function(x) with(dat.work, summary(get(x))))
 ##------Estimate CIF and make plots------
 out.i.SBE <- mclapply(1:4,
   function(i){ 
-    est.i.SBE <- cuminc(
+    est.i.SBE <- cuminc( # Use Aalen-Johansen Estimator
       formula(paste0("Surv(", var.time.SBE[i], ", ", var.event.SBE[i], ") ~ 1")), 
       data = get(var.dat.SBE[i]), conf.level = 0.95)
     
@@ -816,11 +816,11 @@ fisher.test(data, conf.level = 0.95, alternative = "two.sided")
 ```
 
 # Distributions of follow-up time, time to overall subsequent breast cancer events, and other time
-The variables `T2LFU` (follow-up time), `T2SBE` (time to the overall subsequent breast cancer events), and `T2Death` (time to the death) are estimated by subtracting the date of diagnosis from the date of last follow-up, from the date of overall subsequent breast cancer events, or from the date of death, respectively. The variables `T2ER` (time to the ER-positive subsequent breast cancer events), `T2PR` (time to the PR-positive subsequent breast cancer events), `T2HER2` (time to the HER2-positive subsequent breast cancer events), `T2HR` (time to the HR-positive subsequent breast cancer events) are estimated by subtracting the date of diagnosis from the date of overall subsequent breast cancer events in the patients with ER-positive, PR-positive, HER2-positive, or HR-positive subsequent breast cancer events, respectively.
+The variables `T2LFU` (follow-up time), `T2SBE` (time to the overall subsequent breast cancer events), and `T2Death` (time to the death) are estimated by subtracting the date of diagnosis from the date of last follow-up, from the date of overall subsequent breast cancer events, or from the date of death, respectively. The variables `T2ER` (time to the ER-positive subsequent breast cancer events), `T2PR` (time to the PR-positive subsequent breast cancer events), `T2HER2` (time to the HER2-positive subsequent breast cancer events), `T2HR` (time to the HR-positive subsequent breast cancer events), `T2HR_Neg` (time to the HR-negative subsequent breast cancer events) are estimated by subtracting the date of diagnosis from the date of overall subsequent breast cancer events in the patients with ER-positive, PR-positive, HER2-positive, HR-positive, or HR-negative subsequent breast cancer events, respectively.
 
 As the following table shows, the median of follow-up time in the entire cohort is `r median(dat.work$T2LFU, na.rm = T) |> round(2)` (in years), and the median time to the overall subsequent breast cancer events from the initial diagnosis of TNBC is `r median(dat.work$T2SBE, na.rm = T) |> round(2)` (in years).
 ```{r}
-sapply(c("T2LFU", "T2SBE", "T2Death", "T2ER", "T2PR", "T2HER2", "T2HR"), function(x) with(dat.work, c(summary(get(x)), `SD` = sd(get(x), na.rm = T)) |> round(2))) |> knitr::kable()
+sapply(c("T2LFU", "T2SBE", "T2Death", "T2ER", "T2PR", "T2HER2", "T2HR", "T2HR_Neg"), function(x) with(dat.work, c(summary(get(x)), `SD` = sd(get(x), na.rm = T)) |> round(2))) |> knitr::kable()
 ```
 
 
