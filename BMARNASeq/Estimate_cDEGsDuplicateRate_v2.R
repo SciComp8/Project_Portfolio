@@ -1,6 +1,7 @@
 # Update on Estimate_cDEGsDuplicateRate_v1.R: 
 # To make the function `duplicate_rate_cDEGs_per_variable()` compatible with all modeling scenariors (univariable, multivariable, and interaction across all approaches),
 # an argument named `model.type` is added.
+# Rediscovery rate
 
 cDEGs = cDEGs.list = NULL
 threshold.vec <- seq(1000, 5000, 1000)
