@@ -5,7 +5,6 @@
 # The overall duplicate rate of common differentially expressed genes associated with a variable is estimated by 
 # taking the median of duplicated rates of all common differentially expressed genes associated with a variable within the particular ranking threshold
 
-
 cDEGs = cDEGs.list = NULL
 threshold.vec <- seq(1000, 5000, 1000)
 seed.vec <- c(8809678, 98907, 233, 556, 7890, 120, 2390, 778, 666, 99999)
