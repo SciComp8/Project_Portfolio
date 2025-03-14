@@ -1,4 +1,4 @@
-var.name <- c("BMI")
+var.name <- "BMI"
 
 easypackages::libraries("BMAseq", "limma", "qvalue", "parallel", "tidyverse", 
                         "edgeR", "DESeq2", "data.table", "ggVennDiagram", "gridExtra", 
