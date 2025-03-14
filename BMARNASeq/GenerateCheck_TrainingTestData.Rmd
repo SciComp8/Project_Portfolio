@@ -27,7 +27,7 @@ knitr::opts_chunk$set(
 # Save and load images
 ```{r save.image, eval=FALSE}
 image.date <- format(Sys.Date(), "%Y%b%d")
-save.image(file = paste0("../ApplicationData/derived/", image.date, "_checkdata_image_ALiu.RData"))
+save.image(file = paste0("../ApplicationData/derived/", image.date, "_checkdata_image.RData"))
 ```
 
 ```{r load.image}
