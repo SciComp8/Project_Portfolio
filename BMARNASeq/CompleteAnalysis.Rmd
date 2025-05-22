@@ -1,6 +1,5 @@
 ---
 title: "Assessment of multi-model BMAseq and other single-model approaches on inferring robust differentially expressed genes"
-author: "Anni Liu"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output: rmarkdown::html_vignette
 ---
